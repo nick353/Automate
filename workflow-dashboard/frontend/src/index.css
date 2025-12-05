@@ -1,0 +1,247 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Light Mode Theme */
+    --background: 0 0% 100%; /* White */
+    --foreground: 240 10% 3.9%; /* Dark Grey */
+
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+
+    --primary: 168 100% 35%; /* Darker Cyan for Light Mode contrast */
+    --primary-foreground: 0 0% 98%;
+
+    --secondary: 275 80% 50%; /* Purple */
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+
+    --accent: 340 100% 50%; /* Neon Red */
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 168 100% 35%;
+
+    --radius: 0.25rem;
+    
+    --neon-glow: 0 0 10px rgba(0, 200, 160, 0.3), 0 0 20px rgba(0, 200, 160, 0.1);
+  }
+
+  .dark {
+    /* 
+      Cyberpunk / Futuristic "Data Nexus" Theme
+      Void Black, Neon Accents, Digital Noise
+    */
+    --background: 0 0% 2%; /* #050505 Void Black */
+    --foreground: 180 100% 90%; /* Pale Cyan for text */
+
+    --card: 0 0% 5%; /* Slightly lighter black */
+    --card-foreground: 180 100% 90%;
+
+    --popover: 0 0% 5%;
+    --popover-foreground: 180 100% 90%;
+
+    --primary: 168 100% 50%; /* #00FFCC Cyber Cyan */
+    --primary-foreground: 0 0% 0%;
+
+    --secondary: 275 100% 50%; /* #BC13FE Matrix Purple */
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 240 5% 10%;
+    --muted-foreground: 240 5% 60%;
+
+    --accent: 340 100% 50%; /* #FF0055 Neon Red */
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 340 100% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 168 100% 20%; /* Dim Cyan Border */
+    --input: 240 5% 10%;
+    --ring: 168 100% 50%;
+
+    --neon-glow: 0 0 10px theme('colors.cyber.cyan'), 0 0 20px theme('colors.cyber.cyan');
+  }
+}
+
+@layer base {
+  * {
+    border-color: hsl(var(--border));
+  }
+  body {
+    @apply antialiased bg-background text-foreground transition-colors duration-300;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    overflow-x: hidden;
+  }
+  
+  /* Custom Scrollbar - Adaptive */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-muted;
+  }
+  .dark ::-webkit-scrollbar-track {
+    background: #050505;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-primary/50 rounded-[4px] border-2 border-background;
+  }
+  .dark ::-webkit-scrollbar-thumb {
+    background: #00FFCC; 
+    border-color: #050505;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-accent;
+  }
+}
+
+@layer utilities {
+  /* Cyber Glass - Adaptive */
+  .glass {
+    @apply backdrop-blur-md shadow-lg transition-all duration-300;
+    @apply bg-white/60 border-white/20 shadow-black/5; 
+  }
+  
+  .dark .glass {
+    background-color: rgba(5, 5, 5, 0.6);
+    border: 1px solid rgba(0, 255, 204, 0.2);
+    box-shadow: 0 0 15px rgba(0, 255, 204, 0.1);
+  }
+
+  .glass-card {
+    @apply backdrop-blur-md shadow-lg transition-all duration-300 relative overflow-hidden;
+    @apply bg-white/80 border-gray-200;
+  }
+
+  .dark .glass-card {
+    background-color: rgba(10, 10, 10, 0.7);
+    border: 1px solid rgba(0, 255, 204, 0.15);
+  }
+  
+  /* Loading bar effect - only show in dark mode or make adaptive */
+  .glass-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 2px;
+    background: linear-gradient(90deg, transparent, hsl(var(--primary)), transparent);
+    transform: translateX(-100%);
+    transition: transform 0.5s ease;
+    opacity: 0;
+  }
+  
+  .dark .glass-card::before {
+    opacity: 1;
+    background: linear-gradient(90deg, transparent, #00FFCC, transparent);
+  }
+  
+  .glass-card:hover {
+    @apply border-primary/50 shadow-lg;
+  }
+  
+  .dark .glass-card:hover {
+    border-color: rgba(0, 255, 204, 0.5);
+    box-shadow: 0 0 20px rgba(0, 255, 204, 0.2);
+  }
+  
+  .glass-card:hover::before {
+    transform: translateX(100%);
+    transition: transform 0.8s ease;
+  }
+
+  /* Text Gradient */
+  .text-gradient {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(to right, hsl(var(--primary)), hsl(var(--secondary)));
+  }
+  
+  .text-neon {
+    text-shadow: 0 0 5px hsl(var(--primary) / 0.5);
+  }
+  
+  .dark .text-neon {
+    text-shadow: 0 0 5px rgba(0, 255, 204, 0.5), 0 0 10px rgba(0, 255, 204, 0.3);
+  }
+
+  /* Glitch Effect Utility */
+  .glitch-hover:hover {
+    animation: glitch 0.3s cubic-bezier(.25, .46, .45, .94) both infinite;
+  }
+
+  @keyframes glitch {
+    0% { transform: translate(0) }
+    20% { transform: translate(-2px, 2px) }
+    40% { transform: translate(-2px, -2px) }
+    60% { transform: translate(2px, 2px) }
+    80% { transform: translate(2px, -2px) }
+    100% { transform: translate(0) }
+  }
+}
+
+/* Component Overrides */
+@layer components {
+  .card {
+    @apply glass-card rounded-lg; /* Sharp corners */
+  }
+  
+  .card-header {
+    @apply px-6 py-4 border-b flex items-center justify-between;
+    @apply border-border;
+  }
+  .dark .card-header {
+    @apply border-white/10;
+  }
+  
+  .card-body {
+    @apply p-6;
+  }
+
+  /* Cyber Buttons */
+  .btn {
+    @apply px-4 py-2 rounded-sm font-bold uppercase tracking-wider transition-all duration-200 
+           focus:outline-none focus:ring-1 focus:ring-primary relative overflow-hidden;
+  }
+  
+  .btn-primary {
+    @apply bg-primary/10 text-primary-700 border border-primary/30 hover:bg-primary/20 hover:shadow-md;
+  }
+  .dark .btn-primary {
+    @apply bg-cyan-500/20 text-cyan-400 border-cyan-500/50 hover:bg-cyan-500/40 hover:shadow-[0_0_15px_rgba(6,182,212,0.5)];
+  }
+  
+  .btn-secondary {
+    @apply bg-secondary/10 text-secondary-700 border border-secondary/30 hover:bg-secondary/20;
+  }
+  .dark .btn-secondary {
+    @apply bg-purple-500/20 text-purple-400 border-purple-500/50 hover:bg-purple-500/40 hover:shadow-[0_0_15px_rgba(168,85,247,0.5)];
+  }
+
+  .btn-danger {
+    @apply bg-destructive/10 text-destructive border border-destructive/30 hover:bg-destructive/20;
+  }
+  .dark .btn-danger {
+    @apply bg-red-500/20 text-red-400 border-red-500/50 hover:bg-red-500/40 hover:shadow-[0_0_15px_rgba(239,68,68,0.5)];
+  }
+  
+  .input {
+    @apply w-full px-4 py-2 rounded-sm transition-all;
+    @apply bg-muted/50 border border-input text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/50;
+  }
+  .dark .input {
+    @apply bg-black/50 border-white/20 text-cyan-100 focus:border-cyan-400 focus:ring-cyan-400/50 placeholder:text-white/20;
+  }
+}

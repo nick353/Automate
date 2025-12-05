@@ -1,0 +1,119 @@
+import axios from 'axios'
+
+// #region agent log
+const debugLog = (location, message, data = null, hypothesisId = null) => {
+  try {
+    fetch('http://127.0.0.1:7242/ingest/8177f6f9-bb3b-423b-ae2e-b3e291c71be2', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        location: location,
+        message: message,
+        data: data || {},
+        timestamp: Date.now(),
+        sessionId: 'debug-session',
+        runId: 'run1',
+        hypothesisId: hypothesisId || 'F'
+      })
+    }).catch(() => {});
+  } catch (e) {}
+};
+// #endregion
+
+const api = axios.create({
+  baseURL: '/api',
+  headers: {
+    'Content-Type': 'application/json'
+  }
+})
+
+// リクエストインターセプター
+api.interceptors.request.use(
+  (config) => {
+    // #region agent log
+    debugLog('api.js:request', 'API request started', { url: config.url, method: config.method, baseURL: config.baseURL }, 'F');
+    // #endregion
+    return config
+  },
+  (error) => {
+    // #region agent log
+    debugLog('api.js:request', 'API request error', { error: error.message }, 'F');
+    // #endregion
+    return Promise.reject(error)
+  }
+)
+
+// レスポンスインターセプター
+api.interceptors.response.use(
+  (response) => {
+    // #region agent log
+    debugLog('api.js:response', 'API response success', { url: response.config.url, status: response.status }, 'F');
+    // #endregion
+    return response
+  },
+  (error) => {
+    // #region agent log
+    debugLog('api.js:response', 'API response error', { 
+      url: error.config?.url, 
+      status: error.response?.status, 
+      statusText: error.response?.statusText,
+      message: error.message,
+      code: error.code
+    }, 'F');
+    // #endregion
+    console.error('API Error:', error.response?.data || error.message)
+    return Promise.reject(error)
+  }
+)
+
+// Tasks API
+export const tasksApi = {
+  getAll: (params) => api.get('/tasks', { params }),
+  get: (id) => api.get(`/tasks/${id}`),
+  create: (data) => api.post('/tasks', data),
+  update: (id, data) => api.put(`/tasks/${id}`, data),
+  delete: (id) => api.delete(`/tasks/${id}`),
+  toggle: (id) => api.post(`/tasks/${id}/toggle`),
+  run: (id) => api.post(`/tasks/${id}/run`)
+}
+
+// Credentials API
+export const credentialsApi = {
+  getAll: () => api.get('/credentials'),
+  get: (id) => api.get(`/credentials/${id}`),
+  getWithData: (id) => api.get(`/credentials/${id}/data`),
+  getTypes: () => api.get('/credentials/types'),
+  getByType: (type) => api.get(`/credentials/by-type/${type}`),
+  create: (data) => api.post('/credentials', data),
+  update: (id, data) => api.put(`/credentials/${id}`, data),
+  delete: (id) => api.delete(`/credentials/${id}`),
+  test: (id) => api.post(`/credentials/${id}/test`)
+}
+
+// Executions API
+export const executionsApi = {
+  getAll: (params) => api.get('/executions', { params }),
+  get: (id) => api.get(`/executions/${id}`),
+  getLogs: (id) => api.get(`/executions/${id}/logs`),
+  delete: (id) => api.delete(`/executions/${id}`),
+  downloadResult: (id) => `/api/executions/${id}/result/download`,
+  getRunningCount: () => api.get('/executions/running/count')
+}
+
+// Live View API
+export const liveViewApi = {
+  getData: (id) => api.get(`/executions/${id}/live`),
+  getSteps: (id) => api.get(`/executions/${id}/steps`),
+  getScreenshot: (id) => api.get(`/executions/${id}/screenshot`),
+  pause: (id) => api.post(`/executions/${id}/pause`),
+  resume: (id) => api.post(`/executions/${id}/resume`),
+  stop: (id) => api.post(`/executions/${id}/stop`)
+}
+
+// Stats API
+export const statsApi = {
+  get: () => api.get('/stats')
+}
+
+export default api
+
