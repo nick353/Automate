@@ -115,5 +115,48 @@ export const statsApi = {
   get: () => api.get('/stats')
 }
 
+// Wizard API
+export const wizardApi = {
+  // チャット専用セッションを開始
+  startChat: (initialMessage = null) => 
+    api.post('/wizard/start-chat', { initial_message: initialMessage }),
+  
+  // 動画をアップロード
+  uploadVideo: (file) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return api.post('/wizard/upload-video', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+  },
+  
+  // 動画を分析
+  analyzeVideo: (sessionId, additionalContext = '') => {
+    const formData = new FormData()
+    formData.append('additional_context', additionalContext)
+    return api.post(`/wizard/sessions/${sessionId}/analyze`, formData)
+  },
+  
+  // セッション情報を取得
+  getSession: (sessionId) => 
+    api.get(`/wizard/sessions/${sessionId}`),
+  
+  // AIとチャット
+  chat: (sessionId, message) => 
+    api.post(`/wizard/sessions/${sessionId}/chat`, { message }),
+  
+  // タスクを生成
+  generateTask: (sessionId) => 
+    api.post(`/wizard/sessions/${sessionId}/generate-task`),
+  
+  // タスクを作成（DBに保存）
+  createTask: (sessionId) => 
+    api.post(`/wizard/sessions/${sessionId}/create-task`),
+  
+  // セッションを削除
+  deleteSession: (sessionId) => 
+    api.delete(`/wizard/sessions/${sessionId}`)
+}
+
 export default api
 

@@ -5,6 +5,8 @@ import aiofiles
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
+from pydantic import BaseModel
+from typing import Optional
 
 from app.database import get_db
 from app.models import WizardSession, Task
@@ -16,6 +18,63 @@ router = APIRouter(prefix="/wizard", tags=["wizard"])
 
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
+
+
+class StartChatRequest(BaseModel):
+    """チャット開始リクエスト"""
+    initial_message: Optional[str] = None
+
+
+@router.post("/start-chat")
+async def start_chat_session(
+    request: StartChatRequest = None,
+    db: Session = Depends(get_db)
+):
+    """チャット専用セッションを開始（動画なし）"""
+    session_id = str(uuid.uuid4())
+    
+    # システムの挨拶メッセージ
+    initial_chat = [{
+        "role": "assistant",
+        "content": """こんにちは！自動化タスク作成のお手伝いをします 🤖
+
+どんな作業を自動化したいですか？以下のような例があります：
+
+📧 **メール・通知系**
+- Gmailの受信メールを自動でSlackに転送
+- 特定の条件でメールを送信
+
+📊 **データ収集・入力系**
+- Webサイトから情報を定期的に取得
+- スプレッドシートにデータを自動入力
+
+🔄 **繰り返し作業**
+- 毎日同じサイトでログインして確認
+- SNSの投稿スケジュール
+
+**やりたいことを自由に教えてください！** できるだけ詳しく教えてもらえると、より良い提案ができます。"""
+    }]
+    
+    # 初期メッセージがあれば追加
+    if request and request.initial_message:
+        initial_chat.append({
+            "role": "user",
+            "content": request.initial_message
+        })
+    
+    session = WizardSession(
+        session_id=session_id,
+        status="chatting",
+        chat_history=json.dumps(initial_chat, ensure_ascii=False)
+    )
+    db.add(session)
+    db.commit()
+    
+    return {
+        "session_id": session_id,
+        "status": "chatting",
+        "chat_history": initial_chat
+    }
 
 
 @router.post("/upload-video")
@@ -132,11 +191,11 @@ async def chat(
     if not session:
         raise HTTPException(status_code=404, detail="セッションが見つかりません")
     
-    if session.status not in ["analyzed", "chatting"]:
+    if session.status not in ["analyzed", "chatting", "active"]:
         raise HTTPException(status_code=400, detail="このセッションではチャットできません")
     
     # ステータスを更新
-    if session.status == "analyzed":
+    if session.status in ["analyzed", "active"]:
         session.status = "chatting"
         db.commit()
     
@@ -146,6 +205,7 @@ async def chat(
     return {
         "response": result["response"],
         "is_ready_to_create": result.get("is_ready_to_create", False),
+        "suggested_task": result.get("suggested_task"),
         "chat_history": result.get("chat_history", [])
     }
 
