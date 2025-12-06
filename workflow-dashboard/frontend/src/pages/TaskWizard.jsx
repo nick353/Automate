@@ -20,10 +20,19 @@ import {
   Zap,
   Key,
   Globe,
-  Code
+  Code,
+  LayoutGrid,
+  MonitorPlay
 } from 'lucide-react'
 import { wizardApi, tasksApi } from '../services/api'
 import { cn } from '../utils/cn'
+
+// 新しいコンポーネントをインポート
+import Onboarding from '../components/Wizard/Onboarding'
+import TemplateLibrary from '../components/Wizard/TemplateLibrary'
+import ScreenRecorder from '../components/Wizard/ScreenRecorder'
+import TrialRunPreview from '../components/Wizard/TrialRunPreview'
+import ErrorHelper from '../components/Wizard/ErrorHelper'
 
 // チャットメッセージコンポーネント
 function ChatMessage({ message, isUser }) {
@@ -56,20 +65,16 @@ function ChatMessage({ message, isUser }) {
       )}>
         <div className="prose prose-sm dark:prose-invert max-w-none">
           {message.content.split('\n').map((line, i) => {
-            // 見出し（**text**）
             if (line.match(/^\*\*(.+)\*\*$/)) {
               const text = line.replace(/\*\*/g, '')
               return <p key={i} className="font-bold text-primary mt-2 mb-1">{text}</p>
             }
-            // 箇条書き
             if (line.match(/^[-•]/)) {
               return <p key={i} className="ml-2 my-0.5">{line}</p>
             }
-            // 絵文字付きセクション
             if (line.match(/^[📧📊🔄💡✅❌🤖]/)) {
               return <p key={i} className="font-medium mt-2">{line}</p>
             }
-            // 空行
             if (!line.trim()) {
               return <br key={i} />
             }
@@ -82,30 +87,28 @@ function ChatMessage({ message, isUser }) {
 }
 
 // モード選択カード
-function ModeCard({ icon: Icon, title, description, onClick, active, color }) {
+function ModeCard({ icon: Icon, title, description, onClick, color, badge }) {
   return (
     <motion.button
       onClick={onClick}
       whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
-      className={cn(
-        "flex-1 p-6 rounded-2xl border-2 transition-all text-left",
-        active 
-          ? `border-${color}-500 bg-${color}-500/10` 
-          : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700",
-        active && color === 'cyan' && "border-cyan-500 bg-cyan-500/10",
-        active && color === 'purple' && "border-purple-500 bg-purple-500/10"
-      )}
+      className="flex-1 p-6 rounded-2xl border-2 border-zinc-200 dark:border-zinc-800 hover:border-primary/50 transition-all text-left relative overflow-hidden group"
     >
+      {badge && (
+        <span className="absolute top-3 right-3 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs font-bold">
+          {badge}
+        </span>
+      )}
       <div className={cn(
-        "w-12 h-12 rounded-xl flex items-center justify-center mb-4",
-        color === 'cyan' && "bg-gradient-to-br from-cyan-400 to-emerald-500",
-        color === 'purple' && "bg-gradient-to-br from-purple-500 to-pink-500"
+        "w-12 h-12 rounded-xl flex items-center justify-center mb-4 bg-gradient-to-br",
+        color
       )}>
         <Icon className="w-6 h-6 text-white" />
       </div>
       <h3 className="text-lg font-bold text-foreground mb-1">{title}</h3>
       <p className="text-sm text-muted-foreground">{description}</p>
+      <ArrowRight className="absolute bottom-6 right-6 w-5 h-5 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
     </motion.button>
   )
 }
@@ -205,7 +208,7 @@ export default function TaskWizard() {
   const fileInputRef = useRef(null)
   
   // State
-  const [mode, setMode] = useState(null) // 'chat' | 'video'
+  const [mode, setMode] = useState(null) // 'chat' | 'video' | 'record' | 'template'
   const [sessionId, setSessionId] = useState(null)
   const [messages, setMessages] = useState([])
   const [inputMessage, setInputMessage] = useState('')
@@ -216,6 +219,11 @@ export default function TaskWizard() {
   const [generatedTask, setGeneratedTask] = useState(null)
   const [isCreating, setIsCreating] = useState(false)
   const [error, setError] = useState('')
+  
+  // 新機能のState
+  const [showOnboarding, setShowOnboarding] = useState(true)
+  const [showTemplateLibrary, setShowTemplateLibrary] = useState(false)
+  const [showTrialRun, setShowTrialRun] = useState(false)
 
   // チャットを最下部にスクロール
   useEffect(() => {
@@ -225,11 +233,11 @@ export default function TaskWizard() {
   }, [messages])
 
   // チャットセッションを開始
-  const startChatSession = async () => {
+  const startChatSession = async (initialMessage = null) => {
     setIsLoading(true)
     setError('')
     try {
-      const response = await wizardApi.startChat()
+      const response = await wizardApi.startChat(initialMessage)
       setSessionId(response.data.session_id)
       setMessages(response.data.chat_history || [])
       setMode('chat')
@@ -240,34 +248,38 @@ export default function TaskWizard() {
     }
   }
 
+  // テンプレートを選択
+  const handleSelectTemplate = async (template) => {
+    setShowTemplateLibrary(false)
+    await startChatSession(template.prompt)
+  }
+
   // 動画モードを開始
   const startVideoMode = () => {
     setMode('video')
   }
 
-  // 動画をアップロード
-  const handleVideoUpload = async (e) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    
+  // スクリーンレコーダーモードを開始
+  const startRecordMode = () => {
+    setMode('record')
+  }
+
+  // 録画完了時
+  const handleRecordingComplete = async (file) => {
     setVideoFile(file)
     setIsAnalyzing(true)
     setError('')
     
     try {
-      // 動画をアップロード
       const uploadResponse = await wizardApi.uploadVideo(file)
       const sid = uploadResponse.data.session_id
       setSessionId(sid)
       
-      // 動画を分析
       const analyzeResponse = await wizardApi.analyzeVideo(sid)
       
-      // セッションを取得してチャット履歴を設定
       const sessionResponse = await wizardApi.getSession(sid)
       setMessages(sessionResponse.data.chat_history || [])
       
-      // 分析完了、チャットモードに切り替え
       setMode('chat')
     } catch (err) {
       setError('動画の分析に失敗しました: ' + (err.response?.data?.detail || err.message))
@@ -275,6 +287,13 @@ export default function TaskWizard() {
     } finally {
       setIsAnalyzing(false)
     }
+  }
+
+  // 動画をアップロード
+  const handleVideoUpload = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    await handleRecordingComplete(file)
   }
 
   // メッセージを送信
@@ -286,20 +305,17 @@ export default function TaskWizard() {
     setIsSending(true)
     setError('')
     
-    // ユーザーメッセージを即座に表示
     setMessages(prev => [...prev, { role: 'user', content: userMessage }])
     
     try {
       const response = await wizardApi.chat(sessionId, userMessage)
       
-      // AIの返答を追加
       setMessages(prev => [...prev, { role: 'assistant', content: response.data.response }])
       
-      // タスク作成の準備ができたかチェック
       if (response.data.is_ready_to_create) {
-        // タスクを生成
         const taskResponse = await wizardApi.generateTask(sessionId)
         setGeneratedTask(taskResponse.data.task)
+        setShowTrialRun(true)
       }
     } catch (err) {
       setError('メッセージの送信に失敗しました: ' + (err.response?.data?.detail || err.message))
@@ -326,10 +342,30 @@ export default function TaskWizard() {
   // タスク生成をやり直し
   const regenerateTask = async () => {
     setGeneratedTask(null)
+    setShowTrialRun(false)
     setMessages(prev => [...prev, { 
       role: 'assistant', 
       content: '了解しました。もう少し詳しく教えていただけますか？何か変更したい点や追加情報はありますか？' 
     }])
+  }
+
+  // セッションをリセット
+  const resetSession = () => {
+    setMode(null)
+    setSessionId(null)
+    setMessages([])
+    setGeneratedTask(null)
+    setVideoFile(null)
+    setError('')
+    setShowTrialRun(false)
+  }
+
+  // エラーをリトライ
+  const handleRetry = () => {
+    setError('')
+    if (mode === 'chat' && inputMessage) {
+      sendMessage()
+    }
   }
 
   // Enterキーで送信
@@ -342,6 +378,16 @@ export default function TaskWizard() {
 
   return (
     <div className="max-w-3xl mx-auto pb-8">
+      {/* オンボーディング */}
+      <Onboarding onComplete={() => setShowOnboarding(false)} />
+      
+      {/* テンプレートライブラリ */}
+      <TemplateLibrary 
+        isOpen={showTemplateLibrary}
+        onClose={() => setShowTemplateLibrary(false)}
+        onSelectTemplate={handleSelectTemplate}
+      />
+
       {/* Header */}
       <motion.div 
         initial={{ opacity: 0, y: -20 }}
@@ -372,28 +418,71 @@ export default function TaskWizard() {
             作成方法を選んでください
           </p>
           
-          <div className="flex gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <ModeCard
               icon={MessageCircle}
               title="チャットで相談"
-              description="AIと会話しながらタスクを作成。やりたいことを説明するだけでOK！"
+              description="AIと会話しながらタスクを作成。やりたいことを説明するだけ！"
               onClick={startChatSession}
-              active={false}
-              color="cyan"
+              color="from-cyan-400 to-emerald-500"
+            />
+            <ModeCard
+              icon={LayoutGrid}
+              title="テンプレートから選択"
+              description="よく使う自動化タスクをワンクリックで設定"
+              onClick={() => setShowTemplateLibrary(true)}
+              color="from-amber-400 to-orange-500"
+              badge="おすすめ"
+            />
+            <ModeCard
+              icon={MonitorPlay}
+              title="画面を録画"
+              description="ブラウザ上で操作を録画。AIが分析して自動化"
+              onClick={startRecordMode}
+              color="from-rose-500 to-pink-600"
+              badge="新機能"
             />
             <ModeCard
               icon={Video}
-              title="画面録画から作成"
-              description="操作を録画した動画をアップロード。AIが分析して自動化します。"
+              title="動画をアップロード"
+              description="録画済みの動画をアップロードして分析"
               onClick={startVideoMode}
-              active={false}
-              color="purple"
+              color="from-purple-500 to-indigo-600"
             />
           </div>
           
           {isLoading && (
             <div className="flex justify-center py-8">
               <Loader2 className="w-8 h-8 text-primary animate-spin" />
+            </div>
+          )}
+        </motion.div>
+      )}
+
+      {/* Screen Recorder Mode */}
+      {mode === 'record' && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="space-y-6"
+        >
+          <button
+            onClick={() => setMode(null)}
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            ← 戻る
+          </button>
+          
+          <ScreenRecorder 
+            onRecordingComplete={handleRecordingComplete}
+            onClose={() => setMode(null)}
+          />
+          
+          {isAnalyzing && (
+            <div className="flex flex-col items-center py-8 space-y-4">
+              <Loader2 className="w-12 h-12 text-purple-500 animate-spin" />
+              <p className="font-medium text-foreground">動画を分析中...</p>
+              <p className="text-sm text-muted-foreground">AIが操作内容を解析しています</p>
             </div>
           )}
         </motion.div>
@@ -480,12 +569,7 @@ export default function TaskWizard() {
               </div>
             </div>
             <button
-              onClick={() => {
-                setMode(null)
-                setSessionId(null)
-                setMessages([])
-                setGeneratedTask(null)
-              }}
+              onClick={resetSession}
               className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground hover:text-foreground transition-all"
             >
               <X className="w-5 h-5" />
@@ -515,12 +599,20 @@ export default function TaskWizard() {
             
             {/* Generated Task */}
             {generatedTask && (
-              <div className="p-4">
+              <div className="p-4 space-y-4">
                 <TaskPreview 
                   task={generatedTask}
                   onConfirm={createTask}
                   onEdit={regenerateTask}
                   isCreating={isCreating}
+                />
+                
+                {/* Trial Run Preview */}
+                <TrialRunPreview
+                  task={generatedTask}
+                  onConfirm={createTask}
+                  onEdit={regenerateTask}
+                  isVisible={showTrialRun}
                 />
               </div>
             )}
@@ -552,16 +644,15 @@ export default function TaskWizard() {
         </motion.div>
       )}
 
-      {/* Error */}
+      {/* Error with Helper */}
       {error && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mt-4 p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center gap-3"
-        >
-          <X className="w-5 h-5 text-rose-500 shrink-0" />
-          <p className="text-sm text-rose-600 dark:text-rose-400">{error}</p>
-        </motion.div>
+        <div className="mt-4">
+          <ErrorHelper 
+            error={error}
+            onRetry={handleRetry}
+            onRestart={resetSession}
+          />
+        </div>
       )}
 
       {/* Tips */}
