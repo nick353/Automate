@@ -181,3 +181,4 @@ class ScreencastManager:
 # シングルトンインスタンス
 screencast_manager = ScreencastManager()
 
+

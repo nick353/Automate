@@ -56,6 +56,12 @@ class TaskBase(BaseModel):
     llm_credential_id: Optional[int] = None
     site_credential_id: Optional[int] = None
     notification_credential_id: Optional[int] = None
+    # 実行タイプ: web (Browser Use), desktop (Lux), hybrid (両方)
+    execution_type: str = "web"
+    max_steps: int = 20
+    lux_credential_id: Optional[int] = None  # Lux (OAGI) API Key
+    # 実行場所: server (サーバーで実行), local (ローカルエージェント経由)
+    execution_location: str = "server"
 
 
 class TaskCreate(TaskBase):
@@ -75,6 +81,10 @@ class TaskUpdate(BaseModel):
     llm_credential_id: Optional[int] = None
     site_credential_id: Optional[int] = None
     notification_credential_id: Optional[int] = None
+    execution_type: Optional[str] = None
+    max_steps: Optional[int] = None
+    lux_credential_id: Optional[int] = None
+    execution_location: Optional[str] = None
 
 
 class TaskResponse(TaskBase):
@@ -91,6 +101,7 @@ class TaskWithCredentials(TaskResponse):
     llm_credential: Optional[CredentialResponse] = None
     site_credential: Optional[CredentialResponse] = None
     notification_credential: Optional[CredentialResponse] = None
+    lux_credential: Optional[CredentialResponse] = None
 
 
 # ==================== Execution Schemas ====================
@@ -221,9 +232,33 @@ class ErrorResponse(BaseModel):
 # ==================== Credential Types ====================
 
 CREDENTIAL_TYPES = [
-    {"type": "api_key", "label": "APIキー", "services": ["anthropic", "google", "openai"]},
+    {"type": "api_key", "label": "APIキー", "services": ["anthropic", "google", "openai", "oagi"]},
     {"type": "login", "label": "サイトログイン", "services": ["custom"]},
     {"type": "webhook", "label": "Webhook", "services": ["slack", "discord"]},
     {"type": "smtp", "label": "SMTP設定", "services": ["email"]},
 ]
+
+# 実行タイプの定義
+EXECUTION_TYPES = [
+    {"type": "web", "label": "Webブラウザ (Browser Use)", "description": "ブラウザ自動化のみ"},
+    {"type": "desktop", "label": "デスクトップ (Lux)", "description": "PC全体の自動操作"},
+    {"type": "hybrid", "label": "ハイブリッド", "description": "WebとデスクトップのMIX"},
+]
+
+# 実行場所の定義
+EXECUTION_LOCATIONS = [
+    {
+        "type": "server", 
+        "label": "サーバー (Browser Use)", 
+        "description": "サーバーでWebブラウザ自動化。24時間稼働、スケジュール実行向け",
+        "supported_types": ["web"]
+    },
+    {
+        "type": "local", 
+        "label": "ローカルPC (Lux)", 
+        "description": "ユーザーのPCでデスクトップ操作。Excel、ローカルアプリ向け",
+        "supported_types": ["desktop", "hybrid"]
+    },
+]
+
 

@@ -124,3 +124,4 @@ def get_running_count(db: Session = Depends(get_db)):
     ).count()
     return {"count": count}
 
+

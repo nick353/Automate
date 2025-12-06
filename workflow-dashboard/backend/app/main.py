@@ -9,7 +9,7 @@ import os
 
 from app.config import settings
 from app.database import init_db
-from app.routers import tasks, credentials, executions, live_view, websocket, scheduler, wizard, auth
+from app.routers import tasks, credentials, executions, live_view, websocket, scheduler, wizard, auth, system, trial_run
 from app.routers import settings as settings_router
 from app.utils.logger import logger
 
@@ -136,6 +136,8 @@ app.include_router(live_view.router, prefix=settings.api_prefix)
 app.include_router(scheduler.router, prefix=settings.api_prefix)
 app.include_router(wizard.router, prefix=settings.api_prefix)
 app.include_router(settings_router.router, prefix=settings.api_prefix)
+app.include_router(system.router, prefix=settings.api_prefix)
+app.include_router(trial_run.router, prefix=settings.api_prefix)
 app.include_router(websocket.router)  # WebSocketはプレフィックスなし
 app.include_router(websocket.router, prefix=settings.api_prefix, tags=["screencast"])  # API用
 

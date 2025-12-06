@@ -27,6 +27,7 @@ class Credential(Base):
     tasks_as_llm = relationship("Task", back_populates="llm_credential", foreign_keys="Task.llm_credential_id")
     tasks_as_site = relationship("Task", back_populates="site_credential", foreign_keys="Task.site_credential_id")
     tasks_as_notification = relationship("Task", back_populates="notification_credential", foreign_keys="Task.notification_credential_id")
+    tasks_as_lux = relationship("Task", back_populates="lux_credential", foreign_keys="Task.lux_credential_id")
 
 
 class Task(Base):
@@ -45,10 +46,18 @@ class Task(Base):
     notification_channel = Column(String(50))  # slack, email
     notification_target = Column(String(255))
     
+    # 実行タイプ: web (Browser Use), desktop (Lux), hybrid (両方)
+    execution_type = Column(String(20), default="web")
+    max_steps = Column(Integer, default=20)  # 最大ステップ数
+    
+    # 実行場所: server (サーバーで実行), local (ローカルエージェント経由)
+    execution_location = Column(String(20), default="server")
+    
     # 認証情報への参照
     llm_credential_id = Column(Integer, ForeignKey("credentials.id"))
     site_credential_id = Column(Integer, ForeignKey("credentials.id"))
     notification_credential_id = Column(Integer, ForeignKey("credentials.id"))
+    lux_credential_id = Column(Integer, ForeignKey("credentials.id"))  # Lux (OAGI) API Key
     
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -57,6 +66,7 @@ class Task(Base):
     llm_credential = relationship("Credential", back_populates="tasks_as_llm", foreign_keys=[llm_credential_id])
     site_credential = relationship("Credential", back_populates="tasks_as_site", foreign_keys=[site_credential_id])
     notification_credential = relationship("Credential", back_populates="tasks_as_notification", foreign_keys=[notification_credential_id])
+    lux_credential = relationship("Credential", back_populates="tasks_as_lux", foreign_keys=[lux_credential_id])
     executions = relationship("Execution", back_populates="task", cascade="all, delete-orphan")
 
 

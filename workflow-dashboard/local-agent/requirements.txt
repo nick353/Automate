@@ -1,0 +1,15 @@
+# Workflow Dashboard - Local Agent Requirements
+
+# Core
+websockets>=11.0
+
+# Desktop automation
+pyautogui>=0.9.54
+pillow>=10.0.0
+
+# Lux (OAGI) - Desktop AI Agent
+oagi
+
+# macOS permissions check (optional)
+# pyobjc-framework-Quartz
+

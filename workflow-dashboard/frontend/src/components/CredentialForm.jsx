@@ -1,32 +1,63 @@
 import { useState, useEffect } from 'react'
-import { X, Eye, EyeOff, Shield, Key } from 'lucide-react'
+import { X, Eye, EyeOff, Shield, Key, ExternalLink, Info } from 'lucide-react'
 import { motion } from 'framer-motion'
 import useCredentialStore from '../stores/credentialStore'
 
 const CREDENTIAL_CONFIGS = {
   api_key: {
     anthropic: {
-      label: 'Anthropic API Key',
+      label: 'Anthropic (Claude)',
+      description: 'Claude APIを使用するためのキー',
+      helpUrl: 'https://console.anthropic.com/',
       fields: [
         { name: 'api_key', label: 'API Key', type: 'password', placeholder: 'sk-ant-...' }
       ]
     },
+    openai: {
+      label: 'OpenAI (GPT)',
+      description: 'GPT-4などのOpenAI APIキー',
+      helpUrl: 'https://platform.openai.com/api-keys',
+      fields: [
+        { name: 'api_key', label: 'API Key', type: 'password', placeholder: 'sk-...' }
+      ]
+    },
     google: {
-      label: 'Google API Key',
+      label: 'Google (Gemini)',
+      description: 'Gemini APIを使用するためのキー',
+      helpUrl: 'https://makersuite.google.com/app/apikey',
       fields: [
         { name: 'api_key', label: 'API Key', type: 'password', placeholder: 'AIza...' }
       ]
     },
-    openai: {
-      label: 'OpenAI API Key',
+    oagi: {
+      label: 'OAGI (Lux)',
+      description: 'デスクトップ自動化（Lux）用のAPIキー',
+      helpUrl: 'https://developer.agiopen.org/',
       fields: [
         { name: 'api_key', label: 'API Key', type: 'password', placeholder: 'sk-...' }
+      ]
+    },
+    browseruse: {
+      label: 'Browser Use',
+      description: 'Browser Use Cloud APIキー（オプション）',
+      helpUrl: 'https://browser-use.com/',
+      fields: [
+        { name: 'api_key', label: 'API Key', type: 'password', placeholder: 'bu_...' }
+      ]
+    },
+    custom: {
+      label: 'その他のAPI',
+      description: '任意のAPIサービス用',
+      fields: [
+        { name: 'api_key', label: 'API Key', type: 'password', placeholder: 'your-api-key' },
+        { name: 'base_url', label: 'Base URL (オプション)', type: 'text', placeholder: 'https://api.example.com' }
       ]
     }
   },
   login: {
     custom: {
-      label: 'Site Login',
+      label: 'サイトログイン',
+      description: 'Webサイトのログイン情報',
       fields: [
         { name: 'url', label: 'Login URL', type: 'text', placeholder: 'https://example.com/login' },
         { name: 'username', label: 'Username / Email', type: 'text', placeholder: 'user@example.com' },
@@ -37,14 +68,37 @@ const CREDENTIAL_CONFIGS = {
   webhook: {
     slack: {
       label: 'Slack Webhook',
+      description: '通知をSlackに送信',
+      helpUrl: 'https://api.slack.com/messaging/webhooks',
       fields: [
         { name: 'webhook_url', label: 'Webhook URL', type: 'password', placeholder: 'https://hooks.slack.com/...' }
       ]
     },
     discord: {
       label: 'Discord Webhook',
+      description: '通知をDiscordに送信',
+      helpUrl: 'https://support.discord.com/hc/en-us/articles/228383668',
       fields: [
         { name: 'webhook_url', label: 'Webhook URL', type: 'password', placeholder: 'https://discord.com/api/webhooks/...' }
+      ]
+    },
+    custom: {
+      label: 'カスタムWebhook',
+      description: '任意のWebhook URL',
+      fields: [
+        { name: 'webhook_url', label: 'Webhook URL', type: 'password', placeholder: 'https://...' }
+      ]
+    }
+  },
+  smtp: {
+    custom: {
+      label: 'SMTP設定',
+      description: 'メール送信用SMTP設定',
+      fields: [
+        { name: 'host', label: 'SMTPホスト', type: 'text', placeholder: 'smtp.gmail.com' },
+        { name: 'port', label: 'ポート', type: 'text', placeholder: '587' },
+        { name: 'username', label: 'ユーザー名', type: 'text', placeholder: 'your@email.com' },
+        { name: 'password', label: 'パスワード', type: 'password', placeholder: '••••••••' }
       ]
     }
   }
@@ -174,8 +228,9 @@ export default function CredentialForm({ credential, onClose }) {
                 className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
               >
                 <option value="api_key">API Key</option>
-                <option value="login">Site Login</option>
+                <option value="login">サイトログイン</option>
                 <option value="webhook">Webhook</option>
+                <option value="smtp">SMTP設定</option>
               </select>
             </div>
             <div>
@@ -192,6 +247,26 @@ export default function CredentialForm({ credential, onClose }) {
               </select>
             </div>
           </div>
+          
+          {/* Service Description */}
+          {currentConfig?.description && (
+            <div className="flex items-start gap-3 p-3 rounded-xl bg-blue-500/10 border border-blue-500/20">
+              <Info className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm text-blue-700 dark:text-blue-300">{currentConfig.description}</p>
+                {currentConfig.helpUrl && (
+                  <a
+                    href={currentConfig.helpUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 mt-1 text-xs text-blue-500 hover:underline"
+                  >
+                    APIキーを取得 <ExternalLink className="w-3 h-3" />
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
           
           {/* Dynamic Fields */}
           <div className="space-y-4 bg-muted/30 p-4 rounded-xl border border-border">

@@ -15,6 +15,11 @@ browser-use==0.1.40
 langchain-anthropic==0.1.23
 playwright==1.41.2
 
+# Desktop Automation (Lux/OAGI)
+oagi
+pyautogui
+pillow
+
 # Video Analysis
 google-generativeai==0.4.0
 
@@ -31,4 +36,5 @@ pydantic-settings==2.1.0
 # Notifications
 slack-sdk==3.27.1
 aiosmtplib==3.0.1
+
 

@@ -167,3 +167,4 @@ class LiveViewManager:
 # シングルトンインスタンス
 live_view_manager = LiveViewManager()
 
+

@@ -38,3 +38,4 @@ export default function ControlPanel({ status, onControl }) {
   )
 }
 
+

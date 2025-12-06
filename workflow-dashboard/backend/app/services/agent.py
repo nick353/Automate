@@ -554,7 +554,17 @@ class LiveViewAgent:
 
 
 async def run_task_with_live_view(task_id: int, execution_id: int):
-    """ライブビュー対応でタスクを実行（バックグラウンドタスク用）"""
+    """ライブビュー対応でタスクを実行（バックグラウンドタスク用）
+    
+    execution_locationに応じて実行場所を決定:
+    - server: サーバーで直接実行
+    - local: ローカルエージェント経由で実行
+    
+    execution_typeに応じて適切なエージェントを選択:
+    - web: Browser Use (Webブラウザ自動化)
+    - desktop: Lux/OAGI (デスクトップ自動化)
+    - hybrid: 両方を組み合わせ
+    """
     db = SessionLocal()
     try:
         task = db.query(Task).filter(Task.id == task_id).first()
@@ -564,17 +574,59 @@ async def run_task_with_live_view(task_id: int, execution_id: int):
             logger.error(f"タスクまたは実行が見つかりません: task_id={task_id}, execution_id={execution_id}")
             return
         
+        # 実行場所を確認
+        execution_location = getattr(task, 'execution_location', 'server') or 'server'
+        execution_type = getattr(task, 'execution_type', 'web') or 'web'
+        
+        # ローカルエージェント経由の実行
+        if execution_location == "local":
+            logger.info(f"ローカルエージェント経由で実行: task_id={task_id}")
+            from app.services.local_executor import run_on_local_agent
+            result = await run_on_local_agent(task, execution, db)
+            
+            # 結果を保存
+            if result.get("stopped"):
+                execution.status = "stopped"
+            elif result.get("success"):
+                execution.status = "completed"
+                execution.result = result.get("result")
+            else:
+                execution.status = "failed"
+                execution.error_message = result.get("error")
+            
+            execution.completed_at = datetime.now()
+            db.commit()
+            return
+        
+        # サーバーでの直接実行 → Browser Use（Webブラウザ自動化）のみ
+        # デスクトップ操作はローカルエージェント経由でのみ実行可能
+        
+        if execution_type in ["desktop", "hybrid"]:
+            # デスクトップ/ハイブリッドタスクがサーバー実行に設定されている場合
+            # 自動的にWebモードにフォールバック、または警告
+            logger.warning(
+                f"デスクトップタスクがサーバー実行に設定されています。"
+                f"Browser Use（Web）モードで実行します: task_id={task_id}"
+            )
+            await live_view_manager.send_log(
+                execution.id,
+                "WARNING",
+                "デスクトップタスクですが、サーバー実行のためBrowser Use（Web）で実行します。"
+                "デスクトップ操作が必要な場合は、実行場所を「ローカルPC」に変更してください。"
+            )
+        
         # 実行状態を更新
         execution.status = "running"
         execution.started_at = datetime.now()
         db.commit()
         
-        # エージェントを実行
+        # サーバー実行は常にBrowser Use（Web自動化）を使用
         agent = LiveViewAgent(
             task=task,
             execution=execution,
             db=db
         )
+        logger.info(f"Webエージェント（Browser Use）を使用（サーバー実行）: task_id={task_id}")
         
         result = await agent.run()
         
@@ -591,7 +643,7 @@ async def run_task_with_live_view(task_id: int, execution_id: int):
         execution.completed_at = datetime.now()
         db.commit()
         
-        logger.info(f"タスク実行完了: task_id={task_id}, status={execution.status}")
+        logger.info(f"タスク実行完了: task_id={task_id}, status={execution.status}, type={execution_type}")
         
     except Exception as e:
         logger.error(f"タスク実行エラー: {e}")

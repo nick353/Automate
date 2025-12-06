@@ -62,3 +62,4 @@ class EncryptionService:
 # シングルトンインスタンス
 encryption_service = EncryptionService()
 
+

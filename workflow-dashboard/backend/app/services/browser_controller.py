@@ -112,3 +112,4 @@ class BrowserController:
 # シングルトンインスタンス
 browser_controller = BrowserController()
 
+

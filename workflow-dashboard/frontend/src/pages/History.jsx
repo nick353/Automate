@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { executionsApi } from '../services/api'
+import { BentoGrid, BentoItem } from '../components/Bento/BentoGrid'
 
 export default function History() {
   const [executions, setExecutions] = useState([])
@@ -35,12 +36,12 @@ export default function History() {
   }
   
   const handleDelete = async (execution) => {
-    if (window.confirm('この実行履歴を削除してもよろしいですか？')) {
+    if (window.confirm('Are you sure you want to delete this execution log?')) {
       try {
         await executionsApi.delete(execution.id)
         setExecutions(executions.filter(e => e.id !== execution.id))
       } catch (error) {
-        alert('削除に失敗しました')
+        alert('Failed to delete')
       }
     }
   }
@@ -60,19 +61,19 @@ export default function History() {
   
   const getStatusLabel = (status) => {
     const labels = {
-      completed: '成功',
-      failed: '失敗',
-      running: '実行中',
-      pending: '待機中',
-      paused: '一時停止',
-      stopped: '停止'
+      completed: 'Success',
+      failed: 'Failed',
+      running: 'Running',
+      pending: 'Pending',
+      paused: 'Paused',
+      stopped: 'Stopped'
     }
     return labels[status] || status
   }
   
   const formatDate = (dateStr) => {
     if (!dateStr) return '-'
-    return new Date(dateStr).toLocaleString('ja-JP', {
+    return new Date(dateStr).toLocaleString('en-US', {
       month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
     })
   }
@@ -81,9 +82,9 @@ export default function History() {
     if (!start || !end) return '-'
     const ms = new Date(end) - new Date(start)
     const seconds = Math.floor(ms / 1000)
-    if (seconds < 60) return `${seconds}秒`
+    if (seconds < 60) return `${seconds}s`
     const minutes = Math.floor(seconds / 60)
-    return `${minutes}分${seconds % 60}秒`
+    return `${minutes}m ${seconds % 60}s`
   }
   
   const filteredExecutions = filter === 'all' 
@@ -91,40 +92,30 @@ export default function History() {
     : executions.filter(e => e.status === filter)
 
   const filterOptions = [
-    { value: 'all', label: 'すべて' },
-    { value: 'completed', label: '成功' },
-    { value: 'failed', label: '失敗' },
-    { value: 'running', label: '実行中' }
+    { value: 'all', label: 'All' },
+    { value: 'completed', label: 'Success' },
+    { value: 'failed', label: 'Failed' },
+    { value: 'running', label: 'Running' }
   ]
   
-  const container = {
-    hidden: { opacity: 0 },
-    show: { opacity: 1, transition: { staggerChildren: 0.03 } }
-  }
-
-  const item = {
-    hidden: { opacity: 0, y: 10 },
-    show: { opacity: 1, y: 0 }
-  }
-
   return (
-    <div className="space-y-6 sm:space-y-8">
+    <div className="space-y-8">
       {/* Header */}
       <div className="flex flex-col gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">実行履歴</h1>
-          <p className="text-muted-foreground mt-1 text-sm sm:text-base">過去の実行ログと結果</p>
+          <h1 className="text-4xl font-bold tracking-tight text-foreground">History</h1>
+          <p className="text-muted-foreground mt-1 text-lg">Execution logs and results</p>
         </div>
         
         {/* Filter Tabs */}
-        <div className="flex items-center gap-1 p-1 bg-muted/50 rounded-xl border border-border w-fit overflow-x-auto">
+        <div className="flex items-center gap-1 p-1 bg-zinc-100 dark:bg-zinc-900 rounded-xl w-fit">
           {filterOptions.map(f => (
             <button
               key={f.value}
               onClick={() => setFilter(f.value)}
-              className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap ${
+              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
                 filter === f.value 
-                  ? "bg-background text-foreground shadow-sm" 
+                  ? "bg-white dark:bg-zinc-800 text-foreground shadow-sm" 
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
@@ -138,46 +129,42 @@ export default function History() {
       {isLoading ? (
         <div className="flex items-center justify-center h-64">
           <div className="relative">
-            <div className="w-10 h-10 border-3 border-primary/30 border-t-primary rounded-full animate-spin" />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-primary animate-pulse" />
-            </div>
+            <div className="w-12 h-12 border-4 border-zinc-200 border-t-primary rounded-full animate-spin" />
           </div>
         </div>
       ) : filteredExecutions.length === 0 ? (
-        <div className="rounded-2xl border border-border bg-card p-8 sm:p-12 text-center">
-          <div className="w-14 h-14 sm:w-16 sm:h-16 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center">
-            <HistoryIcon className="w-7 h-7 sm:w-8 sm:h-8 text-muted-foreground" />
-          </div>
-          <h3 className="text-lg font-semibold text-foreground">履歴がありません</h3>
-          <p className="text-muted-foreground mt-1 text-sm sm:text-base">タスクを実行すると履歴が表示されます</p>
-        </div>
+        <BentoGrid>
+          <BentoItem
+            title="No History Found"
+            description="Run a task to see execution logs here."
+            className="md:col-span-3 flex flex-col items-center justify-center py-12 text-center opacity-50"
+            icon={<HistoryIcon className="w-12 h-12 mb-4" />}
+          />
+        </BentoGrid>
       ) : (
-        <>
-          {/* Desktop Table */}
-          <div className="hidden md:block rounded-xl border border-border bg-card overflow-hidden shadow-sm">
+        <BentoGrid>
+          {/* Desktop Table View wrapped in Bento Item */}
+          <BentoItem
+            className="hidden md:block md:col-span-3 p-0 overflow-hidden"
+            span={3}
+            disableHoverEffect={true}
+          >
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-left">
-                <thead className="bg-muted/50 text-xs font-medium text-muted-foreground uppercase tracking-wider border-b border-border">
+                <thead className="bg-zinc-50 dark:bg-zinc-900/50 text-xs font-bold text-muted-foreground uppercase tracking-wider border-b border-zinc-100 dark:border-zinc-800">
                   <tr>
-                    <th className="px-6 py-4">タスク / ステータス</th>
-                    <th className="px-6 py-4">開始日時</th>
-                    <th className="px-6 py-4">所要時間</th>
-                    <th className="px-6 py-4">ステップ</th>
-                    <th className="px-6 py-4 text-right">アクション</th>
+                    <th className="px-6 py-4">Task / Status</th>
+                    <th className="px-6 py-4">Started</th>
+                    <th className="px-6 py-4">Duration</th>
+                    <th className="px-6 py-4">Steps</th>
+                    <th className="px-6 py-4 text-right">Actions</th>
                   </tr>
                 </thead>
-                <motion.tbody 
-                  variants={container}
-                  initial="hidden"
-                  animate="show"
-                  className="divide-y divide-border"
-                >
+                <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
                   {filteredExecutions.map((execution) => (
-                    <motion.tr 
+                    <tr 
                       key={execution.id} 
-                      variants={item}
-                      className="group hover:bg-muted/30 transition-colors"
+                      className="group hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors"
                     >
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
@@ -185,10 +172,10 @@ export default function History() {
                             {getStatusIcon(execution.status)}
                           </div>
                           <div className="min-w-0">
-                            <div className="font-medium text-foreground truncate">
-                              {execution.task?.name || `タスク #${execution.task_id}`}
+                            <div className="font-bold text-foreground truncate">
+                              {execution.task?.name || `Task #${execution.task_id}`}
                             </div>
-                            <div className="text-xs text-muted-foreground">
+                            <div className="text-xs text-muted-foreground font-mono">
                               {getStatusLabel(execution.status)}
                             </div>
                           </div>
@@ -202,16 +189,16 @@ export default function History() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2 text-xs">
-                          <span className="font-medium text-foreground">{execution.completed_steps || 0}</span>
+                          <span className="font-bold text-foreground">{execution.completed_steps || 0}</span>
                           <span className="text-muted-foreground">/ {execution.total_steps || '-'}</span>
                         </div>
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                           <Link 
                             to={`/execution/${execution.id}`}
                             className="p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-                            title="詳細を見る"
+                            title="Details"
                           >
                             <ExternalLink className="w-4 h-4" />
                           </Link>
@@ -219,7 +206,7 @@ export default function History() {
                             <button
                               onClick={() => handleDownload(execution)}
                               className="p-2 rounded-lg text-muted-foreground hover:text-blue-500 hover:bg-blue-500/10 transition-colors"
-                              title="結果をダウンロード"
+                              title="Download"
                             >
                               <Download className="w-4 h-4" />
                             </button>
@@ -227,82 +214,56 @@ export default function History() {
                           <button
                             onClick={() => handleDelete(execution)}
                             className="p-2 rounded-lg text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 transition-colors"
-                            title="削除"
+                            title="Delete"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       </td>
-                    </motion.tr>
+                    </tr>
                   ))}
-                </motion.tbody>
+                </tbody>
               </table>
             </div>
-          </div>
+          </BentoItem>
           
-          {/* Mobile Cards */}
-          <motion.div 
-            variants={container}
-            initial="hidden"
-            animate="show"
-            className="md:hidden space-y-3"
-          >
-            {filteredExecutions.map((execution) => (
-              <motion.div 
-                key={execution.id}
-                variants={item}
-                className="rounded-xl border border-border bg-card p-4 shadow-sm"
-              >
-                <div className="flex items-start justify-between gap-3 mb-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    {getStatusIcon(execution.status)}
-                    <div className="min-w-0">
-                      <p className="font-medium text-foreground truncate">
-                        {execution.task?.name || `タスク #${execution.task_id}`}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {getStatusLabel(execution.status)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-3 text-xs text-muted-foreground mb-3">
-                  <div>
-                    <span className="block text-muted-foreground/70">開始日時</span>
-                    <span className="font-mono">{formatDate(execution.started_at)}</span>
-                  </div>
-                  <div>
-                    <span className="block text-muted-foreground/70">所要時間</span>
-                    <span className="font-mono">{formatDuration(execution.started_at, execution.completed_at)}</span>
-                  </div>
-                </div>
-                
-                <div className="flex items-center justify-between pt-3 border-t border-border">
-                  <div className="text-xs">
-                    <span className="font-medium text-foreground">{execution.completed_steps || 0}</span>
-                    <span className="text-muted-foreground"> / {execution.total_steps || '-'} ステップ</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Link 
-                      to={`/execution/${execution.id}`}
-                      className="p-2 rounded-lg text-primary hover:bg-primary/10 transition-colors"
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                    </Link>
-                    <button
-                      onClick={() => handleDelete(execution)}
-                      className="p-2 rounded-lg text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </motion.div>
-        </>
+          {/* Mobile Card View - Individual Bento Items */}
+          <div className="md:hidden grid grid-cols-1 gap-4 w-full">
+             {filteredExecutions.map((execution) => (
+               <BentoItem
+                 key={execution.id}
+                 className="p-4"
+                 header={
+                   <div className="flex items-center justify-between mb-4">
+                     <div className="flex items-center gap-2">
+                       {getStatusIcon(execution.status)}
+                       <span className="font-bold text-sm">{getStatusLabel(execution.status)}</span>
+                     </div>
+                     <span className="text-xs font-mono text-muted-foreground">{formatDate(execution.started_at)}</span>
+                   </div>
+                 }
+               >
+                 <div className="space-y-2">
+                   <h3 className="font-bold text-lg">{execution.task?.name || `Task #${execution.task_id}`}</h3>
+                   <div className="flex justify-between text-sm text-muted-foreground border-t border-zinc-100 dark:border-zinc-800 pt-2">
+                     <span>Duration: {formatDuration(execution.started_at, execution.completed_at)}</span>
+                     <span>Steps: {execution.completed_steps || 0} / {execution.total_steps || '-'}</span>
+                   </div>
+                   <div className="flex justify-end gap-2 pt-2">
+                      <Link 
+                        to={`/execution/${execution.id}`}
+                        className="p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-foreground text-xs font-bold"
+                      >
+                        Details
+                      </Link>
+                   </div>
+                 </div>
+               </BentoItem>
+             ))}
+          </div>
+        </BentoGrid>
       )}
     </div>
   )
 }
+
