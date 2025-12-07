@@ -34,6 +34,18 @@ import ScreenRecorder from '../components/Wizard/ScreenRecorder'
 import TrialRunPreview from '../components/Wizard/TrialRunPreview'
 import ErrorHelper from '../components/Wizard/ErrorHelper'
 
+// テキスト内の**強調**をパースしてReact要素に変換
+function parseMarkdownBold(text) {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g)
+  return parts.map((part, index) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      const boldText = part.slice(2, -2)
+      return <strong key={index} className="font-bold text-primary">{boldText}</strong>
+    }
+    return part
+  })
+}
+
 // チャットメッセージコンポーネント
 function ChatMessage({ message, isUser }) {
   return (
@@ -65,20 +77,16 @@ function ChatMessage({ message, isUser }) {
       )}>
         <div className="prose prose-sm dark:prose-invert max-w-none">
           {message.content.split('\n').map((line, i) => {
-            if (line.match(/^\*\*(.+)\*\*$/)) {
-              const text = line.replace(/\*\*/g, '')
-              return <p key={i} className="font-bold text-primary mt-2 mb-1">{text}</p>
-            }
-            if (line.match(/^[-•]/)) {
-              return <p key={i} className="ml-2 my-0.5">{line}</p>
-            }
-            if (line.match(/^[📧📊🔄💡✅❌🤖]/)) {
-              return <p key={i} className="font-medium mt-2">{line}</p>
-            }
             if (!line.trim()) {
               return <br key={i} />
             }
-            return <p key={i} className="my-1">{line}</p>
+            if (line.match(/^[-•]/)) {
+              return <p key={i} className="ml-2 my-0.5">{parseMarkdownBold(line)}</p>
+            }
+            if (line.match(/^[📧📊🔄💡✅❌🤖]/)) {
+              return <p key={i} className="font-medium mt-2">{parseMarkdownBold(line)}</p>
+            }
+            return <p key={i} className="my-1">{parseMarkdownBold(line)}</p>
           })}
         </div>
       </div>
