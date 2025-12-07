@@ -1,4 +1,3 @@
 {
-  "app_dir": "workflow-dashboard",
   "dockerfile": "Dockerfile"
 }
