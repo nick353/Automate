@@ -1,7 +1,8 @@
 """Workflow Dashboard - FastAPI メインアプリケーション"""
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, HTMLResponse
 from contextlib import asynccontextmanager
 from pathlib import Path
 import json
@@ -12,6 +13,10 @@ from app.database import init_db
 from app.routers import tasks, credentials, executions, live_view, websocket, scheduler, wizard, auth, system, trial_run
 from app.routers import settings as settings_router
 from app.utils.logger import logger
+
+# フロントエンド静的ファイルのパス
+STATIC_DIR = Path("/app/static")
+SERVE_FRONTEND = os.environ.get("SERVE_FRONTEND", "False").lower() == "true"
 
 # #region agent log
 def debug_log(location, message, data=None, hypothesis_id=None):
@@ -142,19 +147,6 @@ app.include_router(websocket.router)  # WebSocketはプレフィックスなし
 app.include_router(websocket.router, prefix=settings.api_prefix, tags=["screencast"])  # API用
 
 
-@app.get("/")
-async def root():
-    """ルートエンドポイント"""
-    # #region agent log
-    debug_log("main.py:root", "Root endpoint called", {}, "A")
-    # #endregion
-    return {
-        "message": "Workflow Dashboard API",
-        "version": "1.0.0",
-        "docs": "/docs"
-    }
-
-
 @app.get("/health")
 async def health_check():
     """ヘルスチェック"""
@@ -162,6 +154,44 @@ async def health_check():
     debug_log("main.py:health", "Health check called", {}, "A")
     # #endregion
     return {"status": "healthy"}
+
+
+# フロントエンド静的ファイルの配信（Docker環境でのみ有効）
+if SERVE_FRONTEND and STATIC_DIR.exists():
+    # 静的アセット（JS, CSS, 画像など）をマウント
+    app.mount("/assets", StaticFiles(directory=STATIC_DIR / "assets"), name="frontend_assets")
+    
+    @app.get("/")
+    async def serve_frontend_root():
+        """フロントエンドのルートページ"""
+        return FileResponse(STATIC_DIR / "index.html")
+    
+    @app.get("/{full_path:path}")
+    async def serve_frontend_spa(request: Request, full_path: str):
+        """SPAのためのキャッチオールルート"""
+        # APIパスはスキップ（既にルーティング済み）
+        if full_path.startswith("api/") or full_path.startswith("ws/") or full_path.startswith("screenshots/"):
+            return {"detail": "Not Found"}
+        
+        # 静的ファイルが存在する場合はそれを返す
+        file_path = STATIC_DIR / full_path
+        if file_path.exists() and file_path.is_file():
+            return FileResponse(file_path)
+        
+        # それ以外はindex.htmlを返す（SPAルーティング用）
+        return FileResponse(STATIC_DIR / "index.html")
+else:
+    @app.get("/")
+    async def root():
+        """ルートエンドポイント"""
+        # #region agent log
+        debug_log("main.py:root", "Root endpoint called", {}, "A")
+        # #endregion
+        return {
+            "message": "Workflow Dashboard API",
+            "version": "1.0.0",
+            "docs": "/docs"
+        }
 
 
 @app.get(f"{settings.api_prefix}/stats")

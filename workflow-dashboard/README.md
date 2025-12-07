@@ -75,6 +75,23 @@ docker-compose up -d
 docker-compose logs -f
 ```
 
+### Zeabur でデプロイ（推奨）
+
+[![Deploy on Zeabur](https://zeabur.com/button.svg)](https://zeabur.com/templates)
+
+1. [Zeabur](https://zeabur.com) にログイン
+2. 「New Project」→「GitHub」からこのリポジトリを選択
+3. 自動的にDockerfileが検出され、ビルドが開始されます
+4. 環境変数を設定：
+   - `ENCRYPTION_KEY`: 暗号化キー（必須）
+   - `ANTHROPIC_API_KEY`: Anthropic APIキー（推奨）
+5. ドメインを生成してアクセス
+
+**ENCRYPTION_KEYの生成方法:**
+```bash
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
 ## 使い方
 
 ### 1. 認証情報を追加
