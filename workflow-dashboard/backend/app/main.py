@@ -18,24 +18,10 @@ from app.utils.logger import logger
 STATIC_DIR = Path("/app/static")
 SERVE_FRONTEND = os.environ.get("SERVE_FRONTEND", "False").lower() == "true"
 
-# #region agent log
+# デバッグログ関数（本番環境では無効）
 def debug_log(location, message, data=None, hypothesis_id=None):
-    try:
-        log_entry = {
-            "id": f"log_{int(__import__('time').time() * 1000)}",
-            "timestamp": int(__import__('time').time() * 1000),
-            "location": location,
-            "message": message,
-            "data": data or {},
-            "sessionId": "debug-session",
-            "runId": "run1",
-            "hypothesisId": hypothesis_id or "A"
-        }
-        with open("/Users/nichikatanaka/Desktop/自動化/.cursor/debug.log", "a", encoding="utf-8") as f:
-            f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
-    except Exception:
-        pass
-# #endregion
+    """開発環境用のデバッグログ（本番では何もしない）"""
+    pass
 
 
 @asynccontextmanager
@@ -150,48 +136,57 @@ app.include_router(websocket.router, prefix=settings.api_prefix, tags=["screenca
 @app.get("/health")
 async def health_check():
     """ヘルスチェック"""
-    # #region agent log
-    debug_log("main.py:health", "Health check called", {}, "A")
-    # #endregion
     return {"status": "healthy"}
 
 
-# フロントエンド静的ファイルの配信（Docker環境でのみ有効）
-if SERVE_FRONTEND and STATIC_DIR.exists():
-    # 静的アセット（JS, CSS, 画像など）をマウント
-    app.mount("/assets", StaticFiles(directory=STATIC_DIR / "assets"), name="frontend_assets")
+# フロントエンド静的ファイルの配信
+@app.on_event("startup")
+async def setup_frontend():
+    """起動時にフロントエンド静的ファイルをマウント"""
+    if SERVE_FRONTEND and STATIC_DIR.exists():
+        assets_dir = STATIC_DIR / "assets"
+        if assets_dir.exists():
+            app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="frontend_assets")
+            logger.info(f"フロントエンド静的ファイルをマウントしました: {STATIC_DIR}")
+
+
+@app.get("/")
+async def serve_root():
+    """ルートエンドポイント"""
+    # フロントエンドが有効な場合はindex.htmlを返す
+    if SERVE_FRONTEND and STATIC_DIR.exists():
+        index_file = STATIC_DIR / "index.html"
+        if index_file.exists():
+            return FileResponse(index_file)
     
-    @app.get("/")
-    async def serve_frontend_root():
-        """フロントエンドのルートページ"""
-        return FileResponse(STATIC_DIR / "index.html")
+    # APIモードの場合
+    return {
+        "message": "Workflow Dashboard API",
+        "version": "1.0.0",
+        "docs": "/docs"
+    }
+
+
+@app.get("/{full_path:path}")
+async def serve_spa_or_404(request: Request, full_path: str):
+    """SPAのためのキャッチオールルート"""
+    # APIパス、WebSocket、スクリーンショットはスキップ
+    if full_path.startswith("api/") or full_path.startswith("ws/") or full_path.startswith("screenshots/") or full_path.startswith("docs") or full_path.startswith("openapi"):
+        return {"detail": "Not Found"}
     
-    @app.get("/{full_path:path}")
-    async def serve_frontend_spa(request: Request, full_path: str):
-        """SPAのためのキャッチオールルート"""
-        # APIパスはスキップ（既にルーティング済み）
-        if full_path.startswith("api/") or full_path.startswith("ws/") or full_path.startswith("screenshots/"):
-            return {"detail": "Not Found"}
-        
+    # フロントエンドが有効な場合
+    if SERVE_FRONTEND and STATIC_DIR.exists():
         # 静的ファイルが存在する場合はそれを返す
         file_path = STATIC_DIR / full_path
         if file_path.exists() and file_path.is_file():
             return FileResponse(file_path)
         
         # それ以外はindex.htmlを返す（SPAルーティング用）
-        return FileResponse(STATIC_DIR / "index.html")
-else:
-    @app.get("/")
-    async def root():
-        """ルートエンドポイント"""
-        # #region agent log
-        debug_log("main.py:root", "Root endpoint called", {}, "A")
-        # #endregion
-        return {
-            "message": "Workflow Dashboard API",
-            "version": "1.0.0",
-            "docs": "/docs"
-        }
+        index_file = STATIC_DIR / "index.html"
+        if index_file.exists():
+            return FileResponse(index_file)
+    
+    return {"detail": "Not Found"}
 
 
 @app.get(f"{settings.api_prefix}/stats")
