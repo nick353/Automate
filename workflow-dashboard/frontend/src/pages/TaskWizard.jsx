@@ -237,7 +237,9 @@ export default function TaskWizard() {
     setIsLoading(true)
     setError('')
     try {
-      const response = await wizardApi.startChat(initialMessage)
+      // イベントオブジェクトやDOM要素が渡された場合は無視
+      const message = (typeof initialMessage === 'string') ? initialMessage : null
+      const response = await wizardApi.startChat(message)
       setSessionId(response.data.session_id)
       setMessages(response.data.chat_history || [])
       setMode('chat')
@@ -423,7 +425,7 @@ export default function TaskWizard() {
               icon={MessageCircle}
               title="チャットで相談"
               description="AIと会話しながらタスクを作成。やりたいことを説明するだけ！"
-              onClick={startChatSession}
+              onClick={() => startChatSession()}
               color="from-cyan-400 to-emerald-500"
             />
             <ModeCard
