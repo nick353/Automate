@@ -11,7 +11,10 @@ import {
   Code,
   Globe,
   Clock,
-  X
+  X,
+  Terminal,
+  Cpu,
+  Network
 } from 'lucide-react'
 import { cn } from '../../utils/cn'
 
@@ -20,72 +23,68 @@ const ONBOARDING_KEY = 'wizard_onboarding_completed'
 const steps = [
   {
     id: 1,
-    title: 'ようこそ！',
-    subtitle: 'AIタスク作成ウィザードへ',
-    description: 'このウィザードでは、AIがあなたの自動化タスク作成をお手伝いします。難しい設定は不要です。',
-    icon: Sparkles,
-    color: 'from-indigo-500 to-purple-600',
+    title: 'SYSTEM_INIT',
+    subtitle: 'AI TASK WIZARD',
+    description: 'NEXUS OS will assist you in creating automation tasks. No complex configuration required.',
+    icon: Terminal,
     features: [
-      { icon: MessageCircle, text: 'チャットで相談するだけ' },
-      { icon: Video, text: '画面録画から自動生成' },
-      { icon: Zap, text: 'AIが最適な方法を提案' },
+      { icon: MessageCircle, text: 'Natural Language Interface' },
+      { icon: Video, text: 'Visual Recording Analysis' },
+      { icon: Zap, text: 'AI Optimization Engine' },
     ]
   },
   {
     id: 2,
-    title: '2つの作成方法',
-    subtitle: '好きな方法を選べます',
+    title: 'SELECT_METHOD',
+    subtitle: 'CHOOSE INPUT VECTOR',
     description: '',
-    icon: Bot,
-    color: 'from-cyan-500 to-emerald-500',
+    icon: Cpu,
     methods: [
       {
         icon: MessageCircle,
-        title: 'チャットで相談',
-        description: '「毎日Gmailをチェックしたい」など、やりたいことを自由に話すだけ。AIが質問しながら最適な方法を提案します。',
-        color: 'bg-cyan-500'
+        title: 'CHAT INTERFACE',
+        description: 'Describe your objective. AI will negotiate requirements and generate execution plans.',
+        color: 'text-cyan-400 border-cyan-500/30 bg-cyan-500/10'
       },
       {
         icon: Video,
-        title: '画面録画から作成',
-        description: '普段の操作を録画してアップロード。AIが操作内容を分析して自動化タスクを生成します。',
-        color: 'bg-purple-500'
+        title: 'VISUAL RECORDING',
+        description: 'Upload operation footage. AI analyzes temporal sequences to replicate workflows.',
+        color: 'text-purple-400 border-purple-500/30 bg-purple-500/10'
       }
     ]
   },
   {
     id: 3,
-    title: 'API優先アプローチ',
-    subtitle: '最適な方法を自動選択',
-    description: 'AIは利用可能なAPIを調べ、ブラウザ操作より効率的な方法があれば提案します。',
-    icon: Code,
-    color: 'from-emerald-500 to-cyan-500',
+    title: 'OPTIMIZATION',
+    subtitle: 'API PRIORITY PROTOCOL',
+    description: 'System scans for available APIs to replace inefficient browser interactions.',
+    icon: Network,
     comparisons: [
       {
-        title: 'API利用（推奨）',
+        title: 'API DIRECT (RECOMMENDED)',
         icon: Code,
-        benefits: ['高速で安定', 'エラーが少ない', '24時間稼働向け'],
-        color: 'border-emerald-500 bg-emerald-500/10'
+        benefits: ['High Velocity', 'Stability Guarantee', '24/7 Uptime'],
+        color: 'border-emerald-500/50 bg-emerald-500/10 text-emerald-400'
       },
       {
-        title: 'ブラウザ自動化',
+        title: 'BROWSER EMULATION',
         icon: Globe,
-        benefits: ['APIがない場合に', '複雑な操作も可能', 'スクショ取得可'],
-        color: 'border-purple-500 bg-purple-500/10'
+        benefits: ['Legacy Support', 'Complex UI Logic', 'Visual Confirmation'],
+        color: 'border-amber-500/50 bg-amber-500/10 text-amber-400'
       }
     ]
   },
   {
     id: 4,
-    title: '準備完了！',
-    subtitle: 'さっそく始めましょう',
-    description: 'チャットで相談するか、画面録画をアップロードして、あなただけの自動化タスクを作成しましょう。',
+    title: 'READY',
+    subtitle: 'SYSTEM ARMED',
+    description: 'Initiate task creation via Chat or Recording. Nexus OS is standing by.',
     icon: CheckCircle,
-    color: 'from-emerald-400 to-cyan-400',
     tips: [
-      { icon: MessageCircle, text: 'できるだけ詳しく説明すると精度UP' },
-      { icon: Clock, text: '実行頻度も教えてください' },
-      { icon: Zap, text: 'APIキーがあれば設定しておくと便利' },
+      { icon: MessageCircle, text: 'Provide detailed parameters for higher accuracy' },
+      { icon: Clock, text: 'Define execution frequency' },
+      { icon: Zap, text: 'Configure API credentials for enhanced access' },
     ]
   }
 ]
@@ -129,85 +128,108 @@ export default function Onboarding({ onComplete }) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
       >
+        {/* Scanline overlay */}
+        <div 
+            className="absolute inset-0 z-[0] pointer-events-none opacity-[0.03]"
+            style={{
+            backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, currentColor 2px, currentColor 4px)',
+            color: '#00FFCC'
+            }}
+        />
+
         <motion.div
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.9, opacity: 0 }}
-          className="relative w-full max-w-lg bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl overflow-hidden"
+          className="relative w-full max-w-lg bg-black/90 border border-primary/30 dark:border-cyan-500/30 rounded-sm shadow-[0_0_50px_rgba(6,182,212,0.15)] overflow-hidden z-10"
         >
+          {/* Top decorative line */}
+          <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-primary dark:via-cyan-500 to-transparent opacity-50" />
+
           {/* Skip button */}
           <button
             onClick={handleSkip}
-            className="absolute top-4 right-4 p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all z-10"
+            className="absolute top-4 right-4 p-2 rounded-sm text-muted-foreground hover:text-primary dark:hover:text-cyan-400 hover:bg-primary/10 transition-all z-10 font-mono text-xs tracking-wider"
           >
-            <X className="w-5 h-5" />
+            [SKIP]
           </button>
 
           {/* Progress */}
-          <div className="absolute top-4 left-4 flex gap-1.5 z-10">
+          <div className="absolute top-6 left-6 flex gap-1 z-10">
             {steps.map((_, i) => (
               <div
                 key={i}
                 className={cn(
-                  "h-1.5 rounded-full transition-all duration-300",
-                  i <= currentStep ? "w-6 bg-primary" : "w-1.5 bg-zinc-300 dark:bg-zinc-700"
+                  "h-1 transition-all duration-300",
+                  i <= currentStep ? "w-8 bg-primary dark:bg-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.5)]" : "w-2 bg-zinc-800"
                 )}
               />
             ))}
           </div>
 
-          {/* Header with gradient */}
-          <div className={cn(
-            "h-40 flex items-center justify-center bg-gradient-to-br",
-            step.color
-          )}>
+          {/* Header Area */}
+          <div className="h-32 flex items-center justify-center bg-zinc-950/50 relative overflow-hidden">
+             {/* Background Grid for Header */}
+             <div 
+                className="absolute inset-0 opacity-20"
+                style={{
+                    backgroundImage: `linear-gradient(rgba(6,182,212,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(6,182,212,0.1) 1px, transparent 1px)`,
+                    backgroundSize: '20px 20px',
+                }}
+            />
+            
             <motion.div
               key={step.id}
-              initial={{ scale: 0, rotate: -180 }}
-              animate={{ scale: 1, rotate: 0 }}
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
               transition={{ type: "spring", stiffness: 200, damping: 15 }}
-              className="w-20 h-20 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center"
+              className="relative z-10 w-16 h-16 rounded-sm border border-primary/50 dark:border-cyan-500/50 bg-black/50 backdrop-blur-md flex items-center justify-center shadow-[0_0_20px_rgba(6,182,212,0.2)]"
             >
-              <step.icon className="w-10 h-10 text-white" />
+              <step.icon className="w-8 h-8 text-primary dark:text-cyan-400" />
             </motion.div>
           </div>
 
           {/* Content */}
-          <div className="p-6 pt-8">
+          <div className="p-6 pt-6 relative">
             <AnimatePresence mode="wait">
               <motion.div
                 key={step.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                className="space-y-4"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="space-y-6"
               >
                 <div className="text-center">
-                  <h2 className="text-2xl font-bold text-foreground">{step.title}</h2>
-                  <p className="text-sm text-primary font-medium mt-1">{step.subtitle}</p>
+                  <h2 className="text-xl sm:text-2xl font-black text-foreground dark:text-white tracking-tight font-mono">
+                    <span className="text-primary dark:text-cyan-400 mr-2">&gt;</span>
+                    {step.title}
+                  </h2>
+                  <p className="text-xs text-primary/70 dark:text-cyan-500/70 font-mono tracking-widest mt-1 uppercase">{step.subtitle}</p>
                 </div>
 
                 {step.description && (
-                  <p className="text-center text-muted-foreground">{step.description}</p>
+                  <p className="text-center text-sm text-muted-foreground font-mono leading-relaxed px-4">
+                    {step.description}
+                  </p>
                 )}
 
                 {/* Step 1: Features */}
                 {step.features && (
-                  <div className="space-y-3 pt-2">
+                  <div className="space-y-2 pt-2">
                     {step.features.map((feature, i) => (
                       <motion.div
                         key={i}
-                        initial={{ opacity: 0, x: -20 }}
+                        initial={{ opacity: 0, x: -10 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: i * 0.1 }}
-                        className="flex items-center gap-3 p-3 rounded-xl bg-zinc-50 dark:bg-zinc-800/50"
+                        className="flex items-center gap-3 p-3 rounded-sm border border-zinc-800 bg-zinc-900/50 hover:border-primary/30 transition-colors"
                       >
-                        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                          <feature.icon className="w-5 h-5 text-primary" />
+                        <div className="w-8 h-8 rounded-sm bg-primary/10 flex items-center justify-center">
+                          <feature.icon className="w-4 h-4 text-primary dark:text-cyan-400" />
                         </div>
-                        <span className="font-medium text-foreground">{feature.text}</span>
+                        <span className="font-mono text-sm text-zinc-300">{feature.text}</span>
                       </motion.div>
                     ))}
                   </div>
@@ -219,18 +241,19 @@ export default function Onboarding({ onComplete }) {
                     {step.methods.map((method, i) => (
                       <motion.div
                         key={i}
-                        initial={{ opacity: 0, y: 20 }}
+                        initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: i * 0.15 }}
-                        className="p-4 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/30"
+                        className={cn(
+                            "p-4 rounded-sm border transition-all hover:bg-opacity-20",
+                            method.color
+                        )}
                       >
                         <div className="flex items-start gap-3">
-                          <div className={cn("w-10 h-10 rounded-lg flex items-center justify-center text-white", method.color)}>
-                            <method.icon className="w-5 h-5" />
-                          </div>
+                          <method.icon className="w-5 h-5 shrink-0 mt-0.5" />
                           <div className="flex-1">
-                            <h4 className="font-bold text-foreground">{method.title}</h4>
-                            <p className="text-sm text-muted-foreground mt-1">{method.description}</p>
+                            <h4 className="font-bold text-sm font-mono tracking-wide">{method.title}</h4>
+                            <p className="text-xs opacity-80 mt-1 font-mono">{method.description}</p>
                           </div>
                         </div>
                       </motion.div>
@@ -244,17 +267,20 @@ export default function Onboarding({ onComplete }) {
                     {step.comparisons.map((comp, i) => (
                       <motion.div
                         key={i}
-                        initial={{ opacity: 0, scale: 0.9 }}
+                        initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
                         transition={{ delay: i * 0.1 }}
-                        className={cn("p-4 rounded-xl border-2", comp.color)}
+                        className={cn(
+                            "p-3 rounded-sm border",
+                            comp.color
+                        )}
                       >
-                        <comp.icon className="w-6 h-6 mb-2 text-foreground" />
-                        <h4 className="font-bold text-sm text-foreground mb-2">{comp.title}</h4>
-                        <ul className="space-y-1">
+                        <comp.icon className="w-5 h-5 mb-2" />
+                        <h4 className="font-bold text-xs font-mono mb-2 tracking-wide">{comp.title}</h4>
+                        <ul className="space-y-1.5">
                           {comp.benefits.map((b, j) => (
-                            <li key={j} className="text-xs text-muted-foreground flex items-center gap-1">
-                              <CheckCircle className="w-3 h-3 text-emerald-500" />
+                            <li key={j} className="text-[10px] opacity-80 flex items-center gap-1.5 font-mono">
+                              <span className="w-1 h-1 bg-current rounded-full" />
                               {b}
                             </li>
                           ))}
@@ -270,12 +296,12 @@ export default function Onboarding({ onComplete }) {
                     {step.tips.map((tip, i) => (
                       <motion.div
                         key={i}
-                        initial={{ opacity: 0, x: -20 }}
+                        initial={{ opacity: 0, x: -10 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: i * 0.1 }}
-                        className="flex items-center gap-2 text-sm text-muted-foreground"
+                        className="flex items-center gap-3 text-xs text-zinc-400 font-mono p-2 border-l-2 border-primary/30 bg-primary/5"
                       >
-                        <tip.icon className="w-4 h-4 text-primary shrink-0" />
+                        <tip.icon className="w-3 h-3 text-primary dark:text-cyan-400 shrink-0" />
                         <span>{tip.text}</span>
                       </motion.div>
                     ))}
@@ -285,26 +311,23 @@ export default function Onboarding({ onComplete }) {
             </AnimatePresence>
 
             {/* Actions */}
-            <div className="flex items-center justify-between mt-8 pt-4 border-t border-zinc-200 dark:border-zinc-800">
-              <button
-                onClick={handleSkip}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                スキップ
-              </button>
+            <div className="flex items-center justify-between mt-8 pt-4 border-t border-zinc-800">
+              <div className="text-[10px] text-zinc-600 font-mono">
+                STEP {currentStep + 1}/{steps.length}
+              </div>
               <button
                 onClick={handleNext}
-                className="flex items-center gap-2 px-6 py-3 rounded-full bg-primary text-primary-foreground font-bold hover:scale-105 active:scale-95 transition-all shadow-lg shadow-primary/25"
+                className="group flex items-center gap-2 px-6 py-2 rounded-sm bg-primary/20 dark:bg-cyan-500/20 text-primary dark:text-cyan-400 text-xs font-bold font-mono tracking-wider border border-primary/30 dark:border-cyan-500/50 hover:bg-primary/30 dark:hover:bg-cyan-500/30 hover:shadow-[0_0_15px_rgba(6,182,212,0.3)] transition-all"
               >
                 {currentStep < steps.length - 1 ? (
                   <>
-                    次へ
-                    <ArrowRight className="w-4 h-4" />
+                    NEXT_STEP
+                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                   </>
                 ) : (
                   <>
-                    始める
-                    <Zap className="w-4 h-4" />
+                    INITIALIZE_SYSTEM
+                    <Zap className="w-4 h-4 group-hover:scale-110 transition-transform" />
                   </>
                 )}
               </button>
@@ -320,5 +343,3 @@ export default function Onboarding({ onComplete }) {
 export function resetOnboarding() {
   localStorage.removeItem(ONBOARDING_KEY)
 }
-
-

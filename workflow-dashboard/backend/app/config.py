@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     cors_origins: list = ["http://localhost:3000", "http://localhost:5173"]
     
     # API Keys (オプション - .envから読み込む)
+    openai_api_key: str = ""
     anthropic_api_key: str = ""
     google_api_key: str = ""
     browser_use_api_key: str = ""

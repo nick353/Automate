@@ -53,10 +53,14 @@ class LiveViewAgent:
                 )
             )
             
-            # LLM APIキーを取得
-            llm_credential = credential_manager.get_default(self.db, "api_key", "anthropic")
+            # LLM APIキーを取得（OpenAI優先、なければAnthropic）
+            llm_credential = credential_manager.get_default(self.db, "api_key", "openai")
+            use_openai = True
             if not llm_credential:
-                raise ValueError("Anthropic APIキーが設定されていません。認証情報を追加してください。")
+                llm_credential = credential_manager.get_default(self.db, "api_key", "anthropic")
+                use_openai = False
+            if not llm_credential:
+                raise ValueError("OpenAIまたはAnthropic APIキーが設定されていません。認証情報を追加してください。")
             
             api_key = llm_credential["data"]["api_key"]
             
@@ -75,7 +79,10 @@ class LiveViewAgent:
                 raise ValueError("Browser Use がインストールされていません。pip install browser-use を実行してください。")
             
             # 環境変数にAPIキーを設定
-            os.environ["ANTHROPIC_API_KEY"] = api_key
+            if use_openai:
+                os.environ["OPENAI_API_KEY"] = api_key
+            else:
+                os.environ["ANTHROPIC_API_KEY"] = api_key
             os.environ["BROWSER_USE_API_KEY"] = "bu_UUWBoZnb471Uo4narZN1IoUqt5azNHovbY7XDU-ZFoM"
             
             # ブラウザを起動
@@ -111,9 +118,24 @@ class LiveViewAgent:
                     if "password" in cred_data:
                         task_prompt += f"\nパスワード: {cred_data['password']}"
             
-            # エージェントを作成（環境変数のAPIキーを使用）
+            # LLMを設定
+            if use_openai:
+                from langchain_openai import ChatOpenAI
+                llm = ChatOpenAI(
+                    model="gpt-4o",  # Browser UseはビジョンモデルのGPT-4oを推奨
+                    api_key=api_key
+                )
+            else:
+                from langchain_anthropic import ChatAnthropic
+                llm = ChatAnthropic(
+                    model="claude-sonnet-4-20250514",
+                    api_key=api_key
+                )
+            
+            # エージェントを作成
             agent = Agent(
                 task=task_prompt,
+                llm=llm,
                 browser_profile=browser_profile
             )
             

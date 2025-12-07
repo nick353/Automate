@@ -28,14 +28,14 @@ class WizardChatService:
                 "content": user_message
             })
             
-            # Anthropic APIキーを取得
-            cred = credential_manager.get_default(db, "api_key", "anthropic")
+            # OpenAI APIキーを取得
+            cred = credential_manager.get_default(db, "api_key", "openai")
             if not cred:
-                raise ValueError("Anthropic APIキーが設定されていません")
+                raise ValueError("OpenAI APIキーが設定されていません")
             
             api_key = cred["data"].get("api_key")
             
-            # Anthropic APIを呼び出し
+            # OpenAI APIを呼び出し
             import httpx
             
             # 動画分析結果をコンテキストに含める（あれば）
@@ -100,20 +100,20 @@ APIキーはお持ちですか？なければ取得方法をお伝えします�
 - 技術用語は必要に応じて説明を添える
 - 日本語で回答"""
 
-            messages = [{"role": msg["role"], "content": msg["content"]} for msg in chat_history]
+            # システムメッセージを含むメッセージリストを作成
+            messages = [{"role": "system", "content": system_prompt}]
+            messages.extend([{"role": msg["role"], "content": msg["content"]} for msg in chat_history])
             
             async with httpx.AsyncClient() as client:
                 response = await client.post(
-                    "https://api.anthropic.com/v1/messages",
+                    "https://api.openai.com/v1/chat/completions",
                     headers={
-                        "x-api-key": api_key,
-                        "anthropic-version": "2023-06-01",
-                        "content-type": "application/json"
+                        "Authorization": f"Bearer {api_key}",
+                        "Content-Type": "application/json"
                     },
                     json={
-                        "model": "claude-sonnet-4-20250514",
+                        "model": "gpt-5.1",
                         "max_tokens": 1024,
-                        "system": system_prompt,
                         "messages": messages
                     },
                     timeout=60
@@ -123,7 +123,7 @@ APIキーはお持ちですか？なければ取得方法をお伝えします�
                     raise Exception(f"API Error: {response.status_code} - {response.text}")
                 
                 result = response.json()
-                assistant_message = result["content"][0]["text"]
+                assistant_message = result["choices"][0]["message"]["content"]
             
             # アシスタントメッセージを追加
             chat_history.append({
@@ -159,10 +159,10 @@ APIキーはお持ちですか？なければ取得方法をお伝えします�
     ) -> dict:
         """チャット履歴からタスクを生成"""
         try:
-            # Anthropic APIキーを取得
-            cred = credential_manager.get_default(db, "api_key", "anthropic")
+            # OpenAI APIキーを取得
+            cred = credential_manager.get_default(db, "api_key", "openai")
             if not cred:
-                raise ValueError("Anthropic APIキーが設定されていません")
+                raise ValueError("OpenAI APIキーが設定されていません")
             
             api_key = cred["data"].get("api_key")
             
@@ -206,14 +206,13 @@ APIキーはお持ちですか？なければ取得方法をお伝えします�
             
             async with httpx.AsyncClient() as client:
                 response = await client.post(
-                    "https://api.anthropic.com/v1/messages",
+                    "https://api.openai.com/v1/chat/completions",
                     headers={
-                        "x-api-key": api_key,
-                        "anthropic-version": "2023-06-01",
-                        "content-type": "application/json"
+                        "Authorization": f"Bearer {api_key}",
+                        "Content-Type": "application/json"
                     },
                     json={
-                        "model": "claude-sonnet-4-20250514",
+                        "model": "gpt-5.1",
                         "max_tokens": 2048,
                         "messages": [{"role": "user", "content": prompt}]
                     },
@@ -224,7 +223,7 @@ APIキーはお持ちですか？なければ取得方法をお伝えします�
                     raise Exception(f"API Error: {response.status_code}")
                 
                 result = response.json()
-                response_text = result["content"][0]["text"]
+                response_text = result["choices"][0]["message"]["content"]
             
             # JSONを抽出
             json_start = response_text.find("```json")

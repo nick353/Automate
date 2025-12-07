@@ -14,6 +14,10 @@ apscheduler==3.10.4
 browser-use==0.1.40
 # langchain-anthropic and playwright are managed by browser-use
 
+# OpenAI
+openai>=1.0.0
+langchain-openai>=0.1.0
+
 # Desktop Automation (Lux/OAGI)
 oagi
 pyautogui
