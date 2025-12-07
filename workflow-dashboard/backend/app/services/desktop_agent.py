@@ -484,3 +484,4 @@ async def run_desktop_task_with_live_view(task_id: int, execution_id: int):
         live_view_manager.cleanup(execution_id)
         db.close()
 
+

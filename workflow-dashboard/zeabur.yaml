@@ -1,0 +1,117 @@
+apiVersion: zeabur.com/v1
+kind: Template
+metadata:
+  name: workflow-dashboard
+spec:
+  description: Browser Useを使った自然言語AIエージェントを管理・可視化するWebダッシュボードシステム
+  icon: https://zeabur.com/logo.png
+  tags:
+    - web
+    - automation
+    - ai
+  readme: |
+    # Workflow Dashboard
+    
+    Browser Useを使った自然言語AIエージェントを管理・可視化するWebダッシュボードシステム
+    
+    ## 機能
+    
+    - 🤖 **自然言語でブラウザ自動化**: AIに指示するだけでブラウザ操作を自動実行
+    - 📺 **ライブビュー**: 実行中のタスクをリアルタイムで監視（スクリーンショット + ログ）
+    - 🔐 **認証情報管理**: APIキー・ログイン情報を暗号化して安全に保存
+    - ⏰ **スケジュール実行**: cron形式でタスクを自動実行
+    - 📊 **実行履歴**: 全ての実行結果を記録・閲覧
+    
+    ## 環境変数
+    
+    必須の環境変数を設定してください：
+    
+    - `ENCRYPTION_KEY`: 認証情報の暗号化キー（必須）
+    - `ANTHROPIC_API_KEY`: Anthropic APIキー（推奨）
+    - `DATABASE_URL`: データベース接続URL（オプション、デフォルト: SQLite）
+    
+  variables:
+    - name: ENCRYPTION_KEY
+      description: 認証情報の暗号化キー（必須）
+      type: STRING
+      key: ENCRYPTION_KEY
+      required: true
+    - name: ANTHROPIC_API_KEY
+      description: Anthropic APIキー
+      type: STRING
+      key: ANTHROPIC_API_KEY
+      required: false
+    - name: DATABASE_URL
+      description: データベース接続URL（PostgreSQL推奨）
+      type: STRING
+      key: DATABASE_URL
+      required: false
+  
+  services:
+    - name: backend
+      icon: https://www.python.org/static/favicon.ico
+      template: GIT
+      spec:
+        git:
+          type: GITHUB
+          repoID: ${ZEABUR_GIT_REPO_ID}
+          branch: ${ZEABUR_GIT_BRANCH:-main}
+          rootDirectory: workflow-dashboard/backend
+        build:
+          dockerfile: Dockerfile
+        ports:
+          - name: http
+            port: 8000
+            protocol: TCP
+            expose: true
+        environment:
+          - name: DATABASE_URL
+            value: ${DATABASE_URL:-sqlite:///./data/workflow.db}
+          - name: ENCRYPTION_KEY
+            value: ${ENCRYPTION_KEY}
+          - name: IN_DOCKER
+            value: "True"
+          - name: ANTHROPIC_API_KEY
+            value: ${ANTHROPIC_API_KEY}
+          - name: GOOGLE_API_KEY
+            value: ${GOOGLE_API_KEY:-}
+          - name: BROWSER_USE_API_KEY
+            value: ${BROWSER_USE_API_KEY:-}
+          - name: OAGI_API_KEY
+            value: ${OAGI_API_KEY:-}
+          - name: SUPABASE_URL
+            value: ${SUPABASE_URL:-https://vyvarctfzslbthdbsmvd.supabase.co}
+          - name: SUPABASE_ANON_KEY
+            value: ${SUPABASE_ANON_KEY:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ5dmFyY3RmenNsYnRoZGJzbXZkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NDU1NjcsImV4cCI6MjA4MDQyMTU2N30.FZDTrLLeFrou-ZYSOhegGkHIe0mqDYS_ne9pginpYE8}
+        resources:
+          cpu: 2000
+          memory: 4096
+        healthcheck:
+          path: /health
+          port: 8000
+          interval: 30
+          timeout: 10
+          retries: 3
+    
+    - name: frontend
+      icon: https://react.dev/favicon.ico
+      template: GIT
+      spec:
+        git:
+          type: GITHUB
+          repoID: ${ZEABUR_GIT_REPO_ID}
+          branch: ${ZEABUR_GIT_BRANCH:-main}
+          rootDirectory: workflow-dashboard/frontend
+        build:
+          dockerfile: Dockerfile
+        ports:
+          - name: http
+            port: 80
+            protocol: TCP
+            expose: true
+        environment:
+          - name: BACKEND_URL
+            value: ${backend.URL}
+        dependencies:
+          - backend
+        domainKey: APP_DOMAIN

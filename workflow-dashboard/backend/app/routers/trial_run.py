@@ -377,3 +377,4 @@ async def watch_trial(websocket: WebSocket, trial_id: str):
         if trial_id in trial_watchers:
             trial_watchers[trial_id].discard(websocket)
 
+

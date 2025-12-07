@@ -126,3 +126,4 @@ JSON形式で詳細を指定。再現性が高く、複雑なサイトに最適�
 **対象**: Gemini 3.0 Pro (Google AI Studio)
 
 
+
