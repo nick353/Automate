@@ -217,14 +217,14 @@
   }
   
   .btn-primary {
-    @apply bg-primary/10 text-primary-700 border border-primary/30 hover:bg-primary/20 hover:shadow-md;
+    @apply bg-primary/10 text-primary border border-primary/30 hover:bg-primary/20 hover:shadow-md;
   }
   .dark .btn-primary {
     @apply bg-cyan-500/20 text-cyan-400 border-cyan-500/50 hover:bg-cyan-500/40 hover:shadow-[0_0_15px_rgba(6,182,212,0.5)];
   }
   
   .btn-secondary {
-    @apply bg-secondary/10 text-secondary-700 border border-secondary/30 hover:bg-secondary/20;
+    @apply bg-secondary/10 text-secondary border border-secondary/30 hover:bg-secondary/20;
   }
   .dark .btn-secondary {
     @apply bg-purple-500/20 text-purple-400 border-purple-500/50 hover:bg-purple-500/40 hover:shadow-[0_0_15px_rgba(168,85,247,0.5)];
