@@ -58,22 +58,22 @@ function ChatMessage({ message, isUser }) {
       )}
     >
       <div className={cn(
-        "w-9 h-9 rounded-xl flex items-center justify-center shrink-0",
+        "w-8 h-8 rounded-sm flex items-center justify-center shrink-0 border",
         isUser 
-          ? "bg-gradient-to-br from-indigo-500 to-purple-600" 
-          : "bg-gradient-to-br from-emerald-400 to-cyan-500"
+          ? "bg-primary/10 border-primary/30 text-primary" 
+          : "bg-secondary/10 border-secondary/30 text-secondary"
       )}>
         {isUser ? (
-          <User className="w-5 h-5 text-white" />
+          <User className="w-4 h-4" />
         ) : (
-          <Bot className="w-5 h-5 text-white" />
+          <Bot className="w-4 h-4" />
         )}
       </div>
       <div className={cn(
-        "flex-1 max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed",
+        "flex-1 max-w-[85%] rounded-sm px-4 py-3 text-sm leading-relaxed border",
         isUser 
-          ? "bg-indigo-500/10 dark:bg-indigo-500/20 text-foreground ml-auto" 
-          : "bg-zinc-100 dark:bg-zinc-800/50 text-foreground"
+          ? "bg-primary/5 border-primary/20 text-foreground ml-auto" 
+          : "bg-secondary/5 border-secondary/20 text-foreground"
       )}>
         <div className="prose prose-sm dark:prose-invert max-w-none">
           {message.content.split('\n').map((line, i) => {
@@ -84,7 +84,7 @@ function ChatMessage({ message, isUser }) {
               return <p key={i} className="ml-2 my-0.5">{parseMarkdownBold(line)}</p>
             }
             if (line.match(/^[📧📊🔄💡✅❌🤖]/)) {
-              return <p key={i} className="font-medium mt-2">{parseMarkdownBold(line)}</p>
+              return <p key={i} className="font-medium mt-2 text-primary">{parseMarkdownBold(line)}</p>
             }
             return <p key={i} className="my-1">{parseMarkdownBold(line)}</p>
           })}
@@ -95,28 +95,42 @@ function ChatMessage({ message, isUser }) {
 }
 
 // モード選択カード
-function ModeCard({ icon: Icon, title, description, onClick, color, badge }) {
+function ModeCard({ icon: Icon, title, description, onClick, colorClass, badge }) {
   return (
     <motion.button
       onClick={onClick}
       whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
-      className="flex-1 p-6 rounded-2xl border-2 border-zinc-200 dark:border-zinc-800 hover:border-primary/50 transition-all text-left relative overflow-hidden group"
+      className={cn(
+        "flex-1 p-6 glass-card group text-left relative overflow-hidden h-full flex flex-col",
+        "hover:border-primary/50 transition-all duration-300"
+      )}
     >
       {badge && (
-        <span className="absolute top-3 right-3 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs font-bold">
+        <span className={cn(
+          "absolute top-3 right-3 px-2 py-0.5 rounded-sm text-xs font-bold font-mono tracking-wider",
+          "bg-primary/10 text-primary border border-primary/20 shadow-[0_0_10px_rgba(6,182,212,0.2)]"
+        )}>
           {badge}
         </span>
       )}
       <div className={cn(
-        "w-12 h-12 rounded-xl flex items-center justify-center mb-4 bg-gradient-to-br",
-        color
+        "w-12 h-12 rounded-sm flex items-center justify-center mb-4 border transition-colors",
+        colorClass || "bg-primary/10 border-primary/30 text-primary"
       )}>
-        <Icon className="w-6 h-6 text-white" />
+        <Icon className="w-6 h-6" />
       </div>
-      <h3 className="text-lg font-bold text-foreground mb-1">{title}</h3>
-      <p className="text-sm text-muted-foreground">{description}</p>
-      <ArrowRight className="absolute bottom-6 right-6 w-5 h-5 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+      <h3 className="text-lg font-bold text-foreground mb-1 font-mono tracking-wide">{title}</h3>
+      <p className="text-sm text-muted-foreground leading-relaxed">{description}</p>
+      
+      {/* Decorative corner */}
+      <div className="absolute bottom-0 right-0 w-8 h-8 opacity-20">
+         <div className="absolute bottom-2 right-2 w-2 h-2 bg-primary/50" />
+         <div className="absolute bottom-2 right-5 w-1 h-1 bg-primary/30" />
+         <div className="absolute bottom-5 right-2 w-1 h-1 bg-primary/30" />
+      </div>
+      
+      <ArrowRight className="absolute bottom-6 right-6 w-5 h-5 text-primary opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
     </motion.button>
   )
 }
@@ -127,36 +141,38 @@ function TaskPreview({ task, onConfirm, onEdit, isCreating }) {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="border-2 border-emerald-500/30 bg-emerald-500/5 rounded-2xl p-6 space-y-4"
+      className="border border-primary/30 bg-primary/5 rounded-lg p-6 space-y-4 relative overflow-hidden"
     >
-      <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
+      <div className="absolute top-0 left-0 w-1 h-full bg-primary/50" />
+      
+      <div className="flex items-center gap-2 text-primary">
         <Sparkles className="w-5 h-5" />
-        <span className="font-bold">タスクを生成しました</span>
+        <span className="font-bold font-mono tracking-wider">TASK_GENERATED</span>
       </div>
       
-      <div className="space-y-3">
+      <div className="space-y-4 pl-2">
         <div>
-          <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">タスク名</label>
-          <p className="text-foreground font-medium mt-1">{task.task_name}</p>
+          <label className="text-xs font-bold text-primary/70 uppercase tracking-widest font-mono">Task Name</label>
+          <p className="text-foreground font-bold text-lg mt-1 tracking-wide">{task.task_name}</p>
         </div>
         
         <div>
-          <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">説明</label>
-          <p className="text-foreground/80 text-sm mt-1">{task.task_description}</p>
+          <label className="text-xs font-bold text-primary/70 uppercase tracking-widest font-mono">Description</label>
+          <p className="text-muted-foreground text-sm mt-1 leading-relaxed">{task.task_description}</p>
         </div>
         
         <div>
-          <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">実行タイプ</label>
+          <label className="text-xs font-bold text-primary/70 uppercase tracking-widest font-mono">Execution Type</label>
           <div className="flex items-center gap-2 mt-1">
             {task.task_type === 'api' ? (
               <>
                 <Code className="w-4 h-4 text-cyan-500" />
-                <span className="text-sm text-cyan-600 dark:text-cyan-400">API呼び出し</span>
+                <span className="text-sm text-cyan-400 font-mono">API_CALL</span>
               </>
             ) : (
               <>
                 <Globe className="w-4 h-4 text-purple-500" />
-                <span className="text-sm text-purple-600 dark:text-purple-400">ブラウザ自動化</span>
+                <span className="text-sm text-purple-400 font-mono">BROWSER_AUTOMATION</span>
               </>
             )}
           </div>
@@ -164,10 +180,10 @@ function TaskPreview({ task, onConfirm, onEdit, isCreating }) {
         
         {task.required_credentials && task.required_credentials.length > 0 && (
           <div>
-            <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">必要な認証情報</label>
+            <label className="text-xs font-bold text-primary/70 uppercase tracking-widest font-mono">Required Credentials</label>
             <div className="flex flex-wrap gap-2 mt-2">
               {task.required_credentials.map((cred, i) => (
-                <span key={i} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs font-medium">
+                <span key={i} className="inline-flex items-center gap-1 px-2 py-1 rounded-sm bg-amber-500/10 text-amber-500 border border-amber-500/20 text-xs font-mono">
                   <Key className="w-3 h-3" />
                   {cred}
                 </span>
@@ -178,7 +194,7 @@ function TaskPreview({ task, onConfirm, onEdit, isCreating }) {
         
         {task.schedule && (
           <div>
-            <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">スケジュール</label>
+            <label className="text-xs font-bold text-primary/70 uppercase tracking-widest font-mono">Schedule</label>
             <p className="text-foreground/80 text-sm font-mono mt-1">{task.schedule}</p>
           </div>
         )}
@@ -188,20 +204,20 @@ function TaskPreview({ task, onConfirm, onEdit, isCreating }) {
         <button
           onClick={onConfirm}
           disabled={isCreating}
-          className="flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-all disabled:opacity-50"
+          className="flex-1 btn btn-primary flex items-center justify-center gap-2 disabled:opacity-50"
         >
           {isCreating ? (
             <Loader2 className="w-5 h-5 animate-spin" />
           ) : (
             <>
               <Zap className="w-5 h-5" />
-              タスクを作成
+              CREATE TASK
             </>
           )}
         </button>
         <button
           onClick={onEdit}
-          className="px-4 py-3 rounded-xl border border-zinc-300 dark:border-zinc-700 text-muted-foreground hover:text-foreground hover:border-zinc-400 dark:hover:border-zinc-600 transition-all"
+          className="btn btn-secondary px-4"
         >
           <RefreshCw className="w-5 h-5" />
         </button>
@@ -405,15 +421,15 @@ export default function TaskWizard() {
         className="mb-8 text-center"
       >
         <div className="inline-flex items-center gap-3 mb-4">
-          <div className="p-3 rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 text-white shadow-xl shadow-purple-500/25">
+          <div className="p-3 rounded-sm bg-primary/10 border border-primary/30 text-primary shadow-[0_0_15px_rgba(6,182,212,0.3)]">
             <Wand2 className="w-8 h-8" />
           </div>
         </div>
-        <h1 className="text-3xl font-bold text-foreground tracking-tight mb-2">
-          タスク作成ウィザード
+        <h1 className="text-3xl font-black text-foreground tracking-tight mb-2 font-mono">
+          TASK WIZARD <span className="text-primary text-sm align-top">BETA</span>
         </h1>
-        <p className="text-muted-foreground text-lg">
-          AIがあなたの自動化タスク作成をお手伝いします
+        <p className="text-muted-foreground text-lg font-mono">
+          AI-Powered Automation Assistant
         </p>
       </motion.div>
 
@@ -424,40 +440,40 @@ export default function TaskWizard() {
           animate={{ opacity: 1, y: 0 }}
           className="space-y-6"
         >
-          <p className="text-center text-muted-foreground">
-            作成方法を選んでください
+          <p className="text-center text-muted-foreground font-mono text-xs tracking-widest uppercase">
+            // Select Initialization Method
           </p>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 auto-rows-fr">
             <ModeCard
               icon={MessageCircle}
-              title="チャットで相談"
-              description="AIと会話しながらタスクを作成。やりたいことを説明するだけ！"
+              title="CHAT INTERFACE"
+              description="Interactive task creation via natural language processing. Describe your objective."
               onClick={() => startChatSession()}
-              color="from-cyan-400 to-emerald-500"
+              colorClass="bg-cyan-500/10 border-cyan-500/30 text-cyan-500"
             />
             <ModeCard
               icon={LayoutGrid}
-              title="テンプレートから選択"
-              description="よく使う自動化タスクをワンクリックで設定"
+              title="TEMPLATE LIBRARY"
+              description="Deploy pre-configured automation workflows from the system repository."
               onClick={() => setShowTemplateLibrary(true)}
-              color="from-amber-400 to-orange-500"
-              badge="おすすめ"
+              colorClass="bg-amber-500/10 border-amber-500/30 text-amber-500"
+              badge="RECOMMENDED"
             />
             <ModeCard
               icon={MonitorPlay}
-              title="画面を録画"
-              description="ブラウザ上で操作を録画。AIが分析して自動化"
+              title="SCREEN RECORDING"
+              description="Capture browser interactions for AI analysis and replication."
               onClick={startRecordMode}
-              color="from-rose-500 to-pink-600"
-              badge="新機能"
+              colorClass="bg-pink-500/10 border-pink-500/30 text-pink-500"
+              badge="NEW"
             />
             <ModeCard
               icon={Video}
-              title="動画をアップロード"
-              description="録画済みの動画をアップロードして分析"
+              title="VIDEO ANALYSIS"
+              description="Upload existing operation footage for procedural analysis."
               onClick={startVideoMode}
-              color="from-purple-500 to-indigo-600"
+              colorClass="bg-purple-500/10 border-purple-500/30 text-purple-500"
             />
           </div>
           
@@ -478,9 +494,9 @@ export default function TaskWizard() {
         >
           <button
             onClick={() => setMode(null)}
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors font-mono"
           >
-            ← 戻る
+            ← BACK
           </button>
           
           <ScreenRecorder 
@@ -490,9 +506,9 @@ export default function TaskWizard() {
           
           {isAnalyzing && (
             <div className="flex flex-col items-center py-8 space-y-4">
-              <Loader2 className="w-12 h-12 text-purple-500 animate-spin" />
-              <p className="font-medium text-foreground">動画を分析中...</p>
-              <p className="text-sm text-muted-foreground">AIが操作内容を解析しています</p>
+              <Loader2 className="w-12 h-12 text-primary animate-spin" />
+              <p className="font-medium text-foreground font-mono">ANALYZING_RECORDING...</p>
+              <p className="text-sm text-muted-foreground font-mono">Processing visual data points...</p>
             </div>
           )}
         </motion.div>
@@ -507,18 +523,18 @@ export default function TaskWizard() {
         >
           <button
             onClick={() => setMode(null)}
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors font-mono"
           >
-            ← 戻る
+            ← BACK
           </button>
           
           <div 
             onClick={() => fileInputRef.current?.click()}
             className={cn(
-              "border-2 border-dashed rounded-2xl p-12 text-center cursor-pointer transition-all",
+              "glass-card border-2 border-dashed rounded-lg p-12 text-center cursor-pointer transition-all",
               isAnalyzing 
-                ? "border-purple-500 bg-purple-500/5" 
-                : "border-zinc-300 dark:border-zinc-700 hover:border-purple-500 hover:bg-purple-500/5"
+                ? "border-primary bg-primary/5" 
+                : "border-zinc-700 hover:border-primary hover:bg-primary/5 hover:shadow-[0_0_20px_rgba(6,182,212,0.1)]"
             )}
           >
             <input
@@ -531,28 +547,28 @@ export default function TaskWizard() {
             
             {isAnalyzing ? (
               <div className="space-y-4">
-                <Loader2 className="w-16 h-16 mx-auto text-purple-500 animate-spin" />
-                <p className="text-lg font-medium text-foreground">動画を分析中...</p>
-                <p className="text-sm text-muted-foreground">
-                  AIが操作内容を解析しています。少々お待ちください。
+                <Loader2 className="w-16 h-16 mx-auto text-primary animate-spin" />
+                <p className="text-lg font-medium text-foreground font-mono">ANALYZING_VIDEO_SEQUENCE...</p>
+                <p className="text-sm text-muted-foreground font-mono">
+                  Extracting interaction vectors. Please wait.
                 </p>
               </div>
             ) : videoFile ? (
               <div className="space-y-4">
-                <FileVideo className="w-16 h-16 mx-auto text-purple-500" />
-                <p className="text-lg font-medium text-foreground">{videoFile.name}</p>
-                <p className="text-sm text-muted-foreground">
-                  クリックして別の動画を選択
+                <FileVideo className="w-16 h-16 mx-auto text-primary" />
+                <p className="text-lg font-medium text-foreground font-mono">{videoFile.name}</p>
+                <p className="text-sm text-muted-foreground font-mono">
+                  [CLICK_TO_RESELECT]
                 </p>
               </div>
             ) : (
               <div className="space-y-4">
                 <Upload className="w-16 h-16 mx-auto text-muted-foreground" />
-                <p className="text-lg font-medium text-foreground">
-                  動画をドロップまたはクリックして選択
+                <p className="text-lg font-medium text-foreground font-mono">
+                  DROP_VIDEO_OR_CLICK
                 </p>
-                <p className="text-sm text-muted-foreground">
-                  MP4, WebM, MOV形式に対応
+                <p className="text-sm text-muted-foreground font-mono">
+                  Supported formats: MP4, WebM, MOV
                 </p>
               </div>
             )}
@@ -565,22 +581,22 @@ export default function TaskWizard() {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="flex flex-col h-[600px] rounded-3xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-black/40 backdrop-blur-sm overflow-hidden shadow-xl"
+          className="flex flex-col h-[600px] glass-card rounded-lg overflow-hidden"
         >
           {/* Chat Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200 dark:border-zinc-800">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-primary/20 bg-primary/5">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-cyan-500 flex items-center justify-center">
-                <Bot className="w-5 h-5 text-white" />
+              <div className="w-8 h-8 rounded-sm bg-primary/10 border border-primary/30 flex items-center justify-center">
+                <Bot className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <h3 className="font-bold text-foreground">AIアシスタント</h3>
-                <p className="text-xs text-muted-foreground">タスク作成をお手伝いします</p>
+                <h3 className="font-bold text-foreground font-mono">AI_ASSISTANT</h3>
+                <p className="text-xs text-muted-foreground font-mono">ONLINE // READY</p>
               </div>
             </div>
             <button
               onClick={resetSession}
-              className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground hover:text-foreground transition-all"
+              className="p-2 rounded-sm hover:bg-destructive/10 hover:text-destructive transition-all"
             >
               <X className="w-5 h-5" />
             </button>
@@ -597,12 +613,12 @@ export default function TaskWizard() {
             
             {isSending && (
               <div className="flex gap-3 p-4">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-400 to-cyan-500 flex items-center justify-center">
-                  <Bot className="w-5 h-5 text-white" />
+                <div className="w-8 h-8 rounded-sm bg-secondary/10 border border-secondary/30 flex items-center justify-center">
+                  <Bot className="w-4 h-4 text-secondary" />
                 </div>
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span className="text-sm">考え中...</span>
+                  <span className="text-sm font-mono animate-pulse">PROCESSING...</span>
                 </div>
               </div>
             )}
@@ -630,21 +646,20 @@ export default function TaskWizard() {
 
           {/* Input */}
           {!generatedTask && (
-            <div className="p-4 border-t border-zinc-200 dark:border-zinc-800">
+            <div className="p-4 border-t border-primary/20 bg-black/20">
               <div className="flex gap-3">
                 <textarea
                   value={inputMessage}
                   onChange={(e) => setInputMessage(e.target.value)}
                   onKeyPress={handleKeyPress}
-                  placeholder="メッセージを入力..."
+                  placeholder="Enter instructions..."
                   rows={1}
-                  className="flex-1 px-4 py-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 border-0 resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 text-foreground placeholder:text-muted-foreground"
-                  style={{ minHeight: '48px', maxHeight: '120px' }}
+                  className="flex-1 input resize-none min-h-[48px] max-h-[120px] font-mono text-sm bg-black/40 border-primary/30 focus:border-primary/60"
                 />
                 <button
                   onClick={sendMessage}
                   disabled={!inputMessage.trim() || isSending}
-                  className="w-12 h-12 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-12 h-12 rounded-sm bg-primary/20 border border-primary/50 text-primary hover:bg-primary/30 hover:shadow-[0_0_10px_rgba(6,182,212,0.3)] flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Send className="w-5 h-5" />
                 </button>
@@ -671,14 +686,16 @@ export default function TaskWizard() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.5 }}
-          className="mt-6 p-4 rounded-xl bg-zinc-100 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800"
+          className="mt-6 p-4 rounded-sm border border-dashed border-primary/30 bg-primary/5"
         >
-          <h4 className="text-sm font-bold text-foreground mb-2">💡 ヒント</h4>
-          <ul className="text-xs text-muted-foreground space-y-1">
-            <li>• 自動化したいことをできるだけ詳しく説明してください</li>
-            <li>• 対象のサイトやサービス名を教えてください</li>
-            <li>• 実行頻度（毎日、毎週など）があれば教えてください</li>
-            <li>• APIが使えるサービスの場合、AIがAPIの利用を提案します</li>
+          <h4 className="text-sm font-bold text-foreground mb-2 font-mono flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-primary" />
+            TIPS
+          </h4>
+          <ul className="text-xs text-muted-foreground space-y-1 font-mono">
+            <li>• Be specific about the target URL and desired actions.</li>
+            <li>• Mention execution frequency (daily, weekly) if needed.</li>
+            <li>• The AI will prioritize API endpoints for stability when available.</li>
           </ul>
         </motion.div>
       )}
