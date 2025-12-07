@@ -7,7 +7,7 @@ WORKDIR /frontend
 
 # 依存関係をインストール
 COPY frontend/package*.json ./
-RUN npm install
+RUN npm install --legacy-peer-deps
 
 # フロントエンドをビルド
 COPY frontend/ ./
@@ -16,10 +16,13 @@ RUN npm run build
 # ============================================
 # Stage 2: バックエンド + フロントエンド統合
 # ============================================
-FROM python:3.11-slim
+FROM python:3.11-slim-bookworm
+
+# 環境変数でデバッグを無効化
+ENV DEBIAN_FRONTEND=noninteractive
 
 # Playwrightの依存関係をインストール
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     gnupg \
     libglib2.0-0 \
@@ -42,7 +45,8 @@ RUN apt-get update && apt-get install -y \
     libpango-1.0-0 \
     libcairo2 \
     libasound2 \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
 
 WORKDIR /app
 
