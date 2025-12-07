@@ -12,8 +12,7 @@ apscheduler==3.10.4
 
 # Browser Automation
 browser-use==0.1.40
-langchain-anthropic==0.1.23
-playwright==1.41.2
+# langchain-anthropic and playwright are managed by browser-use
 
 # Desktop Automation (Lux/OAGI)
 oagi
