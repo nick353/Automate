@@ -1,6 +1,6 @@
 """プロジェクト管理 API"""
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
@@ -532,6 +532,3 @@ async def analyze_video_for_project(
         pass
     
     return result
-
-
-from fastapi import UploadFile, File, Form
