@@ -172,7 +172,7 @@ export default function ErrorHelper({ error, onRetry, onRestart }) {
     >
       {/* Header */}
       <div className="p-4 flex items-start gap-3">
-        <div={cn(
+        <div className={cn(
           "w-10 h-10 rounded-xl flex items-center justify-center shrink-0",
           iconColorClasses[errorInfo.color]
         )}>
