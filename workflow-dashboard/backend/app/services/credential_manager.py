@@ -29,16 +29,24 @@ class CredentialManager:
         credentials = query.order_by(Credential.created_at.desc()).all()
         return [self._to_response(c) for c in credentials]
     
-    def get(self, db: Session, credential_id: int) -> Optional[Dict]:
+    def get(self, db: Session, credential_id: int, user_id: str = None) -> Optional[Dict]:
         """認証情報を取得（データは含まない）"""
-        credential = db.query(Credential).filter(Credential.id == credential_id).first()
+        query = db.query(Credential).filter(Credential.id == credential_id)
+        if user_id:
+            query = query.filter(Credential.user_id == user_id)
+        
+        credential = query.first()
         if not credential:
             return None
         return self._to_response(credential)
     
-    def get_with_data(self, db: Session, credential_id: int) -> Optional[Dict]:
+    def get_with_data(self, db: Session, credential_id: int, user_id: str = None) -> Optional[Dict]:
         """認証情報をデータ付きで取得（復号化済み）"""
-        credential = db.query(Credential).filter(Credential.id == credential_id).first()
+        query = db.query(Credential).filter(Credential.id == credential_id)
+        if user_id:
+            query = query.filter(Credential.user_id == user_id)
+        
+        credential = query.first()
         if not credential:
             return None
         
@@ -157,9 +165,13 @@ class CredentialManager:
         logger.info(f"認証情報を作成: {credential.name} ({credential.service_name})")
         return self._to_response(credential)
     
-    def update(self, db: Session, credential_id: int, credential_data: Any) -> Optional[Dict]:
+    def update(self, db: Session, credential_id: int, credential_data: Any, user_id: str = None) -> Optional[Dict]:
         """認証情報を更新"""
-        credential = db.query(Credential).filter(Credential.id == credential_id).first()
+        query = db.query(Credential).filter(Credential.id == credential_id)
+        if user_id:
+            query = query.filter(Credential.user_id == user_id)
+        
+        credential = query.first()
         if not credential:
             return None
         
@@ -190,9 +202,13 @@ class CredentialManager:
         logger.info(f"認証情報を更新: {credential.name}")
         return self._to_response(credential)
     
-    def delete(self, db: Session, credential_id: int) -> bool:
+    def delete(self, db: Session, credential_id: int, user_id: str = None) -> bool:
         """認証情報を削除"""
-        credential = db.query(Credential).filter(Credential.id == credential_id).first()
+        query = db.query(Credential).filter(Credential.id == credential_id)
+        if user_id:
+            query = query.filter(Credential.user_id == user_id)
+        
+        credential = query.first()
         if not credential:
             return False
         
@@ -201,9 +217,9 @@ class CredentialManager:
         db.commit()
         return True
     
-    def test_credential(self, db: Session, credential_id: int) -> Dict:
+    def test_credential(self, db: Session, credential_id: int, user_id: str = None) -> Dict:
         """認証情報をテスト"""
-        credential = self.get_with_data(db, credential_id)
+        credential = self.get_with_data(db, credential_id, user_id=user_id)
         if not credential:
             return {"success": False, "error": "認証情報が見つかりません"}
         

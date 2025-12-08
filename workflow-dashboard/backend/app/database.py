@@ -26,32 +26,42 @@ def debug_log(location, message, data=None, hypothesis_id=None):
         pass
 # #endregion
 
-# #region agent log
-debug_log("database.py", "Database module loading", {"database_url": settings.database_url}, "C")
-# #endregion
-
-# データディレクトリの作成
-data_dir = Path("data")
-data_dir.mkdir(exist_ok=True)
+# 実際に使用するデータベースURL
+effective_db_url = settings.effective_database_url
 
 # #region agent log
-debug_log("database.py", "Data directory created", {"path": str(data_dir.absolute())}, "C")
+debug_log("database.py", "Database module loading", {"database_url": effective_db_url, "using_supabase": bool(settings.supabase_db_url)}, "C")
 # #endregion
+
+# データディレクトリの作成（SQLiteの場合のみ必要）
+if effective_db_url.startswith("sqlite"):
+    data_dir = Path("data")
+    data_dir.mkdir(exist_ok=True)
+    # #region agent log
+    debug_log("database.py", "Data directory created", {"path": str(data_dir.absolute())}, "C")
+    # #endregion
 
 # SQLiteの場合はcheck_same_threadをFalseに
 connect_args = {}
-if settings.database_url.startswith("sqlite"):
+if effective_db_url.startswith("sqlite"):
     connect_args = {"check_same_thread": False}
 
+# PostgreSQLの場合の接続プール設定
+pool_settings = {}
+if effective_db_url.startswith("postgresql"):
+    from sqlalchemy.pool import NullPool
+    pool_settings = {"poolclass": NullPool}  # サーバーレス環境向け
+
 # #region agent log
-debug_log("database.py", "Before engine creation", {"database_url": settings.database_url, "connect_args": connect_args}, "C")
+debug_log("database.py", "Before engine creation", {"database_url": effective_db_url[:50] + "...", "connect_args": connect_args}, "C")
 # #endregion
 
 try:
     engine = create_engine(
-        settings.database_url,
+        effective_db_url,
         connect_args=connect_args,
-        echo=False  # デバッグ時はTrueに
+        echo=False,  # デバッグ時はTrueに
+        **pool_settings
     )
     # #region agent log
     debug_log("database.py", "Engine created successfully", {}, "C")

@@ -1,5 +1,5 @@
 """タスク管理 API"""
-from typing import List
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 
@@ -8,19 +8,33 @@ from app.models import Task, Execution
 from app.schemas import (
     TaskCreate, TaskUpdate, TaskResponse, TaskWithCredentials, MessageResponse
 )
+from app.services.auth import get_current_user, UserInfo
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
 
+def get_user_filter(user: Optional[UserInfo]):
+    """ユーザーIDフィルターを取得（開発モード対応）"""
+    if user and user.id != "local-dev":
+        return user.id
+    return None  # 開発モードではフィルタリングなし
+
+
 @router.get("", response_model=List[TaskResponse])
-def get_tasks(
+async def get_tasks(
     skip: int = 0,
     limit: int = 100,
     is_active: bool = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Optional[UserInfo] = Depends(get_current_user)
 ):
-    """タスク一覧を取得"""
+    """タスク一覧を取得（ユーザーに紐づくタスクのみ）"""
     query = db.query(Task)
+    
+    # ユーザーIDでフィルタリング
+    user_id = get_user_filter(current_user)
+    if user_id:
+        query = query.filter(Task.user_id == user_id)
     
     if is_active is not None:
         query = query.filter(Task.is_active == is_active)
@@ -30,9 +44,19 @@ def get_tasks(
 
 
 @router.post("", response_model=TaskResponse)
-def create_task(task: TaskCreate, db: Session = Depends(get_db)):
-    """タスクを作成"""
-    db_task = Task(**task.model_dump())
+async def create_task(
+    task: TaskCreate,
+    db: Session = Depends(get_db),
+    current_user: Optional[UserInfo] = Depends(get_current_user)
+):
+    """タスクを作成（ユーザーIDを保存）"""
+    task_data = task.model_dump()
+    
+    # ユーザーIDを追加
+    if current_user and current_user.id != "local-dev":
+        task_data["user_id"] = current_user.id
+    
+    db_task = Task(**task_data)
     db.add(db_task)
     db.commit()
     db.refresh(db_task)
@@ -40,18 +64,41 @@ def create_task(task: TaskCreate, db: Session = Depends(get_db)):
 
 
 @router.get("/{task_id}", response_model=TaskWithCredentials)
-def get_task(task_id: int, db: Session = Depends(get_db)):
+async def get_task(
+    task_id: int,
+    db: Session = Depends(get_db),
+    current_user: Optional[UserInfo] = Depends(get_current_user)
+):
     """タスク詳細を取得"""
-    task = db.query(Task).filter(Task.id == task_id).first()
+    query = db.query(Task).filter(Task.id == task_id)
+    
+    # ユーザーIDでフィルタリング
+    user_id = get_user_filter(current_user)
+    if user_id:
+        query = query.filter(Task.user_id == user_id)
+    
+    task = query.first()
     if not task:
         raise HTTPException(status_code=404, detail="タスクが見つかりません")
     return task
 
 
 @router.put("/{task_id}", response_model=TaskResponse)
-def update_task(task_id: int, task_update: TaskUpdate, db: Session = Depends(get_db)):
+async def update_task(
+    task_id: int,
+    task_update: TaskUpdate,
+    db: Session = Depends(get_db),
+    current_user: Optional[UserInfo] = Depends(get_current_user)
+):
     """タスクを更新"""
-    task = db.query(Task).filter(Task.id == task_id).first()
+    query = db.query(Task).filter(Task.id == task_id)
+    
+    # ユーザーIDでフィルタリング
+    user_id = get_user_filter(current_user)
+    if user_id:
+        query = query.filter(Task.user_id == user_id)
+    
+    task = query.first()
     if not task:
         raise HTTPException(status_code=404, detail="タスクが見つかりません")
     
@@ -65,9 +112,20 @@ def update_task(task_id: int, task_update: TaskUpdate, db: Session = Depends(get
 
 
 @router.delete("/{task_id}", response_model=MessageResponse)
-def delete_task(task_id: int, db: Session = Depends(get_db)):
+async def delete_task(
+    task_id: int,
+    db: Session = Depends(get_db),
+    current_user: Optional[UserInfo] = Depends(get_current_user)
+):
     """タスクを削除"""
-    task = db.query(Task).filter(Task.id == task_id).first()
+    query = db.query(Task).filter(Task.id == task_id)
+    
+    # ユーザーIDでフィルタリング
+    user_id = get_user_filter(current_user)
+    if user_id:
+        query = query.filter(Task.user_id == user_id)
+    
+    task = query.first()
     if not task:
         raise HTTPException(status_code=404, detail="タスクが見つかりません")
     
@@ -77,9 +135,20 @@ def delete_task(task_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/{task_id}/toggle", response_model=TaskResponse)
-def toggle_task(task_id: int, db: Session = Depends(get_db)):
+async def toggle_task(
+    task_id: int,
+    db: Session = Depends(get_db),
+    current_user: Optional[UserInfo] = Depends(get_current_user)
+):
     """タスクの有効/無効を切り替え"""
-    task = db.query(Task).filter(Task.id == task_id).first()
+    query = db.query(Task).filter(Task.id == task_id)
+    
+    # ユーザーIDでフィルタリング
+    user_id = get_user_filter(current_user)
+    if user_id:
+        query = query.filter(Task.user_id == user_id)
+    
+    task = query.first()
     if not task:
         raise HTTPException(status_code=404, detail="タスクが見つかりません")
     
@@ -93,13 +162,21 @@ def toggle_task(task_id: int, db: Session = Depends(get_db)):
 async def run_task(
     task_id: int,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Optional[UserInfo] = Depends(get_current_user)
 ):
     """タスクを手動実行"""
     from app.services.agent import run_task_with_live_view
     from datetime import datetime
     
-    task = db.query(Task).filter(Task.id == task_id).first()
+    query = db.query(Task).filter(Task.id == task_id)
+    
+    # ユーザーIDでフィルタリング
+    user_id = get_user_filter(current_user)
+    if user_id:
+        query = query.filter(Task.user_id == user_id)
+    
+    task = query.first()
     if not task:
         raise HTTPException(status_code=404, detail="タスクが見つかりません")
     

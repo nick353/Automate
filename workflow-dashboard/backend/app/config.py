@@ -3,6 +3,7 @@
 
 環境変数の設定:
 - DATABASE_URL: データベース接続URL (default: sqlite:///./data/workflow.db)
+- SUPABASE_DB_URL: Supabase PostgreSQL接続URL (設定された場合、DATABASE_URLより優先)
 - ENCRYPTION_KEY: 認証情報暗号化キー (python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())" で生成)
 - IN_DOCKER: Docker環境フラグ (default: False)
 """
@@ -12,8 +13,20 @@ from functools import lru_cache
 
 
 class Settings(BaseSettings):
-    # Database
+    # Database - Supabase PostgreSQL優先、なければSQLite
     database_url: str = "sqlite:///./data/workflow.db"
+    supabase_db_url: str = "postgresql://postgres.vyvarctfzslbthdbsmvd:Nichika0823@aws-1-ap-south-1.pooler.supabase.com:5432/postgres"
+    
+    @property
+    def effective_database_url(self) -> str:
+        """実際に使用するデータベースURLを返す"""
+        if self.supabase_db_url:
+            # postgresql:// で始まるように変換
+            url = self.supabase_db_url
+            if url.startswith("postgres://"):
+                url = url.replace("postgres://", "postgresql://", 1)
+            return url
+        return self.database_url
     
     # Encryption
     encryption_key: str = "default-key-change-in-production"

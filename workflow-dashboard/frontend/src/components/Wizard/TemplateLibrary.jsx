@@ -230,7 +230,7 @@ Slack Webhookを使用して通知してください。`
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
         onClick={onClose}
       >
         <motion.div
@@ -288,7 +288,7 @@ Slack Webhookを使用して通知してください。`
           </div>
 
           {/* Templates Grid */}
-          <div className="flex-1 overflow-y-auto p-6 bg-black/20">
+          <div className="flex-1 overflow-y-auto p-6 bg-transparent">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {filteredTemplates.map((template, index) => (
                 <motion.button

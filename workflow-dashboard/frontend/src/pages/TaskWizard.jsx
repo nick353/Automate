@@ -649,7 +649,7 @@ export default function TaskWizard() {
 
           {/* Input */}
           {!generatedTask && (
-            <div className="p-4 border-t border-primary/20 bg-black/20">
+            <div className="p-4 border-t border-primary/20 bg-transparent">
               <div className="flex gap-3">
                 <textarea
                   value={inputMessage}
@@ -657,7 +657,7 @@ export default function TaskWizard() {
                   onKeyPress={handleKeyPress}
                   placeholder={t('wizard.enterInstructions')}
                   rows={1}
-                  className="flex-1 input resize-none min-h-[48px] max-h-[120px] font-mono text-sm bg-black/40 border-primary/30 focus:border-primary/60"
+                  className="flex-1 input resize-none min-h-[48px] max-h-[120px] font-mono text-sm bg-black/20 border-primary/30 focus:border-primary/60"
                 />
                 <button
                   onClick={sendMessage}
