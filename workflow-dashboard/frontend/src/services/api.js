@@ -66,6 +66,47 @@ api.interceptors.response.use(
   }
 )
 
+// Projects API
+export const projectsApi = {
+  getAll: (params) => api.get('/projects', { params }),
+  get: (id) => api.get(`/projects/${id}`),
+  create: (data) => api.post('/projects', data),
+  update: (id, data) => api.put(`/projects/${id}`, data),
+  delete: (id) => api.delete(`/projects/${id}`),
+  // カンバンボード用
+  getBoardData: () => api.get('/projects/board/data'),
+  getWithTasks: (id) => api.get(`/projects/${id}/with-tasks`),
+  // 役割グループ
+  createRoleGroup: (projectId, data) => api.post(`/projects/${projectId}/role-groups`, data),
+  getRoleGroups: (projectId) => api.get(`/projects/${projectId}/role-groups`),
+  updateRoleGroup: (groupId, data) => api.put(`/projects/role-groups/${groupId}`, data),
+  deleteRoleGroup: (groupId) => api.delete(`/projects/role-groups/${groupId}`),
+  // プロジェクトチャット
+  chat: (projectId, message, chatHistory) => api.post(`/projects/${projectId}/chat`, { message, chat_history: chatHistory }),
+  executeActions: (projectId, actions) => api.post(`/projects/${projectId}/chat/execute-actions`, { actions }),
+  getWorkflowExplanation: (projectId) => api.get(`/projects/${projectId}/workflow-explanation`),
+  // ウィザードチャット（空プロジェクト用）
+  wizardChat: (projectId, message, chatHistory, videoAnalysis, webResearch) => 
+    api.post(`/projects/${projectId}/wizard-chat`, { 
+      message, 
+      chat_history: chatHistory,
+      video_analysis: videoAnalysis,
+      web_research: webResearch
+    }),
+  // Webリサーチ
+  webSearch: (projectId, query, numResults = 5) => 
+    api.post(`/projects/${projectId}/web-search`, { query, num_results: numResults }),
+  // 動画分析
+  analyzeVideo: (projectId, file, context = '') => {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('context', context)
+    return api.post(`/projects/${projectId}/analyze-video`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+  }
+}
+
 // Tasks API
 export const tasksApi = {
   getAll: (params) => api.get('/tasks', { params }),
@@ -74,7 +115,17 @@ export const tasksApi = {
   update: (id, data) => api.put(`/tasks/${id}`, data),
   delete: (id) => api.delete(`/tasks/${id}`),
   toggle: (id) => api.post(`/tasks/${id}/toggle`),
-  run: (id) => api.post(`/tasks/${id}/run`)
+  run: (id) => api.post(`/tasks/${id}/run`),
+  // バッチ更新（ドラッグ&ドロップ用）
+  batchUpdate: (tasks) => api.post('/tasks/batch-update', { tasks }),
+  // トリガー管理
+  getTriggers: (taskId) => api.get(`/tasks/${taskId}/triggers`),
+  createTrigger: (taskId, data) => api.post(`/tasks/${taskId}/triggers`, data),
+  updateTrigger: (triggerId, data) => api.put(`/tasks/triggers/${triggerId}`, data),
+  deleteTrigger: (triggerId) => api.delete(`/tasks/triggers/${triggerId}`),
+  // タスク個別チャット
+  taskChat: (taskId, message, chatHistory) => api.post(`/tasks/${taskId}/chat`, { message, chat_history: chatHistory }),
+  executeTaskActions: (taskId, actions) => api.post(`/tasks/${taskId}/chat/execute-actions`, { actions })
 }
 
 // Credentials API
@@ -159,4 +210,3 @@ export const wizardApi = {
 }
 
 export default api
-

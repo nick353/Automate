@@ -1,12 +1,13 @@
 """タスク管理 API"""
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
-from app.models import Task, Execution
+from app.models import Task, Execution, TaskTrigger
 from app.schemas import (
-    TaskCreate, TaskUpdate, TaskResponse, TaskWithCredentials, MessageResponse
+    TaskCreate, TaskUpdate, TaskResponse, TaskWithCredentials, MessageResponse,
+    TaskBatchUpdateRequest, TaskTriggerCreate, TaskTriggerUpdate, TaskTriggerResponse
 )
 from app.services.auth import get_current_user, UserInfo
 
@@ -198,6 +199,211 @@ async def run_task(
         "message": "タスクを開始しました",
         "status": str(execution.id)
     }
+
+
+# ==================== バッチ更新API ====================
+
+@router.post("/batch-update", response_model=MessageResponse)
+async def batch_update_tasks(
+    request: TaskBatchUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: Optional[UserInfo] = Depends(get_current_user)
+):
+    """複数タスクを一括更新（ドラッグ&ドロップ用）"""
+    user_id = get_user_filter(current_user)
+    
+    for task_update in request.tasks:
+        query = db.query(Task).filter(Task.id == task_update.id)
+        if user_id:
+            query = query.filter(Task.user_id == user_id)
+        
+        task = query.first()
+        if task:
+            if task_update.project_id is not None:
+                task.project_id = task_update.project_id if task_update.project_id > 0 else None
+            if task_update.role_group is not None:
+                task.role_group = task_update.role_group
+            if task_update.role_group_id is not None:
+                task.role_group_id = task_update.role_group_id if task_update.role_group_id > 0 else None
+            if task_update.order_index is not None:
+                task.order_index = task_update.order_index
+    
+    db.commit()
+    return {"message": f"{len(request.tasks)}件のタスクを更新しました"}
+
+
+# ==================== トリガーAPI ====================
+
+@router.get("/{task_id}/triggers", response_model=List[TaskTriggerResponse])
+async def get_task_triggers(
+    task_id: int,
+    db: Session = Depends(get_db),
+    current_user: Optional[UserInfo] = Depends(get_current_user)
+):
+    """タスクのトリガー一覧を取得"""
+    # タスクの存在確認
+    user_id = get_user_filter(current_user)
+    task_query = db.query(Task).filter(Task.id == task_id)
+    if user_id:
+        task_query = task_query.filter(Task.user_id == user_id)
+    
+    task = task_query.first()
+    if not task:
+        raise HTTPException(status_code=404, detail="タスクが見つかりません")
+    
+    triggers = db.query(TaskTrigger).filter(TaskTrigger.task_id == task_id).all()
+    return triggers
+
+
+@router.post("/{task_id}/triggers", response_model=TaskTriggerResponse)
+async def create_task_trigger(
+    task_id: int,
+    trigger: TaskTriggerCreate,
+    db: Session = Depends(get_db),
+    current_user: Optional[UserInfo] = Depends(get_current_user)
+):
+    """タスクのトリガーを作成"""
+    # タスクの存在確認
+    user_id = get_user_filter(current_user)
+    task_query = db.query(Task).filter(Task.id == task_id)
+    if user_id:
+        task_query = task_query.filter(Task.user_id == user_id)
+    
+    task = task_query.first()
+    if not task:
+        raise HTTPException(status_code=404, detail="タスクが見つかりません")
+    
+    trigger_data = trigger.model_dump()
+    trigger_data["task_id"] = task_id
+    
+    db_trigger = TaskTrigger(**trigger_data)
+    db.add(db_trigger)
+    db.commit()
+    db.refresh(db_trigger)
+    return db_trigger
+
+
+@router.put("/triggers/{trigger_id}", response_model=TaskTriggerResponse)
+async def update_task_trigger(
+    trigger_id: int,
+    trigger_update: TaskTriggerUpdate,
+    db: Session = Depends(get_db),
+    current_user: Optional[UserInfo] = Depends(get_current_user)
+):
+    """トリガーを更新"""
+    trigger = db.query(TaskTrigger).filter(TaskTrigger.id == trigger_id).first()
+    if not trigger:
+        raise HTTPException(status_code=404, detail="トリガーが見つかりません")
+    
+    # タスクの所有確認
+    user_id = get_user_filter(current_user)
+    if user_id:
+        task = db.query(Task).filter(Task.id == trigger.task_id, Task.user_id == user_id).first()
+        if not task:
+            raise HTTPException(status_code=404, detail="タスクが見つかりません")
+    
+    update_data = trigger_update.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(trigger, key, value)
+    
+    db.commit()
+    db.refresh(trigger)
+    return trigger
+
+
+@router.delete("/triggers/{trigger_id}", response_model=MessageResponse)
+async def delete_task_trigger(
+    trigger_id: int,
+    db: Session = Depends(get_db),
+    current_user: Optional[UserInfo] = Depends(get_current_user)
+):
+    """トリガーを削除"""
+    trigger = db.query(TaskTrigger).filter(TaskTrigger.id == trigger_id).first()
+    if not trigger:
+        raise HTTPException(status_code=404, detail="トリガーが見つかりません")
+    
+    # タスクの所有確認
+    user_id = get_user_filter(current_user)
+    if user_id:
+        task = db.query(Task).filter(Task.id == trigger.task_id, Task.user_id == user_id).first()
+        if not task:
+            raise HTTPException(status_code=404, detail="タスクが見つかりません")
+    
+    db.delete(trigger)
+    db.commit()
+    return {"message": "トリガーを削除しました"}
+
+
+# ==================== タスク個別チャットAPI ====================
+
+from pydantic import BaseModel
+from app.services.project_chat import project_chat_service
+
+
+class TaskChatRequest(BaseModel):
+    """タスクチャットリクエスト"""
+    message: str
+    chat_history: list = None
+
+
+class TaskChatActionsRequest(BaseModel):
+    """タスクアクション実行リクエスト"""
+    actions: list
+
+
+@router.post("/{task_id}/chat")
+async def task_chat(
+    task_id: int,
+    request: TaskChatRequest,
+    db: Session = Depends(get_db),
+    current_user: Optional[UserInfo] = Depends(get_current_user)
+):
+    """タスク個別のAIチャット（ロジック理解・微調整）"""
+    user_id = get_user_filter(current_user)
+    task_query = db.query(Task).filter(Task.id == task_id)
+    if user_id:
+        task_query = task_query.filter(Task.user_id == user_id)
+    
+    task = task_query.first()
+    if not task:
+        raise HTTPException(status_code=404, detail="タスクが見つかりません")
+    
+    # チャットを実行（user_idを渡してAPIキー保存時に使用）
+    result = await project_chat_service.task_chat(
+        db,
+        task_id,
+        request.message,
+        request.chat_history,
+        user_id
+    )
+    
+    return result
+
+
+@router.post("/{task_id}/chat/execute-actions")
+async def execute_task_chat_actions(
+    task_id: int,
+    request: TaskChatActionsRequest,
+    db: Session = Depends(get_db),
+    current_user: Optional[UserInfo] = Depends(get_current_user)
+):
+    """タスクチャットで提案されたアクションを実行"""
+    user_id = get_user_filter(current_user)
+    task_query = db.query(Task).filter(Task.id == task_id)
+    if user_id:
+        task_query = task_query.filter(Task.user_id == user_id)
+    
+    task = task_query.first()
+    if not task:
+        raise HTTPException(status_code=404, detail="タスクが見つかりません")
+    
+    result = await project_chat_service.execute_task_actions(
+        db,
+        task_id,
+        request.actions
+    )
+    
+    return result
 
 
 

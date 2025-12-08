@@ -30,12 +30,32 @@ class Credential(Base):
     tasks_as_lux = relationship("Task", back_populates="lux_credential", foreign_keys="Task.lux_credential_id")
 
 
+class Project(Base):
+    """プロジェクトテーブル"""
+    __tablename__ = "projects"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(String(36), index=True)
+    name = Column(String(255), nullable=False)
+    description = Column(Text)
+    color = Column(String(20), default="#6366f1")  # プロジェクトカラー
+    icon = Column(String(50), default="folder")  # Lucide icon名
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    tasks = relationship("Task", back_populates="project", cascade="all, delete-orphan")
+    role_groups = relationship("RoleGroup", back_populates="project", cascade="all, delete-orphan")
+
+
 class Task(Base):
     """タスクテーブル"""
     __tablename__ = "tasks"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(String(36), index=True)  # Supabase user ID (nullable for local dev)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=True) # プロジェクトID
+    
     name = Column(String(255), nullable=False)
     description = Column(Text)
     task_prompt = Column(Text, nullable=False)
@@ -53,6 +73,16 @@ class Task(Base):
     # 実行場所: server (サーバーで実行), local (ローカルエージェント経由)
     execution_location = Column(String(20), default="server")
     
+    # グループ分け（役割・フェーズ）
+    role_group = Column(String(100), default="General")
+    role_group_id = Column(Integer, ForeignKey("role_groups.id"), nullable=True)
+    
+    # 依存関係（前のタスクIDのリストをJSON文字列で保存）
+    dependencies = Column(Text, default="[]")
+    
+    # 順序（カンバンボードでの表示順）
+    order_index = Column(Integer, default=0)
+    
     # 認証情報への参照
     llm_credential_id = Column(Integer, ForeignKey("credentials.id"))
     site_credential_id = Column(Integer, ForeignKey("credentials.id"))
@@ -63,11 +93,13 @@ class Task(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
+    project = relationship("Project", back_populates="tasks")
     llm_credential = relationship("Credential", back_populates="tasks_as_llm", foreign_keys=[llm_credential_id])
     site_credential = relationship("Credential", back_populates="tasks_as_site", foreign_keys=[site_credential_id])
     notification_credential = relationship("Credential", back_populates="tasks_as_notification", foreign_keys=[notification_credential_id])
     lux_credential = relationship("Credential", back_populates="tasks_as_lux", foreign_keys=[lux_credential_id])
     executions = relationship("Execution", back_populates="task", cascade="all, delete-orphan")
+    triggers = relationship("TaskTrigger", back_populates="task", foreign_keys="TaskTrigger.task_id", cascade="all, delete-orphan")
 
 
 class Execution(Base):
@@ -148,3 +180,60 @@ class WizardSession(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+
+class TaskTrigger(Base):
+    """タスクトリガーテーブル（時間・条件トリガー）"""
+    __tablename__ = "task_triggers"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    task_id = Column(Integer, ForeignKey("tasks.id"), nullable=False)
+    trigger_type = Column(String(50), nullable=False)  # time, cron, dependency, manual
+    
+    # 時間トリガー設定
+    trigger_time = Column(String(10))  # HH:MM形式
+    trigger_days = Column(String(50))  # JSON配列: ["mon", "tue", ...]
+    
+    # Cronトリガー設定
+    cron_expression = Column(String(100))
+    
+    # 依存トリガー設定
+    depends_on_task_id = Column(Integer, ForeignKey("tasks.id"))
+    trigger_on_status = Column(String(20), default="completed")  # completed, failed, any
+    
+    # 遅延設定（依存タスク完了後X分待つ）
+    delay_minutes = Column(Integer, default=0)
+    
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    task = relationship("Task", back_populates="triggers", foreign_keys=[task_id])
+    depends_on_task = relationship("Task", foreign_keys=[depends_on_task_id])
+
+    __table_args__ = (
+        Index("idx_task_triggers_task_id", "task_id"),
+    )
+
+
+class RoleGroup(Base):
+    """役割グループテーブル（フォルダ管理）"""
+    __tablename__ = "role_groups"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(String(36), index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    name = Column(String(100), nullable=False)
+    description = Column(Text)
+    color = Column(String(20), default="#6366f1")  # インディゴ
+    icon = Column(String(50), default="folder")  # Lucide icon名
+    order_index = Column(Integer, default=0)  # 表示順序
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    project = relationship("Project", back_populates="role_groups")
+
+    __table_args__ = (
+        Index("idx_role_groups_project_id", "project_id"),
+    )

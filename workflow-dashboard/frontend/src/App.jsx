@@ -3,6 +3,7 @@ import Layout from './components/Layout'
 import AuthGuard from './components/AuthGuard'
 import Dashboard from './pages/Dashboard'
 import Tasks from './pages/Tasks'
+import TaskBoard from './pages/TaskBoard'
 import TaskWizard from './pages/TaskWizard'
 import Credentials from './pages/Credentials'
 import History from './pages/History'
@@ -32,6 +33,7 @@ export default function App() {
       >
         <Route index element={<Dashboard />} />
         <Route path="tasks" element={<Tasks />} />
+        <Route path="tasks/board" element={<TaskBoard />} />
         <Route path="tasks/wizard" element={<TaskWizard />} />
         <Route path="credentials" element={<Credentials />} />
         <Route path="history" element={<History />} />
