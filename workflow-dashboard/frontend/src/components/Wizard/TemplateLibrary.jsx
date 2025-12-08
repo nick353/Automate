@@ -238,10 +238,10 @@ Slack Webhookを使用して通知してください。`
           animate={{ scale: 1, opacity: 1, y: 0 }}
           exit={{ scale: 0.9, opacity: 0, y: 20 }}
           onClick={e => e.stopPropagation()}
-          className="relative w-full max-w-4xl max-h-[85vh] glass-card rounded-lg border-primary/20 shadow-[0_0_30px_rgba(6,182,212,0.1)] overflow-hidden flex flex-col"
+          className="relative w-full max-w-4xl max-h-[85vh] bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 shadow-2xl overflow-hidden flex flex-col"
         >
           {/* Header */}
-          <div className="p-6 border-b border-white/5">
+          <div className="p-6 border-b border-zinc-200 dark:border-zinc-800">
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h2 className="text-2xl font-black text-foreground font-mono tracking-tight">{t('wizard.templates.title')}</h2>
@@ -263,7 +263,7 @@ Slack Webhookを使用して通知してください。`
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder={t('wizard.templates.searchPlaceholder')}
-                className="w-full h-10 pl-10 pr-4 rounded-sm bg-black/40 border border-white/10 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 font-mono text-sm"
+                className="w-full h-10 pl-10 pr-4 rounded-sm bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 font-mono text-sm"
               />
             </div>
 
@@ -277,7 +277,7 @@ Slack Webhookを使用して通知してください。`
                     "flex items-center gap-2 px-3 py-1.5 rounded-sm text-xs font-bold font-mono whitespace-nowrap transition-all border",
                     selectedCategory === cat.id
                       ? "bg-primary/20 border-primary/50 text-primary shadow-[0_0_10px_rgba(6,182,212,0.2)]"
-                      : "bg-transparent border-white/10 text-muted-foreground hover:text-foreground hover:border-white/30"
+                      : "bg-transparent border-zinc-200 dark:border-zinc-700 text-muted-foreground hover:text-foreground hover:border-primary/30"
                   )}
                 >
                   <cat.icon className="w-3 h-3" />
@@ -297,9 +297,9 @@ Slack Webhookを使用して通知してください。`
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.05 }}
                   onClick={() => handleSelect(template)}
-                  className="group p-5 rounded-sm border border-white/5 hover:border-primary/40 bg-white/5 hover:bg-white/10 transition-all text-left relative overflow-hidden"
+                  className="group p-5 rounded-sm border border-zinc-200 dark:border-zinc-800 hover:border-primary/40 bg-zinc-50 dark:bg-zinc-800/50 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all text-left relative overflow-hidden"
                 >
-                  <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-white/5 to-transparent -mr-8 -mt-8 rotate-45" />
+                  <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-zinc-200/50 dark:from-white/5 to-transparent -mr-8 -mt-8 rotate-45" />
                   
                   <div className="flex items-start gap-4">
                     <div className={cn(

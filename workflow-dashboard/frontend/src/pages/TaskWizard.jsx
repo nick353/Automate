@@ -657,7 +657,7 @@ export default function TaskWizard() {
                   onKeyPress={handleKeyPress}
                   placeholder={t('wizard.enterInstructions')}
                   rows={1}
-                  className="flex-1 input resize-none min-h-[48px] max-h-[120px] font-mono text-sm bg-black/20 border-primary/30 focus:border-primary/60"
+                  className="flex-1 input resize-none min-h-[48px] max-h-[120px] font-mono text-sm bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 focus:border-primary/60"
                 />
                 <button
                   onClick={sendMessage}
