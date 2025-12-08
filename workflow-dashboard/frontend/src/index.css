@@ -33,7 +33,7 @@
     --input: 240 5.9% 90%;
     --ring: 168 100% 35%;
 
-    --radius: 0.25rem;
+    --radius: 0.125rem;
     
     --neon-glow: 0 0 10px rgba(0, 200, 160, 0.3), 0 0 20px rgba(0, 200, 160, 0.1);
   }
@@ -80,7 +80,7 @@
     border-color: hsl(var(--border));
   }
   body {
-    @apply antialiased bg-background text-foreground transition-colors duration-300;
+    @apply antialiased bg-background text-foreground transition-colors duration-300 font-mono;
     font-feature-settings: "rlig" 1, "calt" 1;
     overflow-x: hidden;
   }
@@ -195,7 +195,7 @@
 /* Component Overrides */
 @layer components {
   .card {
-    @apply glass-card rounded-lg; /* Sharp corners */
+    @apply glass-card rounded-sm; /* Sharp corners */
   }
   
   .card-header {

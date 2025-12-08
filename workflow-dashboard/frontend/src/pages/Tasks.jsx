@@ -93,14 +93,14 @@ export default function Tasks() {
             <div className="flex items-center gap-3 w-full sm:w-auto">
             <Link 
                 to="/tasks/wizard" 
-                className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-3 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-bold shadow-lg hover:scale-105 transition-all"
+                className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-3 rounded-sm bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-bold shadow-lg hover:scale-105 transition-all"
             >
                 <Wand2 className="w-4 h-4" />
                 <span>{t('dashboard.aiWizard')}</span>
             </Link>
             <button 
                 onClick={() => setShowForm(true)}
-                className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-3 rounded-full bg-black dark:bg-white text-white dark:text-black font-bold shadow-lg hover:scale-105 transition-all"
+                className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-3 rounded-sm bg-black dark:bg-white text-white dark:text-black font-bold shadow-lg hover:scale-105 transition-all"
             >
                 <Plus className="w-4 h-4" />
                 <span>{t('dashboard.newTask')}</span>
@@ -117,7 +117,7 @@ export default function Tasks() {
           placeholder={t('tasks.searchPlaceholder')}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full h-12 pl-11 pr-4 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:ring-2 focus:ring-primary/20 focus:outline-none transition-all shadow-sm"
+          className="w-full h-12 pl-11 pr-4 rounded-sm bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:ring-2 focus:ring-primary/20 focus:outline-none transition-all shadow-sm"
         />
       </div>
       
@@ -135,16 +135,16 @@ export default function Tasks() {
         <motion.div 
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="rounded-3xl border-2 border-dashed border-zinc-200 dark:border-zinc-800 p-12 text-center bg-zinc-50 dark:bg-zinc-900/50"
+          className="rounded-sm border-2 border-dashed border-zinc-200 dark:border-zinc-800 p-12 text-center bg-zinc-50 dark:bg-zinc-900/50"
         >
-          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-sm bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center">
             <Plus className="w-8 h-8 text-zinc-400" />
           </div>
           <h3 className="text-xl font-bold text-foreground mb-2">{t('tasks.noTasks')}</h3>
           <p className="text-muted-foreground mb-6">{t('tasks.createFirst')}</p>
           <button 
             onClick={() => setShowForm(true)}
-            className="inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-full bg-primary text-primary-foreground font-bold hover:scale-105 transition-all"
+            className="inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-sm bg-primary text-primary-foreground font-bold hover:scale-105 transition-all"
           >
             <Plus className="w-4 h-4" />
             {t('tasks.createTask')}
@@ -168,13 +168,13 @@ export default function Tasks() {
                                 const config = EXECUTION_LOCATION_CONFIG[task.execution_location] || EXECUTION_LOCATION_CONFIG.server
                                 const LocationIcon = config.icon
                                 return (
-                                <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-white/80 dark:bg-black/50 backdrop-blur-sm shadow-sm ${config.color}`}>
+                                <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-xs font-medium bg-white/80 dark:bg-black/50 backdrop-blur-sm shadow-sm ${config.color}`}>
                                     <LocationIcon className="w-3.5 h-3.5" />
                                     <span>{config.label}</span>
                                 </div>
                                 )
                             })()}
-                           <div className="flex items-center gap-1 text-xs text-zinc-500 font-mono bg-white/80 dark:bg-black/50 px-2 py-1 rounded-full">
+                           <div className="flex items-center gap-1 text-xs text-zinc-500 font-mono bg-white/80 dark:bg-black/50 px-2 py-1 rounded-sm">
                                <Calendar className="w-3 h-3" />
                                {task.schedule || t('tasks.manual')}
                            </div>
@@ -188,7 +188,7 @@ export default function Tasks() {
                     <button
                         onClick={(e) => handleRun(e, task)}
                         disabled={runningTaskId === task.id}
-                        className="flex-1 flex items-center justify-center gap-2 p-2.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 font-bold text-sm transition-colors disabled:opacity-50"
+                        className="flex-1 flex items-center justify-center gap-2 p-2.5 rounded-sm bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 font-bold text-sm transition-colors disabled:opacity-50"
                     >
                         {runningTaskId === task.id ? (
                             <div className="w-4 h-4 border-2 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin" />
@@ -201,13 +201,13 @@ export default function Tasks() {
                     </button>
                     <button
                         onClick={(e) => handleEdit(e, task)}
-                        className="p-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+                        className="p-2.5 rounded-sm bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
                     >
                         <Edit2 className="w-4 h-4" />
                     </button>
                     <button
                         onClick={(e) => handleDelete(e, task)}
-                        className="p-2.5 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-500/20 transition-colors"
+                        className="p-2.5 rounded-sm bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-500/20 transition-colors"
                     >
                         <Trash2 className="w-4 h-4" />
                     </button>

@@ -71,11 +71,11 @@ export default function Dashboard() {
     const c = config[status] || config.stopped
     
     return (
-      <span className={`inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-bold border tracking-wider ${c.bg} ${c.text} ${c.border}`}>
+      <span className={`inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-sm text-[10px] sm:text-xs font-bold border tracking-wider ${c.bg} ${c.text} ${c.border}`}>
         {c.glow && (
           <span className="relative flex h-1.5 w-1.5 sm:h-2 sm:w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-current opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-1.5 w-1.5 sm:h-2 sm:w-2 bg-current shadow-[0_0_5px_currentColor]"></span>
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-sm bg-current opacity-75"></span>
+            <span className="relative inline-flex rounded-sm h-1.5 w-1.5 sm:h-2 sm:w-2 bg-current shadow-[0_0_5px_currentColor]"></span>
           </span>
         )}
         <span className="sm:hidden">{c.label}</span>
@@ -101,7 +101,7 @@ export default function Dashboard() {
         </div>
         <Link 
           to="/tasks" 
-          className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-black dark:bg-white text-white dark:text-black text-sm font-bold shadow-lg hover:scale-105 active:scale-95 transition-all"
+          className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-sm bg-black dark:bg-white text-white dark:text-black text-sm font-bold shadow-lg hover:scale-105 active:scale-95 transition-all"
         >
           <ListTodo className="w-4 h-4" />
           <span>{t('dashboard.manageTasks')}</span>
@@ -185,9 +185,9 @@ export default function Dashboard() {
                 ) : (
                     <div className="space-y-3">
                         {recentExecutions.map((execution) => (
-                            <div key={execution.id} className="flex items-center justify-between p-3 rounded-xl bg-muted/50 hover:bg-muted transition-colors">
+                            <div key={execution.id} className="flex items-center justify-between p-3 rounded-sm bg-muted/50 hover:bg-muted transition-colors">
                                 <div className="flex items-center gap-3 overflow-hidden">
-                                    <div className={`w-2 h-10 rounded-full shrink-0 ${
+                                    <div className={`w-2 h-10 rounded-sm shrink-0 ${
                                         execution.status === 'completed' ? 'bg-emerald-500' :
                                         execution.status === 'failed' ? 'bg-rose-500' :
                                         execution.status === 'running' ? 'bg-yellow-500' : 'bg-gray-500'
@@ -199,7 +199,7 @@ export default function Dashboard() {
                                 </div>
                                 <div className="shrink-0 flex items-center gap-2">
                                     {getStatusBadge(execution.status)}
-                                    <Link to={`/execution/${execution.id}`} className="p-2 rounded-full hover:bg-background/50 text-muted-foreground hover:text-primary transition-colors">
+                                    <Link to={`/execution/${execution.id}`} className="p-2 rounded-sm hover:bg-background/50 text-muted-foreground hover:text-primary transition-colors">
                                         <ExternalLink className="w-4 h-4" />
                                     </Link>
                                 </div>
@@ -221,8 +221,8 @@ export default function Dashboard() {
           icon={<Zap className="h-4 w-4 text-purple-500" />}
         >
             <div className="grid grid-cols-1 gap-2 mt-4">
-                <Link to="/tasks/wizard" className="flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-indigo-500/10 to-purple-500/10 hover:from-indigo-500/20 hover:to-purple-500/20 border border-indigo-500/20 transition-colors group">
-                    <div className="p-2 rounded-lg bg-indigo-500 text-white shadow-lg group-hover:scale-110 transition-transform">
+                <Link to="/tasks/wizard" className="flex items-center gap-3 p-3 rounded-sm bg-gradient-to-r from-indigo-500/10 to-purple-500/10 hover:from-indigo-500/20 hover:to-purple-500/20 border border-indigo-500/20 transition-colors group">
+                    <div className="p-2 rounded-sm bg-indigo-500 text-white shadow-lg group-hover:scale-110 transition-transform">
                         <Zap className="w-4 h-4" />
                     </div>
                     <div>
@@ -232,9 +232,9 @@ export default function Dashboard() {
                 </Link>
                 <button 
                   onClick={() => window.location.href='/tasks'} 
-                  className="flex items-center gap-3 p-3 rounded-xl bg-muted/50 hover:bg-muted border border-border transition-colors group"
+                  className="flex items-center gap-3 p-3 rounded-sm bg-muted/50 hover:bg-muted border border-border transition-colors group"
                 >
-                    <div className="p-2 rounded-lg bg-primary text-white shadow-lg group-hover:scale-110 transition-transform">
+                    <div className="p-2 rounded-sm bg-primary text-white shadow-lg group-hover:scale-110 transition-transform">
                         <Plus className="w-4 h-4" />
                     </div>
                     <div className="text-left">

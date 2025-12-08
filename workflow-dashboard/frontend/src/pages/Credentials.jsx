@@ -90,7 +90,7 @@ export default function Credentials() {
         </div>
         <button 
           onClick={() => setShowForm(true)}
-          className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-black dark:bg-white text-white dark:text-black font-bold shadow-lg hover:scale-105 transition-all w-fit"
+          className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-sm bg-black dark:bg-white text-white dark:text-black font-bold shadow-lg hover:scale-105 transition-all w-fit"
         >
           <Plus className="w-4 h-4" />
           <span>{t('credentials.addCredential')}</span>
@@ -116,15 +116,15 @@ export default function Credentials() {
           </div>
         </div>
       ) : credentials.length === 0 ? (
-        <div className="rounded-3xl border-2 border-dashed border-zinc-200 dark:border-zinc-800 p-12 text-center bg-zinc-50 dark:bg-zinc-900/50">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center">
+        <div className="rounded-sm border-2 border-dashed border-zinc-200 dark:border-zinc-800 p-12 text-center bg-zinc-50 dark:bg-zinc-900/50">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-sm bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center">
             <Lock className="w-8 h-8 text-zinc-400" />
           </div>
           <h3 className="text-xl font-bold text-foreground mb-2">{t('credentials.noCredentials')}</h3>
           <p className="text-muted-foreground mb-6">{t('credentials.addFirst')}</p>
           <button 
             onClick={() => setShowForm(true)}
-            className="inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-full bg-primary text-primary-foreground font-bold hover:scale-105 transition-all"
+            className="inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-sm bg-primary text-primary-foreground font-bold hover:scale-105 transition-all"
           >
             <Plus className="w-4 h-4" />
             {t('credentials.addCredential')}
@@ -157,7 +157,7 @@ export default function Credentials() {
                         <div className="flex items-center justify-between mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800">
                              <div className="flex items-center gap-2">
                                 {credential.is_default && (
-                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary border border-primary/20">
+                                    <span className="px-2 py-0.5 rounded-sm text-[10px] font-bold bg-primary/10 text-primary border border-primary/20">
                                         DEFAULT
                                     </span>
                                 )}
@@ -180,7 +180,7 @@ export default function Credentials() {
                              <button
                                 onClick={(e) => handleTest(e, credential)}
                                 disabled={testingId === credential.id}
-                                className="flex-1 p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-xs font-bold transition-colors flex items-center justify-center gap-1"
+                                className="flex-1 p-2 rounded-sm bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-xs font-bold transition-colors flex items-center justify-center gap-1"
                              >
                                 {testingId === credential.id ? (
                                     <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
@@ -193,13 +193,13 @@ export default function Credentials() {
                              </button>
                              <button
                                 onClick={(e) => handleEdit(e, credential)}
-                                className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-foreground transition-colors"
+                                className="p-2 rounded-sm hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-foreground transition-colors"
                              >
                                 <Edit2 className="w-4 h-4" />
                              </button>
                              <button
                                 onClick={(e) => handleDelete(e, credential)}
-                                className="p-2 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-900/20 text-zinc-500 hover:text-rose-500 transition-colors"
+                                className="p-2 rounded-sm hover:bg-rose-50 dark:hover:bg-rose-900/20 text-zinc-500 hover:text-rose-500 transition-colors"
                              >
                                 <Trash2 className="w-4 h-4" />
                              </button>

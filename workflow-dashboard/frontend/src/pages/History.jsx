@@ -110,12 +110,12 @@ export default function History() {
         </div>
         
         {/* Filter Tabs */}
-        <div className="flex items-center gap-1 p-1 bg-zinc-100 dark:bg-zinc-900 rounded-xl w-fit">
+        <div className="flex items-center gap-1 p-1 bg-zinc-100 dark:bg-zinc-900 rounded-sm w-fit">
           {filterOptions.map(f => (
             <button
               key={f.value}
               onClick={() => setFilter(f.value)}
-              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+              className={`px-4 py-2 rounded-sm text-sm font-bold transition-all ${
                 filter === f.value 
                   ? "bg-white dark:bg-zinc-800 text-foreground shadow-sm" 
                   : "text-muted-foreground hover:text-foreground"
@@ -199,7 +199,7 @@ export default function History() {
                         <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                           <Link 
                             to={`/execution/${execution.id}`}
-                            className="p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                            className="p-2 rounded-sm text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
                             title={t('history.details')}
                           >
                             <ExternalLink className="w-4 h-4" />
@@ -207,7 +207,7 @@ export default function History() {
                           {execution.result && (
                             <button
                               onClick={() => handleDownload(execution)}
-                              className="p-2 rounded-lg text-muted-foreground hover:text-blue-500 hover:bg-blue-500/10 transition-colors"
+                              className="p-2 rounded-sm text-muted-foreground hover:text-blue-500 hover:bg-blue-500/10 transition-colors"
                               title={t('history.download')}
                             >
                               <Download className="w-4 h-4" />
@@ -215,7 +215,7 @@ export default function History() {
                           )}
                           <button
                             onClick={() => handleDelete(execution)}
-                            className="p-2 rounded-lg text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 transition-colors"
+                            className="p-2 rounded-sm text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 transition-colors"
                             title={t('common.delete')}
                           >
                             <Trash2 className="w-4 h-4" />
@@ -254,7 +254,7 @@ export default function History() {
                    <div className="flex justify-end gap-2 pt-2">
                       <Link 
                         to={`/execution/${execution.id}`}
-                        className="p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-foreground text-xs font-bold"
+                        className="p-2 rounded-sm bg-zinc-100 dark:bg-zinc-800 text-foreground text-xs font-bold"
                       >
                         {t('history.details')}
                       </Link>

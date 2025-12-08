@@ -43,8 +43,8 @@ export const BentoItem = ({
         damping: 20
       }}
       className={cn(
-        "row-span-1 rounded-3xl group/bento transition duration-200 shadow-sm dark:shadow-none p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 justify-between flex flex-col space-y-4 overflow-hidden",
-        !disableHoverEffect && "hover:shadow-xl",
+        "row-span-1 rounded-sm group/bento transition duration-200 shadow-sm dark:shadow-none p-6 glass-card justify-between flex flex-col space-y-4 overflow-hidden",
+        !disableHoverEffect && "hover:shadow-xl hover:border-primary/50",
         onClick ? "cursor-pointer" : "cursor-default",
         span === 2 ? "md:col-span-2" : "md:col-span-1",
         span === 3 ? "md:col-span-3" : "",
@@ -54,7 +54,7 @@ export const BentoItem = ({
       onClick={onClick}
     >
       {header && (
-        <div className="flex flex-1 w-full h-full min-h-[6rem] rounded-xl bg-gradient-to-br from-neutral-100 to-neutral-200 dark:from-neutral-900 dark:to-neutral-800 overflow-hidden relative">
+        <div className="flex flex-1 w-full h-full min-h-[6rem] rounded-sm bg-gradient-to-br from-neutral-100 to-neutral-200 dark:from-neutral-900 dark:to-neutral-800 overflow-hidden relative">
             {header}
         </div>
       )}
