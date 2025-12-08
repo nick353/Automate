@@ -13,16 +13,12 @@ import {
   Monitor
 } from 'lucide-react'
 
-// 実行場所のアイコンと色
-const EXECUTION_LOCATION_CONFIG = {
-  server: { icon: Globe, color: 'text-blue-500', bg: 'bg-blue-500/10', label: 'サーバー' },
-  local: { icon: Monitor, color: 'text-purple-500', bg: 'bg-purple-500/10', label: 'ローカル' },
-}
 import { motion, AnimatePresence } from 'framer-motion'
 import useTaskStore from '../stores/taskStore'
 import TaskForm from '../components/TaskForm'
 import StatusBadge from '../components/StatusBadge'
 import { BentoGrid, BentoItem } from '../components/Bento/BentoGrid'
+import useLanguageStore from '../stores/languageStore'
 
 export default function Tasks() {
   const navigate = useNavigate()
@@ -31,7 +27,14 @@ export default function Tasks() {
   const [editingTask, setEditingTask] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [runningTaskId, setRunningTaskId] = useState(null)
+  const { t } = useLanguageStore()
   
+  // 実行場所のアイコンと色
+  const EXECUTION_LOCATION_CONFIG = {
+    server: { icon: Globe, color: 'text-blue-500', bg: 'bg-blue-500/10', label: t('tasks.server') },
+    local: { icon: Monitor, color: 'text-purple-500', bg: 'bg-purple-500/10', label: t('tasks.local') },
+  }
+
   useEffect(() => {
     fetchTasks()
   }, [fetchTasks])
@@ -44,7 +47,7 @@ export default function Tasks() {
   
   const handleDelete = async (e, task) => {
     e.stopPropagation()
-    if (window.confirm(`「${task.name}」を削除してもよろしいですか？`)) {
+    if (window.confirm(t('tasks.confirmDelete').replace('{name}', task.name))) {
       await deleteTask(task.id)
     }
   }
@@ -84,8 +87,8 @@ export default function Tasks() {
       <div className="flex flex-col gap-4">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
-            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">Task Library</h1>
-            <p className="text-muted-foreground mt-1 text-lg">Manage and execute automation workflows</p>
+            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">{t('tasks.title')}</h1>
+            <p className="text-muted-foreground mt-1 text-lg">{t('tasks.subtitle')}</p>
             </div>
             <div className="flex items-center gap-3 w-full sm:w-auto">
             <Link 
@@ -93,14 +96,14 @@ export default function Tasks() {
                 className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-3 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-bold shadow-lg hover:scale-105 transition-all"
             >
                 <Wand2 className="w-4 h-4" />
-                <span>AI Wizard</span>
+                <span>{t('dashboard.aiWizard')}</span>
             </Link>
             <button 
                 onClick={() => setShowForm(true)}
                 className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-3 rounded-full bg-black dark:bg-white text-white dark:text-black font-bold shadow-lg hover:scale-105 transition-all"
             >
                 <Plus className="w-4 h-4" />
-                <span>New Task</span>
+                <span>{t('dashboard.newTask')}</span>
             </button>
             </div>
         </div>
@@ -111,7 +114,7 @@ export default function Tasks() {
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors pointer-events-none" />
         <input
           type="text"
-          placeholder="Search tasks..."
+          placeholder={t('tasks.searchPlaceholder')}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="w-full h-12 pl-11 pr-4 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:ring-2 focus:ring-primary/20 focus:outline-none transition-all shadow-sm"
@@ -137,14 +140,14 @@ export default function Tasks() {
           <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center">
             <Plus className="w-8 h-8 text-zinc-400" />
           </div>
-          <h3 className="text-xl font-bold text-foreground mb-2">No Tasks Found</h3>
-          <p className="text-muted-foreground mb-6">Create your first automation task to get started</p>
+          <h3 className="text-xl font-bold text-foreground mb-2">{t('tasks.noTasks')}</h3>
+          <p className="text-muted-foreground mb-6">{t('tasks.createFirst')}</p>
           <button 
             onClick={() => setShowForm(true)}
             className="inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-full bg-primary text-primary-foreground font-bold hover:scale-105 transition-all"
           >
             <Plus className="w-4 h-4" />
-            Create Task
+            {t('tasks.createTask')}
           </button>
         </motion.div>
       ) : (
@@ -173,7 +176,7 @@ export default function Tasks() {
                             })()}
                            <div className="flex items-center gap-1 text-xs text-zinc-500 font-mono bg-white/80 dark:bg-black/50 px-2 py-1 rounded-full">
                                <Calendar className="w-3 h-3" />
-                               {task.schedule || 'Manual'}
+                               {task.schedule || t('tasks.manual')}
                            </div>
                       </div>
                   </div>
@@ -192,7 +195,7 @@ export default function Tasks() {
                         ) : (
                             <>
                                 <Play className="w-4 h-4 fill-current" />
-                                <span>Run</span>
+                                <span>{t('tasks.run')}</span>
                             </>
                         )}
                     </button>
@@ -226,4 +229,3 @@ export default function Tasks() {
     </div>
   )
 }
-

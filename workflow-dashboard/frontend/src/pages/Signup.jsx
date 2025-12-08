@@ -5,6 +5,7 @@ import { Workflow, Mail, Lock, Loader2, AlertCircle, ArrowRight, Check } from 'l
 import { motion } from 'framer-motion'
 import useAuthStore from '../stores/authStore'
 import useThemeStore from '../stores/themeStore'
+import useLanguageStore from '../stores/languageStore'
 import { CyberpunkBackground } from '../components/Immersive/CyberpunkBackground'
 
 // Glitch Text Effect Component
@@ -47,6 +48,7 @@ export default function Signup() {
   const navigate = useNavigate()
   const { signUp, isLoading } = useAuthStore()
   const { resolvedTheme } = useThemeStore()
+  const { t } = useLanguageStore()
   
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -130,18 +132,16 @@ export default function Signup() {
             <Check className="w-10 h-10 text-primary dark:text-cyan-400" />
           </motion.div>
           <h2 className="text-2xl sm:text-3xl font-black text-foreground dark:text-white mb-4 tracking-tight">
-             <GlitchText>REGISTRATION COMPLETE</GlitchText>
+             <GlitchText>{t('auth.registrationComplete')}</GlitchText>
           </h2>
           <p className="text-muted-foreground dark:text-gray-400 mb-8 font-mono text-sm">
-            Verification email sent.
-            <br />
-            Please activate your account.
+            {t('auth.emailSent')}
           </p>
           <Link 
             to="/login" 
             className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-sm bg-primary/10 dark:bg-cyan-500/20 text-primary dark:text-cyan-400 font-bold uppercase tracking-wider border border-primary/30 dark:border-cyan-500/50 hover:bg-primary/20 dark:hover:bg-cyan-500/40 hover:shadow-[0_0_20px_rgba(6,182,212,0.4)] transition-all duration-200"
           >
-            PROCEED TO LOGIN
+            {t('auth.proceedLogin')}
             <ArrowRight className="w-5 h-5" />
           </Link>
         </motion.div>
@@ -195,8 +195,8 @@ export default function Signup() {
             transition={{ delay: 0.2, duration: 0.4 }}
             className="text-2xl sm:text-3xl lg:text-4xl font-black text-foreground dark:text-white tracking-tight"
           >
-            <GlitchText>INITIALIZE</GlitchText>
-            <span className="block text-primary dark:text-cyan-400 text-sm sm:text-base lg:text-lg font-mono tracking-[0.2em] sm:tracking-[0.3em] mt-1">NEW USER PROTOCOL</span>
+            <GlitchText>{t('auth.initialize')}</GlitchText>
+            <span className="block text-primary dark:text-cyan-400 text-sm sm:text-base lg:text-lg font-mono tracking-[0.2em] sm:tracking-[0.3em] mt-1">{t('auth.newUserProtocol')}</span>
           </motion.h1>
           <motion.p 
             initial={{ opacity: 0 }}
@@ -204,7 +204,7 @@ export default function Signup() {
             transition={{ delay: 0.3, duration: 0.4 }}
             className="text-muted-foreground dark:text-gray-500 mt-3 sm:mt-4 font-mono text-xs sm:text-sm"
           >
-            &gt; CREATE_NEW_ACCOUNT_
+            &gt; {t('auth.createNewAccount')}
           </motion.p>
         </div>
         
@@ -234,7 +234,7 @@ export default function Signup() {
           <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
             <div>
               <label className="block text-[10px] sm:text-xs font-bold text-primary dark:text-cyan-400 mb-1.5 sm:mb-2 tracking-wider">
-                USER_ID (EMAIL)
+                {t('auth.userIdEmail')}
               </label>
               <div className="relative group">
                 <Mail className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground dark:text-gray-600 group-focus-within:text-primary dark:group-focus-within:text-cyan-400 transition-colors pointer-events-none" />
@@ -251,7 +251,7 @@ export default function Signup() {
             
             <div>
               <label className="block text-[10px] sm:text-xs font-bold text-primary dark:text-cyan-400 mb-1.5 sm:mb-2 tracking-wider">
-                ACCESS_KEY (PASSWORD)
+                {t('auth.accessKeyPassword')}
               </label>
               <div className="relative group">
                 <Lock className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground dark:text-gray-600 group-focus-within:text-primary dark:group-focus-within:text-cyan-400 transition-colors pointer-events-none" />
@@ -268,7 +268,7 @@ export default function Signup() {
             
             <div>
               <label className="block text-[10px] sm:text-xs font-bold text-primary dark:text-cyan-400 mb-1.5 sm:mb-2 tracking-wider">
-                CONFIRM_KEY
+                {t('auth.confirmKey')}
               </label>
               <div className="relative group">
                 <Lock className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground dark:text-gray-600 group-focus-within:text-primary dark:group-focus-within:text-cyan-400 transition-colors pointer-events-none" />
@@ -291,12 +291,12 @@ export default function Signup() {
               {isLoading ? (
                 <>
                   <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
-                  <span className="hidden xs:inline">PROCESSING...</span>
+                  <span className="hidden xs:inline">{t('auth.processing')}</span>
                   <span className="xs:hidden">...</span>
                 </>
               ) : (
                 <>
-                  <span className="hidden xs:inline">CREATE </span>ACCOUNT
+                  <span className="hidden xs:inline">{t('auth.createAccount').split(' ')[0]} </span>{t('auth.createAccount').split(' ')[1] || 'ACCOUNT'}
                   <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5" />
                 </>
               )}
@@ -305,12 +305,12 @@ export default function Signup() {
           
           <div className="mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-border dark:border-gray-800 text-center">
             <p className="text-muted-foreground dark:text-gray-500 text-xs sm:text-sm font-mono">
-              ALREADY REGISTERED?{' '}
+              {t('auth.alreadyRegistered')}{' '}
               <Link 
                 to="/login" 
                 className="text-primary dark:text-cyan-400 hover:text-primary/80 dark:hover:text-cyan-300 font-bold transition-colors"
               >
-                LOGIN
+                {t('auth.login')}
               </Link>
             </p>
           </div>

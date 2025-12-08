@@ -12,81 +12,7 @@ import {
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { cn } from '../../utils/cn'
-
-// エラータイプと解決策のマッピング
-const errorSolutions = {
-  // API関連
-  'API': {
-    icon: Key,
-    color: 'amber',
-    title: 'APIエラー',
-    solutions: [
-      { text: 'APIキーが正しく設定されているか確認', action: 'credentials' },
-      { text: 'APIの利用制限に達していないか確認', action: 'link', url: 'https://console.anthropic.com' },
-      { text: 'APIキーの権限が十分か確認', action: 'info' }
-    ]
-  },
-  'Anthropic': {
-    icon: Key,
-    color: 'purple',
-    title: 'Anthropic APIエラー',
-    solutions: [
-      { text: 'Anthropic APIキーを設定してください', action: 'credentials' },
-      { text: 'APIキーが有効期限切れでないか確認', action: 'info' },
-      { text: 'クレジット残高を確認', action: 'link', url: 'https://console.anthropic.com' }
-    ]
-  },
-  'Google': {
-    icon: Key,
-    color: 'blue',
-    title: 'Google APIエラー',
-    solutions: [
-      { text: 'Google APIキーを設定してください', action: 'credentials' },
-      { text: 'APIが有効化されているか確認', action: 'link', url: 'https://console.cloud.google.com/apis' },
-      { text: '必要な権限（スコープ）を確認', action: 'info' }
-    ]
-  },
-  // ネットワーク関連
-  'network': {
-    icon: Wifi,
-    color: 'rose',
-    title: 'ネットワークエラー',
-    solutions: [
-      { text: 'インターネット接続を確認', action: 'info' },
-      { text: 'バックエンドサーバーが起動しているか確認', action: 'info' },
-      { text: 'しばらく待ってから再試行', action: 'retry' }
-    ]
-  },
-  'timeout': {
-    icon: RefreshCw,
-    color: 'orange',
-    title: 'タイムアウト',
-    solutions: [
-      { text: '処理に時間がかかっています。しばらくお待ちください', action: 'info' },
-      { text: '再試行する', action: 'retry' }
-    ]
-  },
-  // セッション関連
-  'session': {
-    icon: RefreshCw,
-    color: 'gray',
-    title: 'セッションエラー',
-    solutions: [
-      { text: 'ページを再読み込みしてください', action: 'reload' },
-      { text: '新しいセッションを開始', action: 'restart' }
-    ]
-  },
-  // デフォルト
-  'default': {
-    icon: AlertTriangle,
-    color: 'rose',
-    title: 'エラーが発生しました',
-    solutions: [
-      { text: 'ページを再読み込みしてください', action: 'reload' },
-      { text: '問題が続く場合は管理者に連絡', action: 'info' }
-    ]
-  }
-}
+import useLanguageStore from '../../stores/languageStore'
 
 // エラーメッセージからエラータイプを判定
 function detectErrorType(errorMessage) {
@@ -115,7 +41,84 @@ function detectErrorType(errorMessage) {
 }
 
 export default function ErrorHelper({ error, onRetry, onRestart }) {
+  const { t } = useLanguageStore()
+
   if (!error) return null
+
+  // エラータイプと解決策のマッピング
+  const errorSolutions = {
+    // API関連
+    'API': {
+      icon: Key,
+      color: 'amber',
+      title: t('error.api.title'),
+      solutions: [
+        { text: t('error.api.checkKey'), action: 'credentials' },
+        { text: t('error.api.checkLimit'), action: 'link', url: 'https://console.anthropic.com' },
+        { text: t('error.api.checkPermissions'), action: 'info' }
+      ]
+    },
+    'Anthropic': {
+      icon: Key,
+      color: 'purple',
+      title: 'Anthropic ' + t('error.api.title'),
+      solutions: [
+        { text: t('error.api.checkKey'), action: 'credentials' },
+        { text: 'APIキーが有効期限切れでないか確認', action: 'info' },
+        { text: t('error.api.checkLimit'), action: 'link', url: 'https://console.anthropic.com' }
+      ]
+    },
+    'Google': {
+      icon: Key,
+      color: 'blue',
+      title: 'Google ' + t('error.api.title'),
+      solutions: [
+        { text: t('error.api.checkKey'), action: 'credentials' },
+        { text: 'APIが有効化されているか確認', action: 'link', url: 'https://console.cloud.google.com/apis' },
+        { text: t('error.api.checkPermissions'), action: 'info' }
+      ]
+    },
+    // ネットワーク関連
+    'network': {
+      icon: Wifi,
+      color: 'rose',
+      title: t('error.network.title'),
+      solutions: [
+        { text: t('error.network.checkConn'), action: 'info' },
+        { text: t('error.network.checkServer'), action: 'info' },
+        { text: t('error.network.waitRetry'), action: 'retry' }
+      ]
+    },
+    'timeout': {
+      icon: RefreshCw,
+      color: 'orange',
+      title: t('error.timeout.title'),
+      solutions: [
+        { text: t('error.timeout.wait'), action: 'info' },
+        { text: t('error.timeout.retry'), action: 'retry' }
+      ]
+    },
+    // セッション関連
+    'session': {
+      icon: RefreshCw,
+      color: 'gray',
+      title: t('error.session.title'),
+      solutions: [
+        { text: t('error.session.reload'), action: 'reload' },
+        { text: t('error.session.restart'), action: 'restart' }
+      ]
+    },
+    // デフォルト
+    'default': {
+      icon: AlertTriangle,
+      color: 'rose',
+      title: t('error.title'),
+      solutions: [
+        { text: t('error.reload'), action: 'reload' },
+        { text: t('error.contactAdmin'), action: 'info' }
+      ]
+    }
+  }
 
   const errorType = detectErrorType(error)
   const errorInfo = errorSolutions[errorType] || errorSolutions.default
@@ -169,7 +172,7 @@ export default function ErrorHelper({ error, onRetry, onRestart }) {
     >
       {/* Header */}
       <div className="p-4 flex items-start gap-3">
-        <div className={cn(
+        <div={cn(
           "w-10 h-10 rounded-xl flex items-center justify-center shrink-0",
           iconColorClasses[errorInfo.color]
         )}>
@@ -185,7 +188,7 @@ export default function ErrorHelper({ error, onRetry, onRestart }) {
       <div className="px-4 pb-4">
         <div className="flex items-center gap-2 mb-3">
           <Lightbulb className="w-4 h-4 text-amber-500" />
-          <span className="text-sm font-bold text-foreground">解決方法</span>
+          <span className="text-sm font-bold text-foreground">{t('error.solution')}</span>
         </div>
         
         <div className="space-y-2">
@@ -236,7 +239,7 @@ export default function ErrorHelper({ error, onRetry, onRestart }) {
             className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-primary/10 text-primary font-medium hover:bg-primary/20 transition-all"
           >
             <RefreshCw className="w-4 h-4" />
-            再試行
+            {t('error.retry')}
           </button>
         )}
         <Link
@@ -244,11 +247,9 @@ export default function ErrorHelper({ error, onRetry, onRestart }) {
           className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 text-muted-foreground hover:text-foreground hover:border-zinc-300 dark:hover:border-zinc-700 transition-all"
         >
           <Settings className="w-4 h-4" />
-          設定
+          {t('error.settings')}
         </Link>
       </div>
     </motion.div>
   )
 }
-
-

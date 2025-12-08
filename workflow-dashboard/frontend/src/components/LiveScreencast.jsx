@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import useLanguageStore from '../stores/languageStore';
 
 /**
  * ライブスクリーンキャストコンポーネント
@@ -16,6 +17,7 @@ export default function LiveScreencast({ executionId, isRunning }) {
   const wsRef = useRef(null);
   const canvasRef = useRef(null);
   const imageRef = useRef(new Image());
+  const { t } = useLanguageStore();
 
   // スクリーンキャストの利用可否を確認
   useEffect(() => {
@@ -32,7 +34,7 @@ export default function LiveScreencast({ executionId, isRunning }) {
         const data = await response.json();
         setIsAvailable(data.available);
       } catch (err) {
-        console.error('ステータス確認エラー:', err);
+        console.error('Status check error:', err);
         setIsAvailable(false);
       }
     };
@@ -83,12 +85,12 @@ export default function LiveScreencast({ executionId, isRunning }) {
     const host = window.location.hostname;
     const wsUrl = `${protocol}//${host}:8000/ws/screencast/${executionId}`;
     
-    console.log('スクリーンキャストWebSocket接続:', wsUrl);
+    console.log('Screencast WS Connection:', wsUrl);
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
     ws.onopen = () => {
-      console.log('スクリーンキャストWebSocket接続成功');
+      console.log('Screencast WS Connected');
     };
 
     ws.onmessage = (event) => {
@@ -112,23 +114,23 @@ export default function LiveScreencast({ executionId, isRunning }) {
             console.log('Unknown message type:', message.type);
         }
       } catch (err) {
-        console.error('メッセージ解析エラー:', err);
+        console.error('Message parsing error:', err);
       }
     };
 
     ws.onerror = (event) => {
-      console.error('WebSocketエラー:', event);
-      setError('接続エラーが発生しました');
+      console.error('WebSocket error:', event);
+      setError(t('common.error'));
       setIsConnecting(false);
     };
 
     ws.onclose = () => {
-      console.log('スクリーンキャストWebSocket切断');
+      console.log('Screencast WS Disconnected');
       setIsViewing(false);
       setIsConnecting(false);
       wsRef.current = null;
     };
-  }, [executionId, drawFrame]);
+  }, [executionId, drawFrame, t]);
 
   // WebSocket接続を停止
   const stopViewing = useCallback(() => {
@@ -162,7 +164,7 @@ export default function LiveScreencast({ executionId, isRunning }) {
       <div className="flex items-center justify-between px-4 py-3 bg-muted border-b border-border">
         <div className="flex items-center gap-3">
           <div className={`w-3 h-3 rounded-full ${isViewing ? 'bg-red-500 animate-pulse' : 'bg-theme-muted'}`} />
-          <span className="text-foreground font-medium">ライブビュー</span>
+          <span className="text-foreground font-medium">{t('execution.liveView')}</span>
           {isViewing && (
             <span className="text-xs text-muted-foreground">
               {frameCount} frames
@@ -187,10 +189,10 @@ export default function LiveScreencast({ executionId, isRunning }) {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                   </svg>
-                  接続中...
+                  {t('liveView.connecting')}
                 </span>
               ) : (
-                '▶ ライブビュー開始'
+                `▶ ${t('execution.liveView')}`
               )}
             </button>
           ) : (
@@ -198,7 +200,7 @@ export default function LiveScreencast({ executionId, isRunning }) {
               onClick={stopViewing}
               className="px-4 py-1.5 rounded-md text-sm font-medium bg-red-600 hover:bg-red-700 text-white transition-colors"
             >
-              ■ 停止
+              ■ {t('execution.stop')}
             </button>
           )}
         </div>
@@ -225,22 +227,21 @@ export default function LiveScreencast({ executionId, isRunning }) {
                 <svg className="w-12 h-12 mb-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                 </svg>
-                <p>タスクが実行されていません</p>
+                <p>{t('execution.status.stopped')}</p>
               </>
             ) : !isAvailable ? (
               <>
                 <svg className="w-12 h-12 mb-3 opacity-50 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
-                <p>ブラウザ準備中...</p>
-                <p className="text-xs mt-1 text-muted-foreground">ブラウザが起動したらライブビューが利用可能になります</p>
+                <p>{t('liveView.connecting')}</p>
               </>
             ) : (
               <>
                 <svg className="w-12 h-12 mb-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                 </svg>
-                <p>「ライブビュー開始」をクリックして画面を表示</p>
+                <p>{t('execution.liveViewDesc')}</p>
               </>
             )}
           </div>
@@ -250,10 +251,9 @@ export default function LiveScreencast({ executionId, isRunning }) {
       {/* フッター情報 */}
       {isViewing && (
         <div className="px-4 py-2 bg-muted border-t border-border text-xs text-muted-foreground">
-          <span>リアルタイム配信中 • CDP Screencast</span>
+          <span>Real-time • CDP Screencast</span>
         </div>
       )}
     </div>
   );
 }
-

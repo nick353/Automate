@@ -21,21 +21,35 @@ import {
   Key
 } from 'lucide-react'
 import { cn } from '../../utils/cn'
+import useLanguageStore from '../../stores/languageStore'
 
-// テンプレートデータ
-const templates = [
-  {
-    id: 'gmail-to-slack',
-    name: 'GMAIL_TO_SLACK_NOTIFIER',
-    description: 'Auto-forward specific email patterns to Slack channels via Webhook.',
-    category: 'notification',
-    icon: Mail,
-    colorClass: 'text-red-400 bg-red-500/10 border-red-500/30',
-    type: 'api',
-    popular: true,
-    requiredCredentials: ['Gmail API', 'Slack Webhook'],
-    schedule: 'EVERY_5_MIN',
-    prompt: `以下の自動化タスクを設定してください：
+export default function TemplateLibrary({ isOpen, onClose, onSelectTemplate }) {
+  const [selectedCategory, setSelectedCategory] = useState('all')
+  const [searchQuery, setSearchQuery] = useState('')
+  const { t } = useLanguageStore()
+
+  const categories = [
+    { id: 'all', name: t('wizard.templates.categories.all'), icon: Star },
+    { id: 'notification', name: t('wizard.templates.categories.notification'), icon: Bell },
+    { id: 'monitoring', name: t('wizard.templates.categories.monitoring'), icon: Search },
+    { id: 'productivity', name: t('wizard.templates.categories.productivity'), icon: Zap },
+    { id: 'development', name: t('wizard.templates.categories.development'), icon: Code },
+    { id: 'data', name: t('wizard.templates.categories.data'), icon: Database },
+  ]
+
+  const templates = [
+    {
+      id: 'gmail-to-slack',
+      name: t('wizard.templates.items.gmail-to-slack.name'),
+      description: t('wizard.templates.items.gmail-to-slack.desc'),
+      category: 'notification',
+      icon: Mail,
+      colorClass: 'text-red-400 bg-red-500/10 border-red-500/30',
+      type: 'api',
+      popular: true,
+      requiredCredentials: ['Gmail API', 'Slack Webhook'],
+      schedule: 'EVERY_5_MIN',
+      prompt: `以下の自動化タスクを設定してください：
 
 1. Gmail APIを使用して新着メールを監視
 2. 新しいメールが届いたら、以下の情報をSlackに送信:
@@ -45,19 +59,19 @@ const templates = [
    - 本文の最初の100文字
 
 Slack Webhookを使用して通知してください。`
-  },
-  {
-    id: 'notion-daily-summary',
-    name: 'NOTION_DAILY_LOG',
-    description: 'Archive daily productivity metrics to Notion database automatically.',
-    category: 'productivity',
-    icon: FileSpreadsheet,
-    colorClass: 'text-zinc-400 bg-zinc-500/10 border-zinc-500/30',
-    type: 'api',
-    popular: true,
-    requiredCredentials: ['Notion API'],
-    schedule: 'DAILY_2300',
-    prompt: `以下の自動化タスクを設定してください：
+    },
+    {
+      id: 'notion-daily-summary',
+      name: t('wizard.templates.items.notion-daily-summary.name'),
+      description: t('wizard.templates.items.notion-daily-summary.desc'),
+      category: 'productivity',
+      icon: FileSpreadsheet,
+      colorClass: 'text-zinc-400 bg-zinc-500/10 border-zinc-500/30',
+      type: 'api',
+      popular: true,
+      requiredCredentials: ['Notion API'],
+      schedule: 'DAILY_2300',
+      prompt: `以下の自動化タスクを設定してください：
 
 1. Notion APIを使用
 2. 指定したデータベースに日次エントリを作成
@@ -68,19 +82,19 @@ Slack Webhookを使用して通知してください。`
    - メモ
 
 毎日23時に自動実行してください。`
-  },
-  {
-    id: 'twitter-monitor',
-    name: 'X_KEYWORD_MONITOR',
-    description: 'Scan social stream for specific keywords and alert immediately.',
-    category: 'monitoring',
-    icon: Twitter,
-    colorClass: 'text-sky-400 bg-sky-500/10 border-sky-500/30',
-    type: 'api',
-    popular: false,
-    requiredCredentials: ['X API'],
-    schedule: 'EVERY_15_MIN',
-    prompt: `以下の自動化タスクを設定してください：
+    },
+    {
+      id: 'twitter-monitor',
+      name: t('wizard.templates.items.twitter-monitor.name'),
+      description: t('wizard.templates.items.twitter-monitor.desc'),
+      category: 'monitoring',
+      icon: Twitter,
+      colorClass: 'text-sky-400 bg-sky-500/10 border-sky-500/30',
+      type: 'api',
+      popular: false,
+      requiredCredentials: ['X API'],
+      schedule: 'EVERY_15_MIN',
+      prompt: `以下の自動化タスクを設定してください：
 
 1. X (Twitter) APIを使用
 2. 指定したキーワードを含む投稿を検索
@@ -88,19 +102,19 @@ Slack Webhookを使用して通知してください。`
 4. キーワード: [ユーザーに確認]
 
 15分ごとに監視してください。`
-  },
-  {
-    id: 'github-release-notify',
-    name: 'GITHUB_RELEASE_WATCHER',
-    description: 'Track repository releases and changelogs.',
-    category: 'development',
-    icon: Github,
-    colorClass: 'text-purple-400 bg-purple-500/10 border-purple-500/30',
-    type: 'api',
-    popular: true,
-    requiredCredentials: ['GitHub API'],
-    schedule: 'HOURLY',
-    prompt: `以下の自動化タスクを設定してください：
+    },
+    {
+      id: 'github-release-notify',
+      name: t('wizard.templates.items.github-release-notify.name'),
+      description: t('wizard.templates.items.github-release-notify.desc'),
+      category: 'development',
+      icon: Github,
+      colorClass: 'text-purple-400 bg-purple-500/10 border-purple-500/30',
+      type: 'api',
+      popular: true,
+      requiredCredentials: ['GitHub API'],
+      schedule: 'HOURLY',
+      prompt: `以下の自動化タスクを設定してください：
 
 1. GitHub APIを使用
 2. 指定したリポジトリの新しいリリースを監視
@@ -110,19 +124,19 @@ Slack Webhookを使用して通知してください。`
    - リリースノート
 
 毎時間チェックしてください。`
-  },
-  {
-    id: 'google-calendar-reminder',
-    name: 'CALENDAR_EVENT_SYNC',
-    description: 'Pre-meeting alerts via Slack 30 mins before scheduled events.',
-    category: 'notification',
-    icon: Calendar,
-    colorClass: 'text-blue-400 bg-blue-500/10 border-blue-500/30',
-    type: 'api',
-    popular: true,
-    requiredCredentials: ['Google Calendar API', 'Slack Webhook'],
-    schedule: 'EVERY_5_MIN',
-    prompt: `以下の自動化タスクを設定してください：
+    },
+    {
+      id: 'google-calendar-reminder',
+      name: t('wizard.templates.items.google-calendar-reminder.name'),
+      description: t('wizard.templates.items.google-calendar-reminder.desc'),
+      category: 'notification',
+      icon: Calendar,
+      colorClass: 'text-blue-400 bg-blue-500/10 border-blue-500/30',
+      type: 'api',
+      popular: true,
+      requiredCredentials: ['Google Calendar API', 'Slack Webhook'],
+      schedule: 'EVERY_5_MIN',
+      prompt: `以下の自動化タスクを設定してください：
 
 1. Google Calendar APIを使用
 2. 今後30分以内の予定を取得
@@ -133,19 +147,19 @@ Slack Webhookを使用して通知してください。`
    - 参加者
 
 5分ごとにチェックしてください。`
-  },
-  {
-    id: 'ec-price-monitor',
-    name: 'PRICE_TRACKER_BOT',
-    description: 'Monitor e-commerce URLs for price drops and availability.',
-    category: 'monitoring',
-    icon: ShoppingCart,
-    colorClass: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30',
-    type: 'browser',
-    popular: true,
-    requiredCredentials: [],
-    schedule: 'DAILY_0900',
-    prompt: `以下の自動化タスクを設定してください：
+    },
+    {
+      id: 'ec-price-monitor',
+      name: t('wizard.templates.items.ec-price-monitor.name'),
+      description: t('wizard.templates.items.ec-price-monitor.desc'),
+      category: 'monitoring',
+      icon: ShoppingCart,
+      colorClass: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30',
+      type: 'browser',
+      popular: true,
+      requiredCredentials: [],
+      schedule: 'DAILY_0900',
+      prompt: `以下の自動化タスクを設定してください：
 
 1. 指定したECサイトのURLにアクセス
 2. 商品価格を取得
@@ -154,19 +168,19 @@ Slack Webhookを使用して通知してください。`
 
 毎日9時に実行してください。
 対象URL: [ユーザーに確認]`
-  },
-  {
-    id: 'web-scraping',
-    name: 'GENERIC_SCRAPER',
-    description: 'Extract structured data from target websites periodically.',
-    category: 'data',
-    icon: Database,
-    colorClass: 'text-violet-400 bg-violet-500/10 border-violet-500/30',
-    type: 'browser',
-    popular: false,
-    requiredCredentials: [],
-    schedule: 'CUSTOM',
-    prompt: `以下の自動化タスクを設定してください：
+    },
+    {
+      id: 'web-scraping',
+      name: t('wizard.templates.items.web-scraping.name'),
+      description: t('wizard.templates.items.web-scraping.desc'),
+      category: 'data',
+      icon: Database,
+      colorClass: 'text-violet-400 bg-violet-500/10 border-violet-500/30',
+      type: 'browser',
+      popular: false,
+      requiredCredentials: [],
+      schedule: 'CUSTOM',
+      prompt: `以下の自動化タスクを設定してください：
 
 1. 指定したWebサイトにアクセス
 2. 指定した要素からデータを抽出
@@ -174,40 +188,27 @@ Slack Webhookを使用して通知してください。`
 
 対象URL: [ユーザーに確認]
 取得する情報: [ユーザーに確認]`
-  },
-  {
-    id: 'daily-report',
-    name: 'AUTO_REPORT_GENERATOR',
-    description: 'Aggregate data from multiple sources into Google Sheets.',
-    category: 'productivity',
-    icon: FileSpreadsheet,
-    colorClass: 'text-amber-400 bg-amber-500/10 border-amber-500/30',
-    type: 'hybrid',
-    popular: false,
-    requiredCredentials: ['Google Sheets API'],
-    schedule: 'DAILY_1800',
-    prompt: `以下の自動化タスクを設定してください：
+    },
+    {
+      id: 'daily-report',
+      name: t('wizard.templates.items.daily-report.name'),
+      description: t('wizard.templates.items.daily-report.desc'),
+      category: 'productivity',
+      icon: FileSpreadsheet,
+      colorClass: 'text-amber-400 bg-amber-500/10 border-amber-500/30',
+      type: 'hybrid',
+      popular: false,
+      requiredCredentials: ['Google Sheets API'],
+      schedule: 'DAILY_1800',
+      prompt: `以下の自動化タスクを設定してください：
 
 1. 各種データソースから情報を収集
 2. Google Sheetsにデータを記録
 3. 日次レポートを生成
 
 毎日18時に実行してください。`
-  }
-]
-
-const categories = [
-  { id: 'all', name: 'ALL_SYSTEMS', icon: Star },
-  { id: 'notification', name: 'NOTIFIERS', icon: Bell },
-  { id: 'monitoring', name: 'WATCHDOGS', icon: Search },
-  { id: 'productivity', name: 'WORKFLOWS', icon: Zap },
-  { id: 'development', name: 'DEV_OPS', icon: Code },
-  { id: 'data', name: 'DATA_MINING', icon: Database },
-]
-
-export default function TemplateLibrary({ isOpen, onClose, onSelectTemplate }) {
-  const [selectedCategory, setSelectedCategory] = useState('all')
-  const [searchQuery, setSearchQuery] = useState('')
+    }
+  ]
 
   const filteredTemplates = templates.filter(template => {
     const matchesCategory = selectedCategory === 'all' || template.category === selectedCategory
@@ -243,8 +244,8 @@ export default function TemplateLibrary({ isOpen, onClose, onSelectTemplate }) {
           <div className="p-6 border-b border-white/5">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h2 className="text-2xl font-black text-foreground font-mono tracking-tight">TEMPLATE_REPOSITORY</h2>
-                <p className="text-sm text-primary/70 font-mono mt-1">Select pre-configured automation protocols</p>
+                <h2 className="text-2xl font-black text-foreground font-mono tracking-tight">{t('wizard.templates.title')}</h2>
+                <p className="text-sm text-primary/70 font-mono mt-1">{t('wizard.templates.subtitle')}</p>
               </div>
               <button
                 onClick={onClose}
@@ -261,7 +262,7 @@ export default function TemplateLibrary({ isOpen, onClose, onSelectTemplate }) {
                 type="text"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                placeholder="SEARCH_TEMPLATES..."
+                placeholder={t('wizard.templates.searchPlaceholder')}
                 className="w-full h-10 pl-10 pr-4 rounded-sm bg-black/40 border border-white/10 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 font-mono text-sm"
               />
             </div>
@@ -312,7 +313,7 @@ export default function TemplateLibrary({ isOpen, onClose, onSelectTemplate }) {
                         <h3 className="font-bold text-foreground truncate font-mono text-sm tracking-wide">{template.name}</h3>
                         {template.popular && (
                           <span className="px-1.5 py-0.5 rounded-sm bg-amber-500/10 border border-amber-500/30 text-amber-500 text-[10px] font-bold font-mono tracking-wider">
-                            HOT
+                            {t('common.hot')}
                           </span>
                         )}
                       </div>
@@ -357,7 +358,7 @@ export default function TemplateLibrary({ isOpen, onClose, onSelectTemplate }) {
             {filteredTemplates.length === 0 && (
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <Search className="w-12 h-12 text-muted-foreground/20 mb-4" />
-                <p className="text-muted-foreground font-mono text-sm">NO_MATCHING_PROTOCOLS_FOUND</p>
+                <p className="text-muted-foreground font-mono text-sm">{t('wizard.templates.noMatch')}</p>
               </div>
             )}
           </div>
@@ -366,5 +367,3 @@ export default function TemplateLibrary({ isOpen, onClose, onSelectTemplate }) {
     </AnimatePresence>
   )
 }
-
-

@@ -3,19 +3,20 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Video, 
   Square, 
-  Play,
-  Pause,
-  Trash2,
-  Upload,
-  Monitor,
-  Clock,
-  AlertCircle,
-  CheckCircle,
-  Loader2,
-  X,
+  Play, 
+  Pause, 
+  Trash2, 
+  Upload, 
+  Monitor, 
+  Clock, 
+  AlertCircle, 
+  CheckCircle, 
+  Loader2, 
+  X, 
   Download
 } from 'lucide-react'
 import { cn } from '../../utils/cn'
+import useLanguageStore from '../../stores/languageStore'
 
 export default function ScreenRecorder({ onRecordingComplete, onClose }) {
   const [isRecording, setIsRecording] = useState(false)
@@ -24,6 +25,7 @@ export default function ScreenRecorder({ onRecordingComplete, onClose }) {
   const [recordingTime, setRecordingTime] = useState(0)
   const [error, setError] = useState('')
   const [isUploading, setIsUploading] = useState(false)
+  const { t } = useLanguageStore()
   
   const mediaRecorderRef = useRef(null)
   const streamRef = useRef(null)
@@ -86,9 +88,9 @@ export default function ScreenRecorder({ onRecordingComplete, onClose }) {
       
     } catch (err) {
       if (err.name === 'NotAllowedError') {
-        setError('画面共有の許可が必要です。もう一度お試しください。')
+        setError(t('screenRecorder.permissionError'))
       } else {
-        setError(`録画を開始できませんでした: ${err.message}`)
+        setError(`${t('screenRecorder.startError')}: ${err.message}`)
       }
     }
   }, [])
@@ -152,7 +154,7 @@ export default function ScreenRecorder({ onRecordingComplete, onClose }) {
       
       onRecordingComplete(file)
     } catch (err) {
-      setError(`アップロードに失敗しました: ${err.message}`)
+      setError(`${t('screenRecorder.uploadError')}: ${err.message}`)
     } finally {
       setIsUploading(false)
     }
@@ -178,8 +180,8 @@ export default function ScreenRecorder({ onRecordingComplete, onClose }) {
             <Video className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h3 className="font-bold text-foreground">スクリーンレコーダー</h3>
-            <p className="text-sm text-muted-foreground">ブラウザ上で直接画面を録画</p>
+            <h3 className="font-bold text-foreground">{t('screenRecorder.title')}</h3>
+            <p className="text-sm text-muted-foreground">{t('screenRecorder.subtitle')}</p>
           </div>
         </div>
         {onClose && (
@@ -222,7 +224,7 @@ export default function ScreenRecorder({ onRecordingComplete, onClose }) {
               </div>
               <div>
                 <p className="text-lg font-bold text-foreground">
-                  {isPaused ? '一時停止中' : '録画中...'}
+                  {isPaused ? t('screenRecorder.paused') : t('screenRecorder.recording')}
                 </p>
                 <p className="text-3xl font-mono font-bold text-rose-500 mt-2">
                   {formatTime(recordingTime)}
@@ -235,20 +237,20 @@ export default function ScreenRecorder({ onRecordingComplete, onClose }) {
                 <Monitor className="w-10 h-10 text-muted-foreground" />
               </div>
               <div>
-                <p className="font-bold text-foreground">画面を録画</p>
+                <p className="font-bold text-foreground">{t('screenRecorder.recordScreen')}</p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  自動化したい操作を録画してください
+                  {t('screenRecorder.recordDesc')}
                 </p>
               </div>
               <div className="flex flex-wrap gap-2 justify-center text-xs text-muted-foreground">
                 <span className="px-2 py-1 rounded-full bg-zinc-200 dark:bg-zinc-800">
-                  🖥️ 画面全体
+                  🖥️ {t('screenRecorder.fullScreen')}
                 </span>
                 <span className="px-2 py-1 rounded-full bg-zinc-200 dark:bg-zinc-800">
-                  🪟 ウィンドウ
+                  🪟 {t('screenRecorder.window')}
                 </span>
                 <span className="px-2 py-1 rounded-full bg-zinc-200 dark:bg-zinc-800">
-                  📑 タブ
+                  📑 {t('screenRecorder.tab')}
                 </span>
               </div>
             </div>
@@ -298,7 +300,7 @@ export default function ScreenRecorder({ onRecordingComplete, onClose }) {
             className="flex-1 flex items-center justify-center gap-2 px-6 py-4 rounded-xl bg-gradient-to-r from-rose-500 to-pink-600 text-white font-bold hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg shadow-rose-500/25"
           >
             <Video className="w-5 h-5" />
-            録画を開始
+            {t('screenRecorder.startRecording')}
           </button>
         )}
 
@@ -309,7 +311,7 @@ export default function ScreenRecorder({ onRecordingComplete, onClose }) {
               className="flex items-center justify-center gap-2 px-4 py-4 rounded-xl border border-zinc-300 dark:border-zinc-700 text-muted-foreground hover:text-foreground hover:border-zinc-400 dark:hover:border-zinc-600 transition-all"
             >
               <Trash2 className="w-5 h-5" />
-              破棄
+              {t('screenRecorder.discard')}
             </button>
             <button
               onClick={handleUpload}
@@ -319,12 +321,12 @@ export default function ScreenRecorder({ onRecordingComplete, onClose }) {
               {isUploading ? (
                 <>
                   <Loader2 className="w-5 h-5 animate-spin" />
-                  アップロード中...
+                  {t('screenRecorder.uploading')}
                 </>
               ) : (
                 <>
                   <Upload className="w-5 h-5" />
-                  この録画を使用
+                  {t('screenRecorder.useRecording')}
                 </>
               )}
             </button>
@@ -334,16 +336,13 @@ export default function ScreenRecorder({ onRecordingComplete, onClose }) {
 
       {/* Tips */}
       <div className="p-4 rounded-xl bg-zinc-100 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800">
-        <h4 className="text-sm font-bold text-foreground mb-2">📹 録画のコツ</h4>
+        <h4 className="text-sm font-bold text-foreground mb-2">📹 {t('screenRecorder.tipsTitle')}</h4>
         <ul className="text-xs text-muted-foreground space-y-1">
-          <li>• 操作はゆっくり、はっきりと行ってください</li>
-          <li>• 入力するテキストは実際の値を使用してください（パスワードは除く）</li>
-          <li>• エラー時の対処も録画しておくと精度が上がります</li>
-          <li>• 録画時間は5分以内を推奨します</li>
+          {t('screenRecorder.tips').map((tip, i) => (
+            <li key={i}>• {tip}</li>
+          ))}
         </ul>
       </div>
     </motion.div>
   )
 }
-
-

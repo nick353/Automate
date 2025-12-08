@@ -16,11 +16,13 @@ import {
 import { motion } from 'framer-motion'
 import { statsApi, executionsApi } from '../services/api'
 import { BentoGrid, BentoItem } from '../components/Bento/BentoGrid'
+import useLanguageStore from '../stores/languageStore'
 
 export default function Dashboard() {
   const [stats, setStats] = useState(null)
   const [recentExecutions, setRecentExecutions] = useState([])
   const [isLoading, setIsLoading] = useState(true)
+  const { t } = useLanguageStore()
   
   useEffect(() => {
     const fetchData = async () => {
@@ -93,24 +95,24 @@ export default function Dashboard() {
         <div className="min-w-0">
           <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground dark:text-white flex items-center gap-3">
             <Zap className="w-8 h-8 text-primary" />
-            <span className="truncate">Dashboard</span>
+            <span className="truncate">{t('dashboard.title')}</span>
           </h1>
-          <p className="text-muted-foreground dark:text-gray-500 mt-1 text-lg font-medium">System Overview</p>
+          <p className="text-muted-foreground dark:text-gray-500 mt-1 text-lg font-medium">{t('dashboard.subtitle')}</p>
         </div>
         <Link 
           to="/tasks" 
           className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-black dark:bg-white text-white dark:text-black text-sm font-bold shadow-lg hover:scale-105 active:scale-95 transition-all"
         >
           <ListTodo className="w-4 h-4" />
-          <span>Manage Tasks</span>
+          <span>{t('dashboard.manageTasks')}</span>
         </Link>
       </motion.div>
       
       <BentoGrid>
         {/* Active Tasks */}
         <BentoItem
-          title="Active Tasks"
-          description="Currently active tasks in the system"
+          title={t('dashboard.activeTasks')}
+          description={t('dashboard.activeTasksDesc')}
           header={
             <div className="flex flex-1 w-full h-full min-h-[6rem] bg-cyan-500/10 items-center justify-center">
                <div className="text-6xl font-black text-cyan-500">{stats?.tasks?.active || 0}</div>
@@ -121,14 +123,14 @@ export default function Dashboard() {
         >
              <div className="flex items-center gap-2 mt-2 text-xs font-mono text-muted-foreground">
                 <ArrowUpRight className="w-3 h-3 text-emerald-500" />
-                <span>Total: {stats?.tasks?.total || 0}</span>
+                <span>{t('dashboard.total')}: {stats?.tasks?.total || 0}</span>
              </div>
         </BentoItem>
 
         {/* Running Executions */}
         <BentoItem
-          title="Running Now"
-          description="Real-time execution status"
+          title={t('dashboard.runningNow')}
+          description={t('dashboard.runningNowDesc')}
           header={
             <div className="flex flex-1 w-full h-full min-h-[6rem] bg-yellow-500/10 items-center justify-center relative overflow-hidden">
                 <div className="absolute inset-0 bg-yellow-500/5 animate-pulse" />
@@ -141,8 +143,8 @@ export default function Dashboard() {
 
         {/* Success Rate */}
         <BentoItem
-          title="Success Rate"
-          description="Execution success metrics"
+          title={t('dashboard.successRate')}
+          description={t('dashboard.successRateDesc')}
           header={
             <div className="flex flex-1 w-full h-full min-h-[6rem] bg-emerald-500/10 items-center justify-center">
                 <div className="text-6xl font-black text-emerald-500">
@@ -167,8 +169,8 @@ export default function Dashboard() {
 
         {/* Recent Activity - Large Card */}
         <BentoItem
-          title="Recent Activity"
-          description="Latest system executions and logs"
+          title={t('dashboard.recentActivity')}
+          description={t('dashboard.recentActivityDesc')}
           span={2}
           rowSpan={2}
           header={null}
@@ -178,7 +180,7 @@ export default function Dashboard() {
                 {recentExecutions.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center text-muted-foreground opacity-50">
                         <Clock className="w-12 h-12 mb-2" />
-                        <p>No recent activity</p>
+                        <p>{t('dashboard.noActivity')}</p>
                     </div>
                 ) : (
                     <div className="space-y-3">
@@ -206,15 +208,15 @@ export default function Dashboard() {
                     </div>
                 )}
                 <div className="mt-auto pt-4 text-center">
-                    <Link to="/history" className="text-sm font-bold text-primary hover:underline">View Full History &rarr;</Link>
+                    <Link to="/history" className="text-sm font-bold text-primary hover:underline">{t('dashboard.viewHistory')} &rarr;</Link>
                 </div>
             </div>
         </BentoItem>
 
         {/* Quick Actions */}
         <BentoItem
-          title="Quick Actions"
-          description="Common tasks"
+          title={t('dashboard.quickActions')}
+          description={t('dashboard.quickActionsDesc')}
           className="md:col-span-1"
           icon={<Zap className="h-4 w-4 text-purple-500" />}
         >
@@ -224,8 +226,8 @@ export default function Dashboard() {
                         <Zap className="w-4 h-4" />
                     </div>
                     <div>
-                        <p className="font-bold text-sm">AI Wizard</p>
-                        <p className="text-xs text-muted-foreground">Create task with AI</p>
+                        <p className="font-bold text-sm">{t('dashboard.aiWizard')}</p>
+                        <p className="text-xs text-muted-foreground">{t('dashboard.createWithAi')}</p>
                     </div>
                 </Link>
                 <button 
@@ -236,8 +238,8 @@ export default function Dashboard() {
                         <Plus className="w-4 h-4" />
                     </div>
                     <div className="text-left">
-                        <p className="font-bold text-sm">New Task</p>
-                        <p className="text-xs text-muted-foreground">Create manually</p>
+                        <p className="font-bold text-sm">{t('dashboard.newTask')}</p>
+                        <p className="text-xs text-muted-foreground">{t('dashboard.createManually')}</p>
                     </div>
                 </button>
             </div>

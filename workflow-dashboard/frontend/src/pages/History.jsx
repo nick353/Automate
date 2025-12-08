@@ -13,11 +13,13 @@ import {
 import { motion } from 'framer-motion'
 import { executionsApi } from '../services/api'
 import { BentoGrid, BentoItem } from '../components/Bento/BentoGrid'
+import useLanguageStore from '../stores/languageStore'
 
 export default function History() {
   const [executions, setExecutions] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [filter, setFilter] = useState('all')
+  const { t } = useLanguageStore()
   
   useEffect(() => {
     fetchExecutions()
@@ -36,7 +38,7 @@ export default function History() {
   }
   
   const handleDelete = async (execution) => {
-    if (window.confirm('Are you sure you want to delete this execution log?')) {
+    if (window.confirm(t('history.confirmDelete'))) {
       try {
         await executionsApi.delete(execution.id)
         setExecutions(executions.filter(e => e.id !== execution.id))
@@ -61,9 +63,9 @@ export default function History() {
   
   const getStatusLabel = (status) => {
     const labels = {
-      completed: 'Success',
-      failed: 'Failed',
-      running: 'Running',
+      completed: t('history.success'),
+      failed: t('history.failed'),
+      running: t('history.running'),
       pending: 'Pending',
       paused: 'Paused',
       stopped: 'Stopped'
@@ -92,10 +94,10 @@ export default function History() {
     : executions.filter(e => e.status === filter)
 
   const filterOptions = [
-    { value: 'all', label: 'All' },
-    { value: 'completed', label: 'Success' },
-    { value: 'failed', label: 'Failed' },
-    { value: 'running', label: 'Running' }
+    { value: 'all', label: t('history.all') },
+    { value: 'completed', label: t('history.success') },
+    { value: 'failed', label: t('history.failed') },
+    { value: 'running', label: t('history.running') }
   ]
   
   return (
@@ -103,8 +105,8 @@ export default function History() {
       {/* Header */}
       <div className="flex flex-col gap-4">
         <div>
-          <h1 className="text-4xl font-bold tracking-tight text-foreground">History</h1>
-          <p className="text-muted-foreground mt-1 text-lg">Execution logs and results</p>
+          <h1 className="text-4xl font-bold tracking-tight text-foreground">{t('history.title')}</h1>
+          <p className="text-muted-foreground mt-1 text-lg">{t('history.subtitle')}</p>
         </div>
         
         {/* Filter Tabs */}
@@ -135,8 +137,8 @@ export default function History() {
       ) : filteredExecutions.length === 0 ? (
         <BentoGrid>
           <BentoItem
-            title="No History Found"
-            description="Run a task to see execution logs here."
+            title={t('history.noHistory')}
+            description={t('history.runToSee')}
             className="md:col-span-3 flex flex-col items-center justify-center py-12 text-center opacity-50"
             icon={<HistoryIcon className="w-12 h-12 mb-4" />}
           />
@@ -153,11 +155,11 @@ export default function History() {
               <table className="w-full text-sm text-left">
                 <thead className="bg-zinc-50 dark:bg-zinc-900/50 text-xs font-bold text-muted-foreground uppercase tracking-wider border-b border-zinc-100 dark:border-zinc-800">
                   <tr>
-                    <th className="px-6 py-4">Task / Status</th>
-                    <th className="px-6 py-4">Started</th>
-                    <th className="px-6 py-4">Duration</th>
-                    <th className="px-6 py-4">Steps</th>
-                    <th className="px-6 py-4 text-right">Actions</th>
+                    <th className="px-6 py-4">{t('history.taskStatus')}</th>
+                    <th className="px-6 py-4">{t('history.started')}</th>
+                    <th className="px-6 py-4">{t('history.duration')}</th>
+                    <th className="px-6 py-4">{t('history.steps')}</th>
+                    <th className="px-6 py-4 text-right">{t('history.actions')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
@@ -198,7 +200,7 @@ export default function History() {
                           <Link 
                             to={`/execution/${execution.id}`}
                             className="p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-                            title="Details"
+                            title={t('history.details')}
                           >
                             <ExternalLink className="w-4 h-4" />
                           </Link>
@@ -206,7 +208,7 @@ export default function History() {
                             <button
                               onClick={() => handleDownload(execution)}
                               className="p-2 rounded-lg text-muted-foreground hover:text-blue-500 hover:bg-blue-500/10 transition-colors"
-                              title="Download"
+                              title={t('history.download')}
                             >
                               <Download className="w-4 h-4" />
                             </button>
@@ -214,7 +216,7 @@ export default function History() {
                           <button
                             onClick={() => handleDelete(execution)}
                             className="p-2 rounded-lg text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 transition-colors"
-                            title="Delete"
+                            title={t('common.delete')}
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -254,7 +256,7 @@ export default function History() {
                         to={`/execution/${execution.id}`}
                         className="p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-foreground text-xs font-bold"
                       >
-                        Details
+                        {t('history.details')}
                       </Link>
                    </div>
                  </div>
@@ -266,4 +268,3 @@ export default function History() {
     </div>
   )
 }
-

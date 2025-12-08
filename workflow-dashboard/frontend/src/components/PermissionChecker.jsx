@@ -14,12 +14,14 @@ import {
   Check
 } from 'lucide-react'
 import api from '../services/api'
+import useLanguageStore from '../stores/languageStore'
 
 export default function PermissionChecker({ onClose }) {
   const [status, setStatus] = useState(null)
   const [instructions, setInstructions] = useState(null)
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(null)
+  const { t } = useLanguageStore()
   
   const checkPermissions = async () => {
     setLoading(true)
@@ -31,9 +33,9 @@ export default function PermissionChecker({ onClose }) {
       setStatus(permResponse.data)
       setInstructions(instructResponse.data)
     } catch (error) {
-      console.error('権限チェックエラー:', error)
+      console.error('Permission check error:', error)
       setStatus({
-        message: 'サーバーに接続できません。バックエンドが起動しているか確認してください。',
+        message: t('permissions.errorFetch'),
         platform: 'unknown'
       })
     }
@@ -52,9 +54,9 @@ export default function PermissionChecker({ onClose }) {
   
   const PermissionItem = ({ name, icon: Icon, status: itemStatus, description }) => {
     const getStatusInfo = () => {
-      if (itemStatus === true) return { color: 'text-emerald-500', bg: 'bg-emerald-500/10', icon: CheckCircle, label: '許可済み' }
-      if (itemStatus === false) return { color: 'text-rose-500', bg: 'bg-rose-500/10', icon: XCircle, label: '未許可' }
-      return { color: 'text-amber-500', bg: 'bg-amber-500/10', icon: AlertTriangle, label: '確認不可' }
+      if (itemStatus === true) return { color: 'text-emerald-500', bg: 'bg-emerald-500/10', icon: CheckCircle, label: t('permissions.allowed') }
+      if (itemStatus === false) return { color: 'text-rose-500', bg: 'bg-rose-500/10', icon: XCircle, label: t('permissions.denied') }
+      return { color: 'text-amber-500', bg: 'bg-amber-500/10', icon: AlertTriangle, label: t('permissions.unknown') }
     }
     
     const { color, bg, icon: StatusIcon, label } = getStatusInfo()
@@ -96,8 +98,8 @@ export default function PermissionChecker({ onClose }) {
                 <Monitor className="w-6 h-6 text-purple-500" />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-foreground">デスクトップ権限設定</h2>
-                <p className="text-sm text-muted-foreground">Lux (OAGI) を使用するための設定</p>
+                <h2 className="text-xl font-bold text-foreground">{t('permissions.title')}</h2>
+                <p className="text-sm text-muted-foreground">{t('permissions.subtitle')}</p>
               </div>
             </div>
             <button
@@ -132,35 +134,35 @@ export default function PermissionChecker({ onClose }) {
               {/* Permission Items */}
               <div className="space-y-3">
                 <PermissionItem
-                  name="OAGI SDK"
+                  name={t('permissions.oagiSdk')}
                   icon={Terminal}
                   status={status.oagi_installed}
-                  description="Lux デスクトップ自動化のSDK"
+                  description={t('permissions.oagiSdkDesc')}
                 />
                 <PermissionItem
-                  name="OAGI API Key"
+                  name={t('permissions.oagiApiKey')}
                   icon={Key}
                   status={status.oagi_api_key_set}
-                  description="developer.agiopen.org で取得"
+                  description={t('permissions.oagiApiKeyDesc')}
                 />
                 <PermissionItem
-                  name="画面収録"
+                  name={t('permissions.screenRecording')}
                   icon={Eye}
                   status={status.screen_recording}
-                  description="スクリーンショットの取得に必要"
+                  description={t('permissions.screenRecordingDesc')}
                 />
                 <PermissionItem
-                  name="アクセシビリティ"
+                  name={t('permissions.accessibility')}
                   icon={Monitor}
                   status={status.accessibility}
-                  description="マウス・キーボード操作に必要"
+                  description={t('permissions.accessibilityDesc')}
                 />
               </div>
               
               {/* Instructions */}
               {instructions && instructions.platform === 'macOS' && (
                 <div className="space-y-4">
-                  <h3 className="font-semibold text-foreground">設定手順</h3>
+                  <h3 className="font-semibold text-foreground">{t('permissions.instructions')}</h3>
                   
                   {Object.entries(instructions.instructions).map(([key, instruction]) => (
                     <div key={key} className="p-4 rounded-xl bg-muted/30 border border-border">
@@ -172,9 +174,9 @@ export default function PermissionChecker({ onClose }) {
                             className="flex items-center gap-1 px-2 py-1 rounded-lg bg-primary/10 text-primary text-xs hover:bg-primary/20 transition-colors"
                           >
                             {copied === key ? (
-                              <><Check className="w-3 h-3" /> コピー済み</>
+                              <><Check className="w-3 h-3" /> {t('permissions.copied')}</>
                             ) : (
-                              <><Copy className="w-3 h-3" /> コマンドをコピー</>
+                              <><Copy className="w-3 h-3" /> {t('permissions.copyCommand')}</>
                             )}
                           </button>
                         )}
@@ -196,7 +198,7 @@ export default function PermissionChecker({ onClose }) {
                   {instructions.cli_check && (
                     <div className="p-4 rounded-xl bg-zinc-900 text-zinc-100 font-mono text-sm">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-zinc-400">ターミナルで確認:</span>
+                        <span className="text-zinc-400">{t('permissions.terminalCheck')}</span>
                         <button
                           onClick={() => copyToClipboard(instructions.cli_check, 'cli')}
                           className="flex items-center gap-1 px-2 py-1 rounded bg-zinc-700 text-zinc-300 text-xs hover:bg-zinc-600 transition-colors"
@@ -215,8 +217,8 @@ export default function PermissionChecker({ onClose }) {
                 <div className="flex items-center gap-3">
                   <Key className="w-5 h-5 text-purple-500" />
                   <div className="flex-1">
-                    <p className="font-medium text-foreground">OAGI API Key が必要です</p>
-                    <p className="text-sm text-muted-foreground">OpenAGI Developer Console で取得してください</p>
+                    <p className="font-medium text-foreground">{t('permissions.needApiKey')}</p>
+                    <p className="text-sm text-muted-foreground">OpenAGI Developer Console</p>
                   </div>
                   <a
                     href="https://developer.agiopen.org/"
@@ -224,14 +226,14 @@ export default function PermissionChecker({ onClose }) {
                     rel="noopener noreferrer"
                     className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-purple-500 text-white text-sm font-medium hover:bg-purple-600 transition-colors"
                   >
-                    取得する <ExternalLink className="w-4 h-4" />
+                    {t('permissions.getIt')} <ExternalLink className="w-4 h-4" />
                   </a>
                 </div>
               </div>
             </>
           ) : (
             <div className="text-center py-12 text-muted-foreground">
-              権限情報を取得できませんでした
+              {t('permissions.errorFetch')}
             </div>
           )}
         </div>
@@ -242,7 +244,7 @@ export default function PermissionChecker({ onClose }) {
             onClick={onClose}
             className="px-5 py-2.5 rounded-xl border border-border font-medium hover:bg-muted transition-colors"
           >
-            閉じる
+            {t('common.close')}
           </button>
           <button
             onClick={checkPermissions}
@@ -250,12 +252,10 @@ export default function PermissionChecker({ onClose }) {
             className="px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-medium shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all flex items-center gap-2"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            再チェック
+            {t('permissions.recheck')}
           </button>
         </div>
       </motion.div>
     </div>
   )
 }
-
-

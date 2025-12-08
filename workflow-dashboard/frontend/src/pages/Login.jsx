@@ -5,6 +5,7 @@ import { Workflow, Mail, Lock, Loader2, AlertCircle, ArrowRight, Terminal } from
 import { motion } from 'framer-motion'
 import useAuthStore from '../stores/authStore'
 import useThemeStore from '../stores/themeStore'
+import useLanguageStore from '../stores/languageStore'
 import { CyberpunkBackground } from '../components/Immersive/CyberpunkBackground'
 
 // Glitch Text Effect Component
@@ -49,6 +50,7 @@ export default function Login() {
   const { resolvedTheme, initialize: initTheme } = useThemeStore()
   const [initialized, setInitialized] = useState(false)
   const [webglSupported, setWebglSupported] = useState(true)
+  const { t } = useLanguageStore()
   
   useEffect(() => {
     // Check WebGL support
@@ -158,7 +160,7 @@ export default function Login() {
             transition={{ delay: 0.3, duration: 0.4 }}
             className="text-muted-foreground dark:text-gray-500 mt-3 sm:mt-4 font-mono text-xs sm:text-sm"
           >
-            &gt; SYSTEM ACCESS REQUIRED_
+            &gt; {t('auth.systemAccess')}
           </motion.p>
         </div>
         
@@ -177,9 +179,9 @@ export default function Login() {
               <div className="flex items-start gap-2 sm:gap-3">
                 <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-amber-500 mt-0.5 shrink-0" />
                 <div>
-                  <p className="text-xs sm:text-sm text-amber-600 dark:text-amber-400 font-bold">DEV MODE</p>
+                  <p className="text-xs sm:text-sm text-amber-600 dark:text-amber-400 font-bold">{t('auth.devMode')}</p>
                   <p className="text-[10px] sm:text-xs text-amber-600/80 dark:text-amber-500/80 mt-1 font-mono">
-                    Supabase not configured.
+                    {t('auth.supabaseNotConfigured')}
                   </p>
                 </div>
               </div>
@@ -202,7 +204,7 @@ export default function Login() {
           <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
             <div>
               <label className="block text-[10px] sm:text-xs font-bold text-primary dark:text-cyan-400 mb-1.5 sm:mb-2 tracking-wider">
-                USER_ID
+                {t('auth.userId')}
               </label>
               <div className="relative group">
                 <Mail className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground dark:text-gray-600 group-focus-within:text-primary dark:group-focus-within:text-cyan-400 transition-colors pointer-events-none" />
@@ -219,7 +221,7 @@ export default function Login() {
             
             <div>
               <label className="block text-[10px] sm:text-xs font-bold text-primary dark:text-cyan-400 mb-1.5 sm:mb-2 tracking-wider">
-                ACCESS_KEY
+                {t('auth.accessKey')}
               </label>
               <div className="relative group">
                 <Lock className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground dark:text-gray-600 group-focus-within:text-primary dark:group-focus-within:text-cyan-400 transition-colors pointer-events-none" />
@@ -242,12 +244,12 @@ export default function Login() {
               {isLoading ? (
                 <>
                   <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
-                  <span className="hidden xs:inline">AUTHENTICATING...</span>
-                  <span className="xs:hidden">LOADING...</span>
+                  <span className="hidden xs:inline">{t('auth.authenticating')}</span>
+                  <span className="xs:hidden">{t('auth.loading')}</span>
                 </>
               ) : (
                 <>
-                  <span className="hidden xs:inline">INITIATE </span>LOGIN
+                  <span className="hidden xs:inline">{t('auth.initiate')} </span>{t('auth.login')}
                   <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5" />
                 </>
               )}
@@ -261,18 +263,18 @@ export default function Login() {
                   to="/forgot-password" 
                   className="text-xs sm:text-sm text-muted-foreground hover:text-primary dark:hover:text-cyan-400 font-mono transition-colors"
                 >
-                  &gt; FORGOT_ACCESS_KEY?
+                  &gt; {t('auth.forgotKey')}
                 </Link>
               </div>
               
               <div className="mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-border dark:border-gray-800 text-center">
                 <p className="text-muted-foreground dark:text-gray-500 text-xs sm:text-sm font-mono">
-                  NEW USER?{' '}
+                  {t('auth.newUser')}{' '}
                   <Link 
                     to="/signup" 
                     className="text-primary dark:text-cyan-400 hover:text-primary/80 dark:hover:text-cyan-300 font-bold transition-colors"
                   >
-                    REGISTER
+                    {t('auth.register')}
                   </Link>
                 </p>
               </div>

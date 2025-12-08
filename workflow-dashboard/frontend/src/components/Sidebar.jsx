@@ -10,23 +10,26 @@ import {
   User,
   Sun,
   Moon,
-  Zap
+  Zap,
+  Globe
 } from 'lucide-react'
 import useAuthStore from '../stores/authStore'
 import useThemeStore from '../stores/themeStore'
+import useLanguageStore from '../stores/languageStore'
 
 const navItems = [
-  { path: '/', icon: LayoutDashboard, label: 'DASHBOARD' },
-  { path: '/tasks', icon: ListTodo, label: 'TASKS' },
-  { path: '/tasks/wizard', icon: Zap, label: 'WIZARD' },
-  { path: '/credentials', icon: Key, label: 'CREDENTIALS' },
-  { path: '/history', icon: History, label: 'HISTORY' },
+  { path: '/', icon: LayoutDashboard, labelKey: 'common.dashboard' },
+  { path: '/tasks', icon: ListTodo, labelKey: 'common.tasks' },
+  { path: '/tasks/wizard', icon: Zap, labelKey: 'common.wizard' },
+  { path: '/credentials', icon: Key, labelKey: 'common.credentials' },
+  { path: '/history', icon: History, labelKey: 'common.history' },
 ]
 
 export default function Sidebar({ onNavigate }) {
   const navigate = useNavigate()
   const { user, signOut } = useAuthStore()
   const { resolvedTheme, toggleTheme, initialize } = useThemeStore()
+  const { language, setLanguage, t } = useLanguageStore()
   
   useEffect(() => {
     initialize()
@@ -40,6 +43,20 @@ export default function Sidebar({ onNavigate }) {
   const handleNavClick = () => {
     if (onNavigate) {
       onNavigate()
+    }
+  }
+
+  const toggleLanguage = () => {
+    const next = language === 'ja' ? 'en' : language === 'en' ? 'zh' : 'ja'
+    setLanguage(next)
+  }
+
+  const getLanguageLabel = (lang) => {
+    switch(lang) {
+      case 'ja': return '日本語'
+      case 'en': return 'ENGLISH'
+      case 'zh': return '中文'
+      default: return 'ENGLISH'
     }
   }
   
@@ -65,7 +82,7 @@ export default function Sidebar({ onNavigate }) {
       <nav className="flex-1 px-3 lg:px-4 py-3 lg:py-4 space-y-1.5 lg:space-y-2 overflow-y-auto no-scrollbar">
         <div className="mb-3 lg:mb-4 px-2 flex items-center gap-2">
              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-primary/30 dark:via-cyan-900 to-transparent"></div>
-             <span className="text-[9px] lg:text-[10px] font-mono text-primary/80 dark:text-cyan-700/80 uppercase tracking-widest whitespace-nowrap">Navigation</span>
+             <span className="text-[9px] lg:text-[10px] font-mono text-primary/80 dark:text-cyan-700/80 uppercase tracking-widest whitespace-nowrap">{t('common.navigation')}</span>
              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-primary/30 dark:via-cyan-900 to-transparent"></div>
         </div>
 
@@ -91,7 +108,7 @@ export default function Sidebar({ onNavigate }) {
                 <item.icon className={`w-4 h-4 lg:w-5 lg:h-5 shrink-0 transition-colors duration-200 ${
                   isActive ? "text-primary dark:text-cyan-400 drop-shadow-[0_0_5px_rgba(6,182,212,0.8)]" : "text-muted-foreground dark:text-gray-500 group-hover:text-foreground dark:group-hover:text-white"
                 }`} />
-                <span className="relative z-10 tracking-wide truncate">{item.label}</span>
+                <span className="relative z-10 tracking-wide truncate">{t(item.labelKey)}</span>
                 
                 {/* Hover decoration - hidden on mobile */}
                 <div className="hidden lg:block absolute right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
@@ -106,6 +123,24 @@ export default function Sidebar({ onNavigate }) {
       {/* Footer Actions */}
       <div className="p-3 lg:p-4 border-t border-border dark:border-cyan-500/20 shrink-0 bg-muted/30 dark:bg-black/40 space-y-2">
         
+        {/* Language Toggle */}
+        <button
+          onClick={toggleLanguage}
+          className="w-full flex items-center gap-2 lg:gap-3 p-2 lg:p-3 rounded-sm border border-border/50 dark:border-white/5 hover:border-primary/30 hover:bg-primary/10 dark:hover:bg-cyan-950/20 transition-all cursor-pointer group"
+        >
+          <div className="w-8 h-8 lg:w-10 lg:h-10 rounded-sm bg-background dark:bg-gray-900 flex items-center justify-center border border-border dark:border-gray-700 group-hover:border-primary/50 dark:group-hover:border-cyan-500/50 transition-colors shrink-0">
+            <Globe className="w-4 h-4 lg:w-5 lg:h-5 text-muted-foreground dark:text-gray-400 group-hover:text-primary dark:group-hover:text-cyan-400" />
+          </div>
+          <div className="flex-1 text-left min-w-0">
+            <p className="text-xs lg:text-sm font-bold text-foreground dark:text-gray-200 truncate group-hover:text-primary dark:group-hover:text-cyan-200">
+              {t('common.language')}
+            </p>
+            <p className="text-[10px] lg:text-xs text-muted-foreground dark:text-gray-500 group-hover:text-primary/70 dark:group-hover:text-cyan-400/70 font-mono">
+              {getLanguageLabel(language)}
+            </p>
+          </div>
+        </button>
+
         {/* Theme Toggle */}
         <button
           onClick={toggleTheme}
@@ -120,10 +155,10 @@ export default function Sidebar({ onNavigate }) {
           </div>
           <div className="flex-1 text-left min-w-0">
             <p className="text-xs lg:text-sm font-bold text-foreground dark:text-gray-200 truncate group-hover:text-primary dark:group-hover:text-cyan-200">
-              {resolvedTheme === 'dark' ? 'DARK MODE' : 'LIGHT MODE'}
+              {resolvedTheme === 'dark' ? t('common.darkMode') : t('common.lightMode')}
             </p>
             <p className="text-[10px] lg:text-xs text-muted-foreground dark:text-gray-500 group-hover:text-primary/70 dark:group-hover:text-cyan-400/70 font-mono">
-              {resolvedTheme === 'dark' ? 'ACTIVE' : 'ACTIVE'}
+              {t('common.active')}
             </p>
           </div>
         </button>
@@ -138,13 +173,13 @@ export default function Sidebar({ onNavigate }) {
               <p className="text-xs lg:text-sm font-bold text-foreground dark:text-gray-200 truncate group-hover:text-primary dark:group-hover:text-cyan-200">{user.email}</p>
               <div className="flex items-center gap-1 lg:gap-1.5">
                   <div className="w-1 h-1 lg:w-1.5 lg:h-1.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_5px_#22c55e]"></div>
-                  <p className="text-[10px] lg:text-xs text-muted-foreground dark:text-gray-500 group-hover:text-primary/70 dark:group-hover:text-cyan-400/70 font-mono">ONLINE</p>
+                  <p className="text-[10px] lg:text-xs text-muted-foreground dark:text-gray-500 group-hover:text-primary/70 dark:group-hover:text-cyan-400/70 font-mono">{t('common.online')}</p>
               </div>
             </div>
             <button 
               onClick={handleLogout}
               className="p-1.5 lg:p-2 text-muted-foreground dark:text-gray-500 hover:text-destructive dark:hover:text-red-400 lg:opacity-0 lg:group-hover:opacity-100 transition-all duration-200"
-              title="Logout"
+              title={t('common.logout')}
             >
               <LogOut className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
             </button>

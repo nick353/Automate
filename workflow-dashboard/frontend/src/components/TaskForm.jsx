@@ -5,69 +5,7 @@ import useCredentialStore from '../stores/credentialStore'
 import useTaskStore from '../stores/taskStore'
 import PermissionChecker from './PermissionChecker'
 import TrialRunPreview from './TrialRunPreview'
-
-// 実行場所の定義（実行タイプと紐づけ）
-const EXECUTION_LOCATIONS = [
-  { 
-    type: 'server', 
-    label: 'サーバー実行', 
-    description: 'Browser Use でWebブラウザ自動化。24時間稼働、スケジュール実行向け',
-    icon: Globe, 
-    color: 'text-blue-500',
-    executionType: 'web',
-    features: ['24時間稼働', 'スケジュール実行', 'Webスクレイピング', 'フォーム入力']
-  },
-  { 
-    type: 'local', 
-    label: 'ローカルPC実行', 
-    description: 'Lux でデスクトップ全体を操作。Excel、ローカルアプリ向け',
-    icon: Monitor, 
-    color: 'text-purple-500',
-    executionType: 'desktop',
-    features: ['Excel操作', 'ローカルアプリ', 'ファイル操作', 'デスクトップ自動化']
-  },
-]
-
-const CREDENTIAL_CONFIGS = {
-  api_key: {
-    anthropic: {
-      label: 'Anthropic API Key',
-      fields: [
-        { name: 'api_key', label: 'API Key', type: 'password', placeholder: 'sk-ant-...' }
-      ]
-    },
-    google: {
-      label: 'Google API Key',
-      fields: [
-        { name: 'api_key', label: 'API Key', type: 'password', placeholder: 'AIza...' }
-      ]
-    },
-    openai: {
-      label: 'OpenAI API Key',
-      fields: [
-        { name: 'api_key', label: 'API Key', type: 'password', placeholder: 'sk-...' }
-      ]
-    }
-  },
-  login: {
-    custom: {
-      label: 'Site Login',
-      fields: [
-        { name: 'url', label: 'Login URL', type: 'text', placeholder: 'https://example.com/login' },
-        { name: 'username', label: 'Username / Email', type: 'text', placeholder: 'user@example.com' },
-        { name: 'password', label: 'Password', type: 'password', placeholder: '••••••••' }
-      ]
-    }
-  },
-  webhook: {
-    slack: {
-      label: 'Slack Webhook',
-      fields: [
-        { name: 'webhook_url', label: 'Webhook URL', type: 'password', placeholder: 'https://hooks.slack.com/...' }
-      ]
-    }
-  }
-}
+import useLanguageStore from '../stores/languageStore'
 
 export default function TaskForm({ task, onClose }) {
   const { createTask, updateTask } = useTaskStore()
@@ -75,6 +13,29 @@ export default function TaskForm({ task, onClose }) {
   const [isLoading, setIsLoading] = useState(false)
   const [showPermissionChecker, setShowPermissionChecker] = useState(false)
   const [showTrialRun, setShowTrialRun] = useState(false)
+  const { t } = useLanguageStore()
+  
+  // 実行場所の定義（実行タイプと紐づけ）
+  const EXECUTION_LOCATIONS = [
+    { 
+      type: 'server', 
+      label: t('tasks.serverExecution'), 
+      description: t('tasks.serverDesc'),
+      icon: Globe, 
+      color: 'text-blue-500',
+      executionType: 'web',
+      features: t('tasks.serverInfoPoints')
+    },
+    { 
+      type: 'local', 
+      label: t('tasks.localExecution'), 
+      description: t('tasks.localDesc'),
+      icon: Monitor, 
+      color: 'text-purple-500',
+      executionType: 'desktop',
+      features: t('tasks.localWarningPoints')
+    },
+  ]
   
   const [formData, setFormData] = useState({
     name: task?.name || '',
@@ -126,7 +87,7 @@ export default function TaskForm({ task, onClose }) {
       }
       onClose()
     } catch (error) {
-      alert('Failed to save task: ' + error.message)
+      alert(t('common.error') + ': ' + error.message)
     }
     
     setIsLoading(false)
@@ -161,9 +122,9 @@ export default function TaskForm({ task, onClose }) {
         <div className="px-8 py-6 border-b border-border flex items-center justify-between bg-muted/10">
           <div>
             <h2 className="text-2xl font-bold text-foreground">
-              {task ? 'Edit Task' : 'New Automated Task'}
+              {task ? t('tasks.editTask') : t('tasks.newTaskTitle')}
             </h2>
-            <p className="text-sm text-muted-foreground">Configure instructions and schedules for your agent.</p>
+            <p className="text-sm text-muted-foreground">{t('tasks.configureInstructions')}</p>
           </div>
           <button onClick={onClose} className="p-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
             <X className="w-5 h-5" />
@@ -175,26 +136,26 @@ export default function TaskForm({ task, onClose }) {
           {/* Main Info */}
           <div className="grid gap-6">
             <div>
-              <label className="block text-sm font-medium text-foreground mb-2">Task Name *</label>
+              <label className="block text-sm font-medium text-foreground mb-2">{t('tasks.taskName')} *</label>
               <input
                 type="text"
                 name="name"
                 value={formData.name}
                 onChange={handleChange}
                 required
-                placeholder="e.g. Monthly Sales Report Download"
+                placeholder={t('tasks.taskNamePlaceholder')}
                 className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
               />
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-foreground mb-2">Description</label>
+              <label className="block text-sm font-medium text-foreground mb-2">{t('tasks.description')}</label>
               <input
                 type="text"
                 name="description"
                 value={formData.description}
                 onChange={handleChange}
-                placeholder="Briefly describe what this task does..."
+                placeholder={t('tasks.descriptionPlaceholder')}
                 className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
               />
             </div>
@@ -202,7 +163,7 @@ export default function TaskForm({ task, onClose }) {
           
           {/* Execution Location Selection */}
           <div>
-            <label className="block text-sm font-medium text-foreground mb-3">実行場所 *</label>
+            <label className="block text-sm font-medium text-foreground mb-3">{t('tasks.executionLocation')} *</label>
             <div className="grid grid-cols-2 gap-4">
               {EXECUTION_LOCATIONS.map(({ type, label, description, icon: Icon, color, features }) => (
                 <button
@@ -247,11 +208,11 @@ export default function TaskForm({ task, onClose }) {
                 <div className="flex items-start gap-3">
                   <Monitor className="w-5 h-5 text-purple-500 mt-0.5" />
                   <div className="flex-1">
-                    <h4 className="font-semibold text-foreground mb-1">ローカルPC実行について</h4>
+                    <h4 className="font-semibold text-foreground mb-1">{t('tasks.localWarning')}</h4>
                     <ul className="text-sm text-muted-foreground space-y-1">
-                      <li>• タスク実行時にPCでエージェントを起動する必要があります</li>
-                      <li>• OAGI (Lux) APIキーと画面収録・アクセシビリティ権限が必要</li>
-                      <li>• スケジュール実行時もPCが起動している必要があります</li>
+                      {t('tasks.localWarningPoints').map((point, i) => (
+                        <li key={i}>• {point}</li>
+                      ))}
                     </ul>
                     <button
                       type="button"
@@ -259,7 +220,7 @@ export default function TaskForm({ task, onClose }) {
                       className="mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-500/20 text-purple-500 hover:bg-purple-500/30 transition-colors text-sm font-medium"
                     >
                       <Settings className="w-4 h-4" />
-                      権限設定を確認
+                      {t('tasks.checkPermissions')}
                     </button>
                   </div>
                 </div>
@@ -272,11 +233,11 @@ export default function TaskForm({ task, onClose }) {
                 <div className="flex items-start gap-3">
                   <Globe className="w-5 h-5 text-blue-500 mt-0.5" />
                   <div>
-                    <h4 className="font-semibold text-foreground mb-1">サーバー実行について</h4>
+                    <h4 className="font-semibold text-foreground mb-1">{t('tasks.serverInfo')}</h4>
                     <ul className="text-sm text-muted-foreground space-y-1">
-                      <li>• Webブラウザの自動化に特化（Browser Use）</li>
-                      <li>• 24時間稼働、スケジュール実行に最適</li>
-                      <li>• デスクトップアプリの操作はできません</li>
+                      {t('tasks.serverInfoPoints').map((point, i) => (
+                        <li key={i}>• {point}</li>
+                      ))}
                     </ul>
                   </div>
                 </div>
@@ -286,7 +247,7 @@ export default function TaskForm({ task, onClose }) {
           
           {/* Prompt Area */}
           <div>
-            <label className="block text-sm font-medium text-foreground mb-2">Natural Language Instructions *</label>
+            <label className="block text-sm font-medium text-foreground mb-2">{t('tasks.naturalLanguageInstructions')} *</label>
             <div className="relative">
               <textarea
                 name="task_prompt"
@@ -295,12 +256,12 @@ export default function TaskForm({ task, onClose }) {
                 required
                 rows={6}
                 placeholder={formData.execution_type === 'desktop' 
-                  ? "デスクトップ操作の指示を記述してください。例:\n1. Finderを開く\n2. Documentsフォルダに移動\n3. 新しいフォルダを作成..."
-                  : "Describe the workflow step-by-step. Example:\n1. Go to rakuten.co.jp\n2. Login using saved credentials\n3. Navigate to purchase history..."}
+                  ? t('tasks.instructionsPlaceholderDesktop')
+                  : t('tasks.instructionsPlaceholderWeb')}
                 className="w-full p-4 bg-background border border-border rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all font-mono text-sm resize-none"
               />
               <div className="absolute bottom-4 right-4 text-xs text-muted-foreground bg-background/80 backdrop-blur px-2 py-1 rounded-md border border-border">
-                Markdown supported
+                {t('tasks.markdownSupported')}
               </div>
             </div>
           </div>
@@ -309,14 +270,14 @@ export default function TaskForm({ task, onClose }) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">LLM Provider</label>
+                <label className="block text-sm font-medium text-foreground mb-2">{t('tasks.llmProvider')}</label>
                 <select
                   name="llm_credential_id"
                   value={formData.llm_credential_id}
                   onChange={handleChange}
                   className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
                 >
-                  <option value="">Use System Default</option>
+                  <option value="">{t('tasks.useSystemDefault')}</option>
                   {apiKeyCredentials.filter(c => c.service_name !== 'oagi').map(c => (
                     <option key={c.id} value={c.id}>{c.name} ({c.service_name})</option>
                   ))}
@@ -329,7 +290,7 @@ export default function TaskForm({ task, onClose }) {
                   <label className="block text-sm font-medium text-foreground mb-2">
                     <span className="flex items-center gap-2">
                       <Monitor className="w-4 h-4 text-purple-500" />
-                      Lux (OAGI) API Key
+                      {t('tasks.luxApiKey')}
                     </span>
                   </label>
                   <select
@@ -338,28 +299,28 @@ export default function TaskForm({ task, onClose }) {
                     onChange={handleChange}
                     className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
                   >
-                    <option value="">Use System Default</option>
+                    <option value="">{t('tasks.useSystemDefault')}</option>
                     {luxCredentials.map(c => (
                       <option key={c.id} value={c.id}>{c.name}</option>
                     ))}
                   </select>
                   {luxCredentials.length === 0 && (
                     <p className="mt-2 text-xs text-amber-500">
-                      OAGI APIキーが登録されていません。認証情報ページで追加してください。
+                      {t('tasks.noLuxKey')}
                     </p>
                   )}
                 </div>
               )}
               
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">Site Login</label>
+                <label className="block text-sm font-medium text-foreground mb-2">{t('tasks.siteLogin')}</label>
                 <select
                   name="site_credential_id"
                   value={formData.site_credential_id}
                   onChange={handleChange}
                   className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
                 >
-                  <option value="">None</option>
+                  <option value="">{t('tasks.none')}</option>
                   {loginCredentials.map(c => (
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
@@ -369,19 +330,19 @@ export default function TaskForm({ task, onClose }) {
             
             <div className="space-y-6">
                <div>
-                <label className="block text-sm font-medium text-foreground mb-2">Schedule (Cron)</label>
+                <label className="block text-sm font-medium text-foreground mb-2">{t('tasks.schedule')}</label>
                 <input
                   type="text"
                   name="schedule"
                   value={formData.schedule}
                   onChange={handleChange}
-                  placeholder="e.g. 0 9 * * * (Every day at 9am)"
+                  placeholder={t('tasks.schedulePlaceholder')}
                   className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all font-mono"
                 />
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">最大ステップ数</label>
+                <label className="block text-sm font-medium text-foreground mb-2">{t('tasks.maxSteps')}</label>
                 <input
                   type="number"
                   name="max_steps"
@@ -392,7 +353,7 @@ export default function TaskForm({ task, onClose }) {
                   className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
                 />
                 <p className="mt-1 text-xs text-muted-foreground">
-                  無限ループ防止のため、最大ステップ数を設定（デフォルト: 20）
+                  {t('tasks.maxStepsHelp')}
                 </p>
               </div>
               
@@ -405,7 +366,7 @@ export default function TaskForm({ task, onClose }) {
                     onChange={handleChange}
                     className="w-4 h-4 rounded text-primary focus:ring-primary bg-background border-border"
                   />
-                  <span className="text-sm font-medium">Enable Task</span>
+                  <span className="text-sm font-medium">{t('tasks.enableTask')}</span>
                 </label>
                 
                 <label className="flex items-center gap-3 p-3 rounded-xl border border-border hover:bg-muted/50 transition-colors cursor-pointer">
@@ -416,7 +377,7 @@ export default function TaskForm({ task, onClose }) {
                     onChange={handleChange}
                     className="w-4 h-4 rounded text-primary focus:ring-primary bg-background border-border"
                   />
-                  <span className="text-sm font-medium">Notify on Failure</span>
+                  <span className="text-sm font-medium">{t('tasks.notifyOnFailure')}</span>
                 </label>
               </div>
             </div>
@@ -434,7 +395,7 @@ export default function TaskForm({ task, onClose }) {
                 className="px-4 py-2.5 rounded-xl bg-purple-500/10 text-purple-500 border border-purple-500/30 font-medium hover:bg-purple-500/20 transition-colors flex items-center gap-2"
               >
                 <Play className="w-4 h-4" />
-                試運転（ローカルPCで確認）
+                {t('tasks.trialRun')}
               </button>
             )}
           </div>
@@ -444,14 +405,14 @@ export default function TaskForm({ task, onClose }) {
               onClick={onClose}
               className="px-6 py-2.5 rounded-xl border border-border font-medium hover:bg-muted transition-colors"
             >
-              Cancel
+              {t('common.cancel')}
             </button>
             <button
               onClick={handleSubmit}
               disabled={isLoading}
               className="px-6 py-2.5 rounded-xl bg-primary text-primary-foreground font-medium shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all"
             >
-              {isLoading ? 'Saving...' : (task ? 'Save Changes' : 'Create Task')}
+              {isLoading ? t('tasks.saving') : (task ? t('tasks.saveChanges') : t('tasks.createTask'))}
             </button>
           </div>
         </div>

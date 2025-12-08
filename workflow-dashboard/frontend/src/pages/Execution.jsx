@@ -15,6 +15,7 @@ import {
 import useLiveViewStore from '../stores/liveViewStore'
 import { liveViewApi, executionsApi } from '../services/api'
 import LiveScreencast from '../components/LiveScreencast'
+import useLanguageStore from '../stores/languageStore'
 
 export default function Execution() {
   const { executionId } = useParams()
@@ -24,6 +25,7 @@ export default function Execution() {
   const [actionLoading, setActionLoading] = useState(null)
   const timerRef = useRef(null)
   const logsEndRef = useRef(null)
+  const { t, language } = useLanguageStore()
   
   const {
     status,
@@ -48,7 +50,7 @@ export default function Execution() {
         
         // タスク情報を取得
         const execResponse = await executionsApi.get(executionId)
-        setTask(execResponse.data.task || { name: `タスク #${execResponse.data.task_id}` })
+        setTask(execResponse.data.task || { name: `Task #${execResponse.data.task_id}` })
         
         // WebSocket接続（実行中の場合のみ）
         if (['running', 'pending', 'paused'].includes(liveResponse.data.execution?.status)) {
@@ -57,7 +59,7 @@ export default function Execution() {
         
         setIsLoading(false)
       } catch (error) {
-        console.error('初期化エラー:', error)
+        console.error('Initialization error:', error)
         setIsLoading(false)
       }
     }
@@ -110,7 +112,7 @@ export default function Execution() {
     try {
       await liveViewApi.pause(executionId)
     } catch (error) {
-      alert('一時停止に失敗しました: ' + error.message)
+      alert(t('common.error') + ': ' + error.message)
     }
     setActionLoading(null)
   }
@@ -120,19 +122,19 @@ export default function Execution() {
     try {
       await liveViewApi.resume(executionId)
     } catch (error) {
-      alert('再開に失敗しました: ' + error.message)
+      alert(t('common.error') + ': ' + error.message)
     }
     setActionLoading(null)
   }
   
   const handleStop = async () => {
-    if (!window.confirm('本当に実行を停止しますか？')) return
+    if (!window.confirm(t('execution.confirmStop'))) return
     
     setActionLoading('stop')
     try {
       await liveViewApi.stop(executionId)
     } catch (error) {
-      alert('停止に失敗しました: ' + error.message)
+      alert(t('common.error') + ': ' + error.message)
     }
     setActionLoading(null)
   }
@@ -142,18 +144,18 @@ export default function Execution() {
       `[${l.timestamp}] [${l.level}] ${l.message}`
     ).join('\n')
     navigator.clipboard.writeText(logText)
-    alert('ログをコピーしました')
+    alert(t('common.copied'))
   }
   
   const getStatusBadge = () => {
     const statusMap = {
-      running: { text: '実行中', color: 'bg-blue-500', icon: Loader2, animate: true },
-      paused: { text: '一時停止', color: 'bg-yellow-500', icon: Pause },
-      stopping: { text: '停止中...', color: 'bg-orange-500', icon: Loader2, animate: true },
-      stopped: { text: '停止', color: 'bg-gray-500', icon: Square },
-      completed: { text: '完了', color: 'bg-green-500', icon: CheckCircle },
-      failed: { text: '失敗', color: 'bg-red-500', icon: XCircle },
-      pending: { text: '待機中', color: 'bg-yellow-500', icon: Clock }
+      running: { text: t('execution.status.running'), color: 'bg-blue-500', icon: Loader2, animate: true },
+      paused: { text: t('execution.status.paused'), color: 'bg-yellow-500', icon: Pause },
+      stopping: { text: t('execution.status.stopping'), color: 'bg-orange-500', icon: Loader2, animate: true },
+      stopped: { text: t('execution.status.stopped'), color: 'bg-gray-500', icon: Square },
+      completed: { text: t('execution.status.completed'), color: 'bg-green-500', icon: CheckCircle },
+      failed: { text: t('execution.status.failed'), color: 'bg-red-500', icon: XCircle },
+      pending: { text: t('execution.status.pending'), color: 'bg-yellow-500', icon: Clock }
     }
     const s = statusMap[controlStatus] || statusMap.running
     const Icon = s.icon
@@ -208,8 +210,8 @@ export default function Execution() {
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <h1 className="text-xl font-bold text-foreground">{task?.name || 'タスク実行'}</h1>
-            <p className="text-muted-foreground text-sm">実行 #{executionId}</p>
+            <h1 className="text-xl font-bold text-foreground">{task?.name || t('execution.title')}</h1>
+            <p className="text-muted-foreground text-sm">{t('execution.executionId').replace('{id}', executionId)}</p>
           </div>
           {getStatusBadge()}
         </div>
@@ -219,7 +221,7 @@ export default function Execution() {
             {formatTime(elapsedTime)}
           </span>
           <span className={`text-sm ${status === 'connected' ? 'text-green-400' : 'text-muted-foreground'}`}>
-            {status === 'connected' ? '🟢 接続中' : '⚪ 未接続'}
+            {status === 'connected' ? t('execution.status.connected') : t('execution.status.disconnected')}
           </span>
         </div>
       </div>
@@ -230,11 +232,11 @@ export default function Execution() {
           <div className="card-header">
             <h2 className="font-semibold text-foreground flex items-center gap-2">
               <Video className="w-5 h-5 text-primary" />
-              リアルタイム画面配信
-              {isRunning && <span className="text-xs text-red-400 animate-pulse">● LIVE</span>}
+              {t('execution.liveView')}
+              {isRunning && <span className="text-xs text-red-400 animate-pulse">● {t('execution.live')}</span>}
             </h2>
             <p className="text-xs text-muted-foreground">
-              「ライブビュー開始」ボタンでブラウザの動きをリアルタイムで確認できます
+              {t('execution.liveViewDesc')}
             </p>
           </div>
           <div className="card-body p-0">
@@ -246,15 +248,17 @@ export default function Execution() {
       {/* Step Progress */}
       <div className="card">
         <div className="card-header">
-          <h2 className="font-semibold text-foreground">ステップ進捗</h2>
+          <h2 className="font-semibold text-foreground">{t('execution.stepProgress')}</h2>
           <span className="text-sm text-muted-foreground">
-            {steps.filter(s => s.status === 'completed').length} / {steps.length} 完了
+            {t('execution.stepCount')
+              .replace('{completed}', steps.filter(s => s.status === 'completed').length)
+              .replace('{total}', steps.length)}
           </span>
         </div>
         <div className="card-body max-h-80 overflow-y-auto">
           {steps.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              ステップを待機中...
+              {t('execution.waitingSteps')}
             </div>
           ) : (
             <div className="space-y-3">
@@ -283,7 +287,7 @@ export default function Execution() {
                       <p className="text-sm text-muted-foreground mt-1">{step.description}</p>
                     )}
                     {step.error_message && (
-                      <p className="text-sm text-red-400 mt-1">エラー: {step.error_message}</p>
+                      <p className="text-sm text-red-400 mt-1">{t('common.error')}: {step.error_message}</p>
                     )}
                   </div>
                 </div>
@@ -296,23 +300,23 @@ export default function Execution() {
       {/* Logs */}
       <div className="card">
         <div className="card-header">
-          <h2 className="font-semibold text-foreground">実行ログ</h2>
+          <h2 className="font-semibold text-foreground">{t('execution.logs')}</h2>
           <button onClick={handleCopyLogs} className="btn-ghost px-2 py-1 text-sm">
             <Copy className="w-4 h-4 mr-1" />
-            コピー
+            {t('common.copy')}
           </button>
         </div>
         <div className="h-64 bg-muted rounded-b-lg p-3 overflow-y-auto font-mono text-sm">
           {logs.length === 0 ? (
             <div className="h-full flex items-center justify-center text-muted-foreground">
-              ログを待機中...
+              {t('execution.waitingLogs')}
             </div>
           ) : (
             <>
               {logs.map((log, index) => (
                 <div key={index} className="mb-1">
                   <span className="text-muted-foreground">
-                    {new Date(log.timestamp).toLocaleTimeString('ja-JP')}
+                    {new Date(log.timestamp).toLocaleTimeString(language === 'ja' ? 'ja-JP' : 'en-US')}
                   </span>
                   <span className={`ml-2 ${
                     log.level === 'ERROR' ? 'text-red-400' :
@@ -333,7 +337,7 @@ export default function Execution() {
       {/* Control Panel */}
       <div className="card">
         <div className="p-4 flex items-center justify-between">
-          <h2 className="font-semibold text-foreground">コントロール</h2>
+          <h2 className="font-semibold text-foreground">{t('execution.control')}</h2>
           <div className="flex gap-3">
             {isRunning && (
               <button
@@ -342,7 +346,7 @@ export default function Execution() {
                 className="btn-warning"
               >
                 <Pause className="w-4 h-4 mr-2" />
-                一時停止
+                {t('execution.pause')}
               </button>
             )}
             
@@ -353,7 +357,7 @@ export default function Execution() {
                 className="btn-success"
               >
                 <Play className="w-4 h-4 mr-2" />
-                再開
+                {t('execution.resume')}
               </button>
             )}
             
@@ -364,7 +368,7 @@ export default function Execution() {
                 className="btn-danger"
               >
                 <Square className="w-4 h-4 mr-2" />
-                停止
+                {t('execution.stop')}
               </button>
             )}
           </div>
@@ -374,4 +378,3 @@ export default function Execution() {
     </div>
   )
 }
-

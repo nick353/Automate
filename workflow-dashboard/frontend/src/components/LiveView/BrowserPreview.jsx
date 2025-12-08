@@ -1,6 +1,9 @@
 import { Globe, Lock, WifiOff } from 'lucide-react'
+import useLanguageStore from '../../stores/languageStore'
 
 export default function BrowserPreview({ screenshot, status }) {
+  const { t } = useLanguageStore()
+
   if (!screenshot && status === 'running') {
     return (
       <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground bg-zinc-900">
@@ -8,7 +11,7 @@ export default function BrowserPreview({ screenshot, status }) {
           <div className="w-16 h-16 border-4 border-zinc-700 border-t-primary rounded-full animate-spin" />
           <Globe className="absolute inset-0 m-auto w-6 h-6 text-zinc-500" />
         </div>
-        <p className="mt-4 text-sm font-mono animate-pulse">Connecting to remote browser...</p>
+        <p className="mt-4 text-sm font-mono animate-pulse">{t('liveView.connecting')}</p>
       </div>
     )
   }
@@ -17,7 +20,7 @@ export default function BrowserPreview({ screenshot, status }) {
     return (
       <div className="w-full h-full flex flex-col items-center justify-center text-zinc-400 bg-zinc-950">
         <WifiOff className="w-12 h-12 mb-4 opacity-50" />
-        <p className="font-medium">Session Disconnected</p>
+        <p className="font-medium">{t('liveView.disconnected')}</p>
       </div>
     )
   }
@@ -59,4 +62,3 @@ export default function BrowserPreview({ screenshot, status }) {
     </div>
   )
 }
-

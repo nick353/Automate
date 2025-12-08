@@ -14,6 +14,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import useCredentialStore from '../stores/credentialStore'
 import CredentialForm from '../components/CredentialForm'
 import { BentoGrid, BentoItem } from '../components/Bento/BentoGrid'
+import useLanguageStore from '../stores/languageStore'
 
 const SERVICE_ICONS = {
   anthropic: { icon: '🤖', color: 'bg-purple-500/10 text-purple-600 dark:text-purple-400' },
@@ -31,6 +32,7 @@ export default function Credentials() {
   const [editingCredential, setEditingCredential] = useState(null)
   const [testResults, setTestResults] = useState({})
   const [testingId, setTestingId] = useState(null)
+  const { t } = useLanguageStore()
   
   useEffect(() => {
     fetchCredentials()
@@ -44,7 +46,7 @@ export default function Credentials() {
   
   const handleDelete = async (e, credential) => {
     e.stopPropagation()
-    if (window.confirm(`Are you sure you want to delete "${credential.name}"?`)) {
+    if (window.confirm(t('credentials.confirmDelete').replace('{name}', credential.name))) {
       await deleteCredential(credential.id)
     }
   }
@@ -71,9 +73,11 @@ export default function Credentials() {
   }, {})
 
   const typeLabels = {
-    api_key: 'API Keys',
-    login: 'Login Credentials',
-    oauth: 'OAuth Tokens'
+    api_key: t('credentials.apiKeys'),
+    login: t('credentials.loginCreds'),
+    oauth: t('credentials.oauthTokens'),
+    webhook: t('credentials.webhook'),
+    smtp: t('credentials.smtp')
   }
 
   return (
@@ -81,15 +85,15 @@ export default function Credentials() {
       {/* Header */}
       <div className="flex flex-col gap-4">
         <div>
-          <h1 className="text-4xl font-bold tracking-tight text-foreground">Credentials</h1>
-          <p className="text-muted-foreground mt-1 text-lg">Securely manage API keys and logins</p>
+          <h1 className="text-4xl font-bold tracking-tight text-foreground">{t('credentials.title')}</h1>
+          <p className="text-muted-foreground mt-1 text-lg">{t('credentials.subtitle')}</p>
         </div>
         <button 
           onClick={() => setShowForm(true)}
           className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-black dark:bg-white text-white dark:text-black font-bold shadow-lg hover:scale-105 transition-all w-fit"
         >
           <Plus className="w-4 h-4" />
-          <span>Add Credential</span>
+          <span>{t('credentials.addCredential')}</span>
         </button>
       </div>
       
@@ -99,8 +103,8 @@ export default function Credentials() {
             className="bg-blue-50 dark:bg-blue-900/20 border-blue-100 dark:border-blue-800 md:col-span-1"
             header={null}
             icon={<ShieldCheck className="w-8 h-8 text-blue-500" />}
-            title="End-to-End Encryption"
-            description="Credentials are encrypted with AES-256 and only decrypted in memory during task execution."
+            title={t('credentials.encryptionTitle')}
+            description={t('credentials.encryptionDesc')}
         />
       </BentoGrid>
       
@@ -116,14 +120,14 @@ export default function Credentials() {
           <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center">
             <Lock className="w-8 h-8 text-zinc-400" />
           </div>
-          <h3 className="text-xl font-bold text-foreground mb-2">No Credentials</h3>
-          <p className="text-muted-foreground mb-6">Add API keys or login details to enable automation</p>
+          <h3 className="text-xl font-bold text-foreground mb-2">{t('credentials.noCredentials')}</h3>
+          <p className="text-muted-foreground mb-6">{t('credentials.addFirst')}</p>
           <button 
             onClick={() => setShowForm(true)}
             className="inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-full bg-primary text-primary-foreground font-bold hover:scale-105 transition-all"
           >
             <Plus className="w-4 h-4" />
-            Add Credential
+            {t('credentials.addCredential')}
           </button>
         </div>
       ) : (
@@ -183,7 +187,7 @@ export default function Credentials() {
                                 ) : (
                                     <>
                                         <TestTube className="w-3 h-3" />
-                                        Test
+                                        {t('credentials.test')}
                                     </>
                                 )}
                              </button>

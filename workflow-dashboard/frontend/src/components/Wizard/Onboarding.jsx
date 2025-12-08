@@ -17,81 +17,83 @@ import {
   Network
 } from 'lucide-react'
 import { cn } from '../../utils/cn'
+import useLanguageStore from '../../stores/languageStore'
 
 const ONBOARDING_KEY = 'wizard_onboarding_completed'
-
-const steps = [
-  {
-    id: 1,
-    title: 'SYSTEM_INIT',
-    subtitle: 'AI TASK WIZARD',
-    description: 'NEXUS OS will assist you in creating automation tasks. No complex configuration required.',
-    icon: Terminal,
-    features: [
-      { icon: MessageCircle, text: 'Natural Language Interface' },
-      { icon: Video, text: 'Visual Recording Analysis' },
-      { icon: Zap, text: 'AI Optimization Engine' },
-    ]
-  },
-  {
-    id: 2,
-    title: 'SELECT_METHOD',
-    subtitle: 'CHOOSE INPUT VECTOR',
-    description: '',
-    icon: Cpu,
-    methods: [
-      {
-        icon: MessageCircle,
-        title: 'CHAT INTERFACE',
-        description: 'Describe your objective. AI will negotiate requirements and generate execution plans.',
-        color: 'text-cyan-400 border-cyan-500/30 bg-cyan-500/10'
-      },
-      {
-        icon: Video,
-        title: 'VISUAL RECORDING',
-        description: 'Upload operation footage. AI analyzes temporal sequences to replicate workflows.',
-        color: 'text-purple-400 border-purple-500/30 bg-purple-500/10'
-      }
-    ]
-  },
-  {
-    id: 3,
-    title: 'OPTIMIZATION',
-    subtitle: 'API PRIORITY PROTOCOL',
-    description: 'System scans for available APIs to replace inefficient browser interactions.',
-    icon: Network,
-    comparisons: [
-      {
-        title: 'API DIRECT (RECOMMENDED)',
-        icon: Code,
-        benefits: ['High Velocity', 'Stability Guarantee', '24/7 Uptime'],
-        color: 'border-emerald-500/50 bg-emerald-500/10 text-emerald-400'
-      },
-      {
-        title: 'BROWSER EMULATION',
-        icon: Globe,
-        benefits: ['Legacy Support', 'Complex UI Logic', 'Visual Confirmation'],
-        color: 'border-amber-500/50 bg-amber-500/10 text-amber-400'
-      }
-    ]
-  },
-  {
-    id: 4,
-    title: 'READY',
-    subtitle: 'SYSTEM ARMED',
-    description: 'Initiate task creation via Chat or Recording. Nexus OS is standing by.',
-    icon: CheckCircle,
-    tips: [
-      { icon: MessageCircle, text: 'Provide detailed parameters for higher accuracy' },
-      { icon: Clock, text: 'Define execution frequency' },
-      { icon: Zap, text: 'Configure API credentials for enhanced access' },
-    ]
-  }
-]
 
 export default function Onboarding({ onComplete }) {
   const [currentStep, setCurrentStep] = useState(0)
   const [isVisible, setIsVisible] = useState(false)
+  const { t } = useLanguageStore()
+
+  const steps = [
+    {
+      id: 1,
+      title: t('wizard.onboarding.step1.title'),
+      subtitle: t('wizard.onboarding.step1.subtitle'),
+      description: t('wizard.onboarding.step1.desc'),
+      icon: Terminal,
+      features: [
+        { icon: MessageCircle, text: t('wizard.onboarding.step1.features')[0] },
+        { icon: Video, text: t('wizard.onboarding.step1.features')[1] },
+        { icon: Zap, text: t('wizard.onboarding.step1.features')[2] },
+      ]
+    },
+    {
+      id: 2,
+      title: t('wizard.onboarding.step2.title'),
+      subtitle: t('wizard.onboarding.step2.subtitle'),
+      description: '',
+      icon: Cpu,
+      methods: [
+        {
+          icon: MessageCircle,
+          title: t('wizard.onboarding.step2.methods')[0].title,
+          description: t('wizard.onboarding.step2.methods')[0].desc,
+          color: 'text-cyan-400 border-cyan-500/30 bg-cyan-500/10'
+        },
+        {
+          icon: Video,
+          title: t('wizard.onboarding.step2.methods')[1].title,
+          description: t('wizard.onboarding.step2.methods')[1].desc,
+          color: 'text-purple-400 border-purple-500/30 bg-purple-500/10'
+        }
+      ]
+    },
+    {
+      id: 3,
+      title: t('wizard.onboarding.step3.title'),
+      subtitle: t('wizard.onboarding.step3.subtitle'),
+      description: t('wizard.onboarding.step3.desc'),
+      icon: Network,
+      comparisons: [
+        {
+          title: t('wizard.onboarding.step3.comparisons')[0].title,
+          icon: Code,
+          benefits: t('wizard.onboarding.step3.comparisons')[0].benefits,
+          color: 'border-emerald-500/50 bg-emerald-500/10 text-emerald-400'
+        },
+        {
+          title: t('wizard.onboarding.step3.comparisons')[1].title,
+          icon: Globe,
+          benefits: t('wizard.onboarding.step3.comparisons')[1].benefits,
+          color: 'border-amber-500/50 bg-amber-500/10 text-amber-400'
+        }
+      ]
+    },
+    {
+      id: 4,
+      title: t('wizard.onboarding.step4.title'),
+      subtitle: t('wizard.onboarding.step4.subtitle'),
+      description: t('wizard.onboarding.step4.desc'),
+      icon: CheckCircle,
+      tips: [
+        { icon: MessageCircle, text: t('wizard.onboarding.step4.tips')[0] },
+        { icon: Clock, text: t('wizard.onboarding.step4.tips')[1] },
+        { icon: Zap, text: t('wizard.onboarding.step4.tips')[2] },
+      ]
+    }
+  ]
 
   useEffect(() => {
     const completed = localStorage.getItem(ONBOARDING_KEY)
@@ -153,7 +155,7 @@ export default function Onboarding({ onComplete }) {
             onClick={handleSkip}
             className="absolute top-4 right-4 p-2 rounded-sm text-muted-foreground hover:text-primary dark:hover:text-cyan-400 hover:bg-primary/10 transition-all z-10 font-mono text-xs tracking-wider"
           >
-            [SKIP]
+            [{t('common.skip')}]
           </button>
 
           {/* Progress */}
@@ -321,12 +323,12 @@ export default function Onboarding({ onComplete }) {
               >
                 {currentStep < steps.length - 1 ? (
                   <>
-                    NEXT_STEP
+                    {t('common.next')}
                     <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                   </>
                 ) : (
                   <>
-                    INITIALIZE_SYSTEM
+                    {t('common.initialize')}
                     <Zap className="w-4 h-4 group-hover:scale-110 transition-transform" />
                   </>
                 )}

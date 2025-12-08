@@ -3,60 +3,19 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Play, 
   CheckCircle, 
-  XCircle,
-  AlertTriangle,
-  Loader2,
-  ArrowRight,
-  RefreshCw,
+  XCircle, 
+  AlertTriangle, 
+  Loader2, 
   Eye,
   Code,
   Globe,
-  Clock,
   ChevronDown,
   ChevronUp,
-  Terminal,
+  RefreshCw,
   Zap
 } from 'lucide-react'
 import { cn } from '../../utils/cn'
-
-// シミュレートされたステップ（実際のAPIと連携する場合は置き換え）
-const simulateTrialRun = async (task, onStepUpdate) => {
-  const steps = [
-    { id: 1, name: '環境チェック', description: '必要な設定を確認中...', duration: 800 },
-    { id: 2, name: '認証情報確認', description: 'APIキー・ログイン情報をチェック...', duration: 1000 },
-    { id: 3, name: '接続テスト', description: '対象サービスへの接続を確認...', duration: 1200 },
-    { id: 4, name: 'アクション検証', description: 'タスクの実行可能性を検証...', duration: 1500 },
-    { id: 5, name: '完了', description: 'すべてのチェックが完了しました', duration: 500 },
-  ]
-
-  const results = []
-  
-  for (const step of steps) {
-    onStepUpdate({ ...step, status: 'running' })
-    await new Promise(resolve => setTimeout(resolve, step.duration))
-    
-    // ランダムで警告を生成（デモ用）
-    const hasWarning = Math.random() > 0.8
-    const result = {
-      ...step,
-      status: 'completed',
-      warning: hasWarning ? '軽微な問題が検出されましたが、実行可能です' : null
-    }
-    
-    results.push(result)
-    onStepUpdate(result)
-  }
-  
-  return {
-    success: true,
-    results,
-    summary: {
-      totalSteps: steps.length,
-      warnings: results.filter(r => r.warning).length,
-      estimatedDuration: '約30秒'
-    }
-  }
-}
+import useLanguageStore from '../../stores/languageStore'
 
 export default function TrialRunPreview({ task, onConfirm, onEdit, isVisible }) {
   const [isRunning, setIsRunning] = useState(false)
@@ -64,6 +23,46 @@ export default function TrialRunPreview({ task, onConfirm, onEdit, isVisible }) 
   const [completedSteps, setCompletedSteps] = useState([])
   const [result, setResult] = useState(null)
   const [isExpanded, setIsExpanded] = useState(true)
+  const { t } = useLanguageStore()
+
+  // シミュレートされたステップ（実際のAPIと連携する場合は置き換え）
+  const simulateTrialRun = async (task, onStepUpdate) => {
+    const steps = [
+      { id: 1, name: t('wizard.trialRun.steps.checkEnv.name'), description: t('wizard.trialRun.steps.checkEnv.desc'), duration: 800 },
+      { id: 2, name: t('wizard.trialRun.steps.verifyCreds.name'), description: t('wizard.trialRun.steps.verifyCreds.desc'), duration: 1000 },
+      { id: 3, name: t('wizard.trialRun.steps.connTest.name'), description: t('wizard.trialRun.steps.connTest.desc'), duration: 1200 },
+      { id: 4, name: t('wizard.trialRun.steps.validateAction.name'), description: t('wizard.trialRun.steps.validateAction.desc'), duration: 1500 },
+      { id: 5, name: t('wizard.trialRun.steps.complete.name'), description: t('wizard.trialRun.steps.complete.desc'), duration: 500 },
+    ]
+
+    const results = []
+    
+    for (const step of steps) {
+      onStepUpdate({ ...step, status: 'running' })
+      await new Promise(resolve => setTimeout(resolve, step.duration))
+      
+      // ランダムで警告を生成（デモ用）
+      const hasWarning = Math.random() > 0.8
+      const result = {
+        ...step,
+        status: 'completed',
+        warning: hasWarning ? t('wizard.trialRun.warnings.minor') : null
+      }
+      
+      results.push(result)
+      onStepUpdate(result)
+    }
+    
+    return {
+      success: true,
+      results,
+      summary: {
+        totalSteps: steps.length,
+        warnings: results.filter(r => r.warning).length,
+        estimatedDuration: t('wizard.trialRun.summary.estDuration')
+      }
+    }
+  }
 
   const runTrial = async () => {
     setIsRunning(true)
@@ -108,8 +107,8 @@ export default function TrialRunPreview({ task, onConfirm, onEdit, isVisible }) 
             <Eye className="w-5 h-5 text-amber-600 dark:text-amber-400" />
           </div>
           <div>
-            <h3 className="font-bold text-foreground">実行プレビュー</h3>
-            <p className="text-xs text-muted-foreground">タスクを作成する前にテスト実行</p>
+            <h3 className="font-bold text-foreground">{t('tasks.trialRun')}</h3>
+            <p className="text-xs text-muted-foreground">{t('wizard.trialRun.description')}</p>
           </div>
         </div>
         <button className="p-2 rounded-lg hover:bg-amber-500/10 text-amber-600 dark:text-amber-400 transition-colors">
@@ -128,10 +127,10 @@ export default function TrialRunPreview({ task, onConfirm, onEdit, isVisible }) 
             <div className="p-4 pt-0 space-y-4">
               {/* Task Summary */}
               <div className="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
-                <h4 className="text-sm font-bold text-foreground mb-3">タスク概要</h4>
+                <h4 className="text-sm font-bold text-foreground mb-3">{t('wizard.trialRun.summary.title')}</h4>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">タイプ</span>
+                    <span className="text-muted-foreground">{t('credentials.type')}</span>
                     <span className={cn(
                       "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium",
                       task?.task_type === 'api' 
@@ -141,23 +140,23 @@ export default function TrialRunPreview({ task, onConfirm, onEdit, isVisible }) 
                       {task?.task_type === 'api' ? (
                         <>
                           <Code className="w-3 h-3" />
-                          API
+                          {t('wizard.apiCall')}
                         </>
                       ) : (
                         <>
                           <Globe className="w-3 h-3" />
-                          ブラウザ
+                          {t('wizard.browserAutomation')}
                         </>
                       )}
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">タスク名</span>
-                    <span className="font-medium text-foreground">{task?.task_name || '未設定'}</span>
+                    <span className="text-muted-foreground">{t('tasks.taskName')}</span>
+                    <span className="font-medium text-foreground">{task?.task_name || 'Not set'}</span>
                   </div>
                   {task?.schedule && (
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">スケジュール</span>
+                      <span className="text-muted-foreground">{t('tasks.schedule')}</span>
                       <span className="font-mono text-foreground">{task.schedule}</span>
                     </div>
                   )}
@@ -167,7 +166,7 @@ export default function TrialRunPreview({ task, onConfirm, onEdit, isVisible }) 
               {/* Steps Progress */}
               {(isRunning || completedSteps.length > 0) && (
                 <div className="space-y-2">
-                  <h4 className="text-sm font-bold text-foreground">検証ステップ</h4>
+                  <h4 className="text-sm font-bold text-foreground">{t('wizard.trialRun.summary.validationSteps')}</h4>
                   <div className="space-y-2">
                     {completedSteps.map((step, index) => (
                       <motion.div
@@ -244,15 +243,15 @@ export default function TrialRunPreview({ task, onConfirm, onEdit, isVisible }) 
                         "font-bold",
                         result.success ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
                       )}>
-                        {result.success ? 'テスト成功！' : 'テスト失敗'}
+                        {result.success ? t('common.success') : t('common.error')}
                       </h4>
                       {result.success ? (
                         <div className="mt-2 space-y-1 text-sm text-muted-foreground">
-                          <p>✅ {result.summary.totalSteps}ステップすべて完了</p>
+                          <p>✅ {t('wizard.trialRun.summary.stepsCompleted').replace('{count}', result.summary.totalSteps)}</p>
                           {result.summary.warnings > 0 && (
-                            <p>⚠️ {result.summary.warnings}件の警告あり（実行可能）</p>
+                            <p>⚠️ {t('wizard.trialRun.summary.warningsCount').replace('{count}', result.summary.warnings)}</p>
                           )}
-                          <p>⏱️ 推定実行時間: {result.summary.estimatedDuration}</p>
+                          <p>⏱️ {t('wizard.trialRun.summary.estDurationLabel')} {result.summary.estimatedDuration}</p>
                         </div>
                       ) : (
                         <p className="text-sm text-rose-600 dark:text-rose-400 mt-1">{result.error}</p>
@@ -270,7 +269,7 @@ export default function TrialRunPreview({ task, onConfirm, onEdit, isVisible }) 
                     className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold transition-all"
                   >
                     <Play className="w-5 h-5" />
-                    テスト実行
+                    {t('credentials.test')}
                   </button>
                 )}
 
@@ -287,7 +286,7 @@ export default function TrialRunPreview({ task, onConfirm, onEdit, isVisible }) 
                       className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-all"
                     >
                       <Zap className="w-5 h-5" />
-                      タスクを作成
+                      {t('tasks.createTask')}
                     </button>
                   </>
                 )}
@@ -298,7 +297,7 @@ export default function TrialRunPreview({ task, onConfirm, onEdit, isVisible }) 
                     className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-zinc-300 dark:border-zinc-700 text-muted-foreground hover:text-foreground transition-all"
                   >
                     <RefreshCw className="w-5 h-5" />
-                    再試行
+                    {t('error.retry')}
                   </button>
                 )}
               </div>
@@ -309,5 +308,3 @@ export default function TrialRunPreview({ task, onConfirm, onEdit, isVisible }) 
     </motion.div>
   )
 }
-
-

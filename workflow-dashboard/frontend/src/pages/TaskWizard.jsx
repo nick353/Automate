@@ -33,6 +33,7 @@ import TemplateLibrary from '../components/Wizard/TemplateLibrary'
 import ScreenRecorder from '../components/Wizard/ScreenRecorder'
 import TrialRunPreview from '../components/Wizard/TrialRunPreview'
 import ErrorHelper from '../components/Wizard/ErrorHelper'
+import useLanguageStore from '../stores/languageStore'
 
 // テキスト内の**強調**をパースしてReact要素に変換
 function parseMarkdownBold(text) {
@@ -137,6 +138,7 @@ function ModeCard({ icon: Icon, title, description, onClick, colorClass, badge }
 
 // 生成されたタスクプレビュー
 function TaskPreview({ task, onConfirm, onEdit, isCreating }) {
+  const { t } = useLanguageStore()
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -147,32 +149,32 @@ function TaskPreview({ task, onConfirm, onEdit, isCreating }) {
       
       <div className="flex items-center gap-2 text-primary">
         <Sparkles className="w-5 h-5" />
-        <span className="font-bold font-mono tracking-wider">TASK_GENERATED</span>
+        <span className="font-bold font-mono tracking-wider">{t('wizard.taskGenerated')}</span>
       </div>
       
       <div className="space-y-4 pl-2">
         <div>
-          <label className="text-xs font-bold text-primary/70 uppercase tracking-widest font-mono">Task Name</label>
+          <label className="text-xs font-bold text-primary/70 uppercase tracking-widest font-mono">{t('tasks.taskName')}</label>
           <p className="text-foreground font-bold text-lg mt-1 tracking-wide">{task.task_name}</p>
         </div>
         
         <div>
-          <label className="text-xs font-bold text-primary/70 uppercase tracking-widest font-mono">Description</label>
+          <label className="text-xs font-bold text-primary/70 uppercase tracking-widest font-mono">{t('tasks.description')}</label>
           <p className="text-muted-foreground text-sm mt-1 leading-relaxed">{task.task_description}</p>
         </div>
         
         <div>
-          <label className="text-xs font-bold text-primary/70 uppercase tracking-widest font-mono">Execution Type</label>
+          <label className="text-xs font-bold text-primary/70 uppercase tracking-widest font-mono">{t('wizard.executionType')}</label>
           <div className="flex items-center gap-2 mt-1">
             {task.task_type === 'api' ? (
               <>
                 <Code className="w-4 h-4 text-cyan-500" />
-                <span className="text-sm text-cyan-400 font-mono">API_CALL</span>
+                <span className="text-sm text-cyan-400 font-mono">{t('wizard.apiCall')}</span>
               </>
             ) : (
               <>
                 <Globe className="w-4 h-4 text-purple-500" />
-                <span className="text-sm text-purple-400 font-mono">BROWSER_AUTOMATION</span>
+                <span className="text-sm text-purple-400 font-mono">{t('wizard.browserAutomation')}</span>
               </>
             )}
           </div>
@@ -180,7 +182,7 @@ function TaskPreview({ task, onConfirm, onEdit, isCreating }) {
         
         {task.required_credentials && task.required_credentials.length > 0 && (
           <div>
-            <label className="text-xs font-bold text-primary/70 uppercase tracking-widest font-mono">Required Credentials</label>
+            <label className="text-xs font-bold text-primary/70 uppercase tracking-widest font-mono">{t('wizard.requiredCredentials')}</label>
             <div className="flex flex-wrap gap-2 mt-2">
               {task.required_credentials.map((cred, i) => (
                 <span key={i} className="inline-flex items-center gap-1 px-2 py-1 rounded-sm bg-amber-500/10 text-amber-500 border border-amber-500/20 text-xs font-mono">
@@ -194,7 +196,7 @@ function TaskPreview({ task, onConfirm, onEdit, isCreating }) {
         
         {task.schedule && (
           <div>
-            <label className="text-xs font-bold text-primary/70 uppercase tracking-widest font-mono">Schedule</label>
+            <label className="text-xs font-bold text-primary/70 uppercase tracking-widest font-mono">{t('tasks.schedule')}</label>
             <p className="text-foreground/80 text-sm font-mono mt-1">{task.schedule}</p>
           </div>
         )}
@@ -211,7 +213,7 @@ function TaskPreview({ task, onConfirm, onEdit, isCreating }) {
           ) : (
             <>
               <Zap className="w-5 h-5" />
-              CREATE TASK
+              {t('tasks.createTask')}
             </>
           )}
         </button>
@@ -230,6 +232,7 @@ export default function TaskWizard() {
   const navigate = useNavigate()
   const chatContainerRef = useRef(null)
   const fileInputRef = useRef(null)
+  const { t } = useLanguageStore()
   
   // State
   const [mode, setMode] = useState(null) // 'chat' | 'video' | 'record' | 'template'
@@ -268,7 +271,7 @@ export default function TaskWizard() {
       setMessages(response.data.chat_history || [])
       setMode('chat')
     } catch (err) {
-      setError('セッションの開始に失敗しました: ' + (err.response?.data?.detail || err.message))
+      setError(t('common.error') + ': ' + (err.response?.data?.detail || err.message))
     } finally {
       setIsLoading(false)
     }
@@ -308,7 +311,7 @@ export default function TaskWizard() {
       
       setMode('chat')
     } catch (err) {
-      setError('動画の分析に失敗しました: ' + (err.response?.data?.detail || err.message))
+      setError(t('common.error') + ': ' + (err.response?.data?.detail || err.message))
       setVideoFile(null)
     } finally {
       setIsAnalyzing(false)
@@ -344,7 +347,7 @@ export default function TaskWizard() {
         setShowTrialRun(true)
       }
     } catch (err) {
-      setError('メッセージの送信に失敗しました: ' + (err.response?.data?.detail || err.message))
+      setError(t('common.error') + ': ' + (err.response?.data?.detail || err.message))
     } finally {
       setIsSending(false)
     }
@@ -359,7 +362,7 @@ export default function TaskWizard() {
       await wizardApi.createTask(sessionId)
       navigate('/tasks')
     } catch (err) {
-      setError('タスクの作成に失敗しました: ' + (err.response?.data?.detail || err.message))
+      setError(t('common.error') + ': ' + (err.response?.data?.detail || err.message))
     } finally {
       setIsCreating(false)
     }
@@ -371,7 +374,7 @@ export default function TaskWizard() {
     setShowTrialRun(false)
     setMessages(prev => [...prev, { 
       role: 'assistant', 
-      content: '了解しました。もう少し詳しく教えていただけますか？何か変更したい点や追加情報はありますか？' 
+      content: 'OK. Please tell me more details. Do you have any changes or additional information?' 
     }])
   }
 
@@ -426,10 +429,10 @@ export default function TaskWizard() {
           </div>
         </div>
         <h1 className="text-3xl font-black text-foreground tracking-tight mb-2 font-mono">
-          TASK WIZARD <span className="text-primary text-sm align-top">BETA</span>
+          {t('wizard.title')} <span className="text-primary text-sm align-top">{t('common.beta')}</span>
         </h1>
         <p className="text-muted-foreground text-lg font-mono">
-          AI-Powered Automation Assistant
+          {t('wizard.subtitle')}
         </p>
       </motion.div>
 
@@ -441,37 +444,37 @@ export default function TaskWizard() {
           className="space-y-6"
         >
           <p className="text-center text-muted-foreground font-mono text-xs tracking-widest uppercase">
-            // Select Initialization Method
+            {t('wizard.selectMethod')}
           </p>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 auto-rows-fr">
             <ModeCard
               icon={MessageCircle}
-              title="CHAT INTERFACE"
-              description="Interactive task creation via natural language processing. Describe your objective."
+              title={t('wizard.chatInterface')}
+              description={t('wizard.chatDesc')}
               onClick={() => startChatSession()}
               colorClass="bg-cyan-500/10 border-cyan-500/30 text-cyan-500"
             />
             <ModeCard
               icon={LayoutGrid}
-              title="TEMPLATE LIBRARY"
-              description="Deploy pre-configured automation workflows from the system repository."
+              title={t('wizard.templateLibrary')}
+              description={t('wizard.templateDesc')}
               onClick={() => setShowTemplateLibrary(true)}
               colorClass="bg-amber-500/10 border-amber-500/30 text-amber-500"
               badge="RECOMMENDED"
             />
             <ModeCard
               icon={MonitorPlay}
-              title="SCREEN RECORDING"
-              description="Capture browser interactions for AI analysis and replication."
+              title={t('wizard.screenRecording')}
+              description={t('wizard.screenDesc')}
               onClick={startRecordMode}
               colorClass="bg-pink-500/10 border-pink-500/30 text-pink-500"
               badge="NEW"
             />
             <ModeCard
               icon={Video}
-              title="VIDEO ANALYSIS"
-              description="Upload existing operation footage for procedural analysis."
+              title={t('wizard.videoAnalysis')}
+              description={t('wizard.videoDesc')}
               onClick={startVideoMode}
               colorClass="bg-purple-500/10 border-purple-500/30 text-purple-500"
             />
@@ -496,7 +499,7 @@ export default function TaskWizard() {
             onClick={() => setMode(null)}
             className="text-sm text-muted-foreground hover:text-foreground transition-colors font-mono"
           >
-            ← BACK
+            ← {t('common.back')}
           </button>
           
           <ScreenRecorder 
@@ -507,8 +510,8 @@ export default function TaskWizard() {
           {isAnalyzing && (
             <div className="flex flex-col items-center py-8 space-y-4">
               <Loader2 className="w-12 h-12 text-primary animate-spin" />
-              <p className="font-medium text-foreground font-mono">ANALYZING_RECORDING...</p>
-              <p className="text-sm text-muted-foreground font-mono">Processing visual data points...</p>
+              <p className="font-medium text-foreground font-mono">{t('wizard.analyzingRecording')}</p>
+              <p className="text-sm text-muted-foreground font-mono">{t('wizard.processingData')}</p>
             </div>
           )}
         </motion.div>
@@ -525,7 +528,7 @@ export default function TaskWizard() {
             onClick={() => setMode(null)}
             className="text-sm text-muted-foreground hover:text-foreground transition-colors font-mono"
           >
-            ← BACK
+            ← {t('common.back')}
           </button>
           
           <div 
@@ -548,9 +551,9 @@ export default function TaskWizard() {
             {isAnalyzing ? (
               <div className="space-y-4">
                 <Loader2 className="w-16 h-16 mx-auto text-primary animate-spin" />
-                <p className="text-lg font-medium text-foreground font-mono">ANALYZING_VIDEO_SEQUENCE...</p>
+                <p className="text-lg font-medium text-foreground font-mono">{t('wizard.analyzingVideo')}</p>
                 <p className="text-sm text-muted-foreground font-mono">
-                  Extracting interaction vectors. Please wait.
+                  {t('wizard.extractingVectors')}
                 </p>
               </div>
             ) : videoFile ? (
@@ -558,17 +561,17 @@ export default function TaskWizard() {
                 <FileVideo className="w-16 h-16 mx-auto text-primary" />
                 <p className="text-lg font-medium text-foreground font-mono">{videoFile.name}</p>
                 <p className="text-sm text-muted-foreground font-mono">
-                  [CLICK_TO_RESELECT]
+                  {t('wizard.clickToReselect')}
                 </p>
               </div>
             ) : (
               <div className="space-y-4">
                 <Upload className="w-16 h-16 mx-auto text-muted-foreground" />
                 <p className="text-lg font-medium text-foreground font-mono">
-                  DROP_VIDEO_OR_CLICK
+                  {t('wizard.dropVideo')}
                 </p>
                 <p className="text-sm text-muted-foreground font-mono">
-                  Supported formats: MP4, WebM, MOV
+                  {t('wizard.supportedFormats')}
                 </p>
               </div>
             )}
@@ -590,8 +593,8 @@ export default function TaskWizard() {
                 <Bot className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <h3 className="font-bold text-foreground font-mono">AI_ASSISTANT</h3>
-                <p className="text-xs text-muted-foreground font-mono">ONLINE // READY</p>
+                <h3 className="font-bold text-foreground font-mono">{t('wizard.aiAssistant')}</h3>
+                <p className="text-xs text-muted-foreground font-mono">{t('wizard.onlineReady')}</p>
               </div>
             </div>
             <button
@@ -618,7 +621,7 @@ export default function TaskWizard() {
                 </div>
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span className="text-sm font-mono animate-pulse">PROCESSING...</span>
+                  <span className="text-sm font-mono animate-pulse">{t('auth.processing')}</span>
                 </div>
               </div>
             )}
@@ -652,7 +655,7 @@ export default function TaskWizard() {
                   value={inputMessage}
                   onChange={(e) => setInputMessage(e.target.value)}
                   onKeyPress={handleKeyPress}
-                  placeholder="Enter instructions..."
+                  placeholder={t('wizard.enterInstructions')}
                   rows={1}
                   className="flex-1 input resize-none min-h-[48px] max-h-[120px] font-mono text-sm bg-black/40 border-primary/30 focus:border-primary/60"
                 />
@@ -690,12 +693,12 @@ export default function TaskWizard() {
         >
           <h4 className="text-sm font-bold text-foreground mb-2 font-mono flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-primary" />
-            TIPS
+            {t('wizard.tipsTitle')}
           </h4>
           <ul className="text-xs text-muted-foreground space-y-1 font-mono">
-            <li>• Be specific about the target URL and desired actions.</li>
-            <li>• Mention execution frequency (daily, weekly) if needed.</li>
-            <li>• The AI will prioritize API endpoints for stability when available.</li>
+            {t('wizard.tipsList').map((tip, i) => (
+              <li key={i}>• {tip}</li>
+            ))}
           </ul>
         </motion.div>
       )}

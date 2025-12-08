@@ -1,7 +1,9 @@
 import { useEffect, useRef } from 'react'
+import useLanguageStore from '../../stores/languageStore'
 
 export default function LogStream({ logs = [] }) {
   const scrollRef = useRef(null)
+  const { t } = useLanguageStore()
   
   useEffect(() => {
     if (scrollRef.current) {
@@ -16,7 +18,7 @@ export default function LogStream({ logs = [] }) {
     >
       {logs.length === 0 && (
         <div className="text-zinc-500 italic py-2 opacity-50">
-          Waiting for logs...
+          {t('liveView.waitingLogs')}
         </div>
       )}
       
@@ -38,6 +40,3 @@ export default function LogStream({ logs = [] }) {
     </div>
   )
 }
-
-
-

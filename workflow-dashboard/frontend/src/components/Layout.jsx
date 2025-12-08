@@ -5,6 +5,7 @@ import { Canvas } from '@react-three/fiber'
 import { CyberpunkBackground } from './Immersive/CyberpunkBackground'
 import Sidebar from './Sidebar'
 import useThemeStore from '../stores/themeStore'
+import useLanguageStore from '../stores/languageStore'
 
 // Fallback CSS Background for when WebGL is not available
 const CSSFallbackBackground = () => (
@@ -74,6 +75,7 @@ export default function Layout() {
   const [isMobile, setIsMobile] = useState(false)
   const [webglSupported, setWebglSupported] = useState(true)
   const { resolvedTheme } = useThemeStore()
+  const { t } = useLanguageStore()
 
   useEffect(() => {
     // Check WebGL support
@@ -155,7 +157,7 @@ export default function Layout() {
         <button
           onClick={toggleSidebar}
           className="fixed top-3 left-3 z-[60] lg:hidden p-2.5 rounded-sm bg-background/70 dark:bg-black/70 backdrop-blur-sm border border-primary/50 dark:border-cyan-500/50 shadow-md hover:bg-primary/10 dark:hover:bg-cyan-900/20 active:scale-95 transition-all text-primary dark:text-cyan-400"
-          aria-label="Toggle sidebar"
+          aria-label={t('common.toggleSidebar')}
         >
           {isSidebarOpen ? (
             <X className="w-5 h-5" />

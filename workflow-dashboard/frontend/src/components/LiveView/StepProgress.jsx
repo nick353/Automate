@@ -1,12 +1,15 @@
 import { CheckCircle2, Circle, Loader2, Clock } from 'lucide-react'
 import { motion } from 'framer-motion'
-import clsx from 'clsx'
+import { cn } from '../../utils/cn'
+import useLanguageStore from '../../stores/languageStore'
 
 export default function StepProgress({ steps, currentStepId }) {
+  const { t } = useLanguageStore()
+
   if (!steps || steps.length === 0) {
     return (
       <div className="text-center py-8 text-muted-foreground">
-        <p className="text-sm">No steps recorded yet</p>
+        <p className="text-sm">{t('liveView.noSteps')}</p>
       </div>
     )
   }
@@ -28,7 +31,7 @@ export default function StepProgress({ steps, currentStepId }) {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.05 }}
-            className={clsx(
+            className={cn(
               "relative z-10 flex gap-4 p-3 rounded-lg transition-colors duration-200",
               isCurrent ? "bg-primary/5 border border-primary/10" : "hover:bg-muted/50"
             )}
@@ -55,18 +58,18 @@ export default function StepProgress({ steps, currentStepId }) {
             {/* Step Info */}
             <div className="flex-1 min-w-0 pt-1">
               <div className="flex items-center justify-between mb-1">
-                <span className={clsx(
+                <span className={cn(
                   "text-xs font-bold uppercase tracking-wider",
                   isCurrent ? "text-primary" : "text-muted-foreground"
                 )}>
-                  Step {step.step_number}
+                  {t('liveView.step')} {step.step_number}
                 </span>
                 <span className="text-[10px] text-muted-foreground font-mono">
                   {step.duration_ms ? `${(step.duration_ms / 1000).toFixed(1)}s` : ''}
                 </span>
               </div>
               
-              <p className={clsx(
+              <p className={cn(
                 "text-sm font-medium leading-snug",
                 isPending ? "text-muted-foreground" : "text-foreground"
               )}>
@@ -75,7 +78,7 @@ export default function StepProgress({ steps, currentStepId }) {
               
               {step.input_value && (
                 <div className="mt-2 px-2 py-1 bg-muted/50 rounded text-xs font-mono text-muted-foreground border border-border truncate">
-                  Input: <span className="text-foreground">{step.input_value}</span>
+                  {t('liveView.input')}: <span className="text-foreground">{step.input_value}</span>
                 </div>
               )}
               
@@ -91,6 +94,3 @@ export default function StepProgress({ steps, currentStepId }) {
     </div>
   )
 }
-
-
-
