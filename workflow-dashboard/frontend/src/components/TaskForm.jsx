@@ -116,10 +116,10 @@ export default function TaskForm({ task, onClose }) {
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        className="glass-card rounded-sm w-full max-w-3xl max-h-[90vh] shadow-2xl overflow-hidden flex flex-col font-mono"
+        className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-sm w-full max-w-3xl max-h-[90vh] shadow-2xl overflow-hidden flex flex-col font-mono"
       >
         {/* Header */}
-        <div className="px-8 py-6 border-b border-border flex items-center justify-between bg-transparent">
+        <div className="px-8 py-6 border-b border-border flex items-center justify-between bg-zinc-50/50 dark:bg-zinc-800/50">
           <div>
             <h2 className="text-2xl font-bold text-foreground">
               {task ? t('tasks.editTask') : t('tasks.newTaskTitle')}
@@ -258,7 +258,7 @@ export default function TaskForm({ task, onClose }) {
                 placeholder={formData.execution_type === 'desktop' 
                   ? t('tasks.instructionsPlaceholderDesktop')
                   : t('tasks.instructionsPlaceholderWeb')}
-                className="w-full p-4 bg-background border border-border rounded-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all font-mono text-sm resize-none"
+                className="w-full p-4 bg-zinc-50 dark:bg-zinc-800 border border-border rounded-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all font-mono text-sm resize-none"
               />
               <div className="absolute bottom-4 right-4 text-xs text-muted-foreground bg-background/80 backdrop-blur px-2 py-1 rounded-sm border border-border">
                 {t('tasks.markdownSupported')}
@@ -385,7 +385,7 @@ export default function TaskForm({ task, onClose }) {
         </form>
         
         {/* Footer */}
-        <div className="px-8 py-6 border-t border-border bg-transparent flex justify-between gap-4">
+        <div className="px-8 py-6 border-t border-border bg-zinc-50/50 dark:bg-zinc-800/50 flex justify-between gap-4">
           {/* 試運転ボタン（ローカルPC実行時のみ表示） */}
           <div>
             {formData.execution_location === 'local' && formData.task_prompt && (
@@ -410,7 +410,7 @@ export default function TaskForm({ task, onClose }) {
             <button
               onClick={handleSubmit}
               disabled={isLoading}
-              className="px-6 py-2.5 rounded-sm bg-primary/10 text-primary border border-primary/30 font-medium hover:bg-primary/20 transition-all"
+              className="px-6 py-2.5 rounded-sm bg-primary text-primary-foreground font-medium shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all"
             >
               {isLoading ? t('tasks.saving') : (task ? t('tasks.saveChanges') : t('tasks.createTask'))}
             </button>

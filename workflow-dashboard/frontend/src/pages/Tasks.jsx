@@ -229,7 +229,7 @@ export default function Tasks() {
           initial={{ scale: 0.95, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.95, opacity: 0 }}
-          className="glass-card rounded-sm shadow-2xl w-full max-w-md p-6 font-mono"
+          className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-sm shadow-2xl w-full max-w-md p-6 font-mono"
           onClick={(e) => e.stopPropagation()}
         >
           <h2 className="text-xl font-bold mb-4">
@@ -244,7 +244,7 @@ export default function Tasks() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder={t('taskBoard.projectNamePlaceholder')}
-                className="w-full px-3 py-2 rounded-sm border border-zinc-200 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+                className="w-full px-3 py-2 rounded-sm border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
                 required
               />
             </div>
@@ -255,7 +255,7 @@ export default function Tasks() {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={3}
-                className="w-full px-3 py-2 rounded-sm border border-zinc-200 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none resize-none"
+                className="w-full px-3 py-2 rounded-sm border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none resize-none"
               />
             </div>
             
@@ -737,21 +737,21 @@ export default function Tasks() {
             {/* 新規プロジェクト作成ボタン */}
             <button 
               onClick={() => setShowProjectForm(true)}
-              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-3 rounded-sm bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/30 text-emerald-500 font-bold hover:bg-emerald-500/20 transition-all"
+              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-3 rounded-sm bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg font-bold hover:scale-105 transition-all"
             >
               <FolderPlus className="w-4 h-4" />
               <span>{t('taskBoard.newProject')}</span>
             </button>
             <Link 
               to="/tasks/wizard" 
-              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-3 rounded-sm bg-gradient-to-r from-indigo-500/10 to-purple-500/10 border border-indigo-500/30 text-indigo-500 font-bold hover:bg-indigo-500/20 transition-all"
+              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-3 rounded-sm bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-lg font-bold hover:scale-105 transition-all"
             >
               <Wand2 className="w-4 h-4" />
               <span>{t('dashboard.aiWizard')}</span>
             </Link>
             <button 
               onClick={() => setShowForm(true)}
-              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-3 rounded-sm bg-primary/10 text-primary border border-primary/30 font-bold hover:bg-primary/20 transition-all"
+              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-3 rounded-sm bg-black dark:bg-white text-white dark:text-black shadow-lg font-bold hover:scale-105 transition-all"
             >
               <Plus className="w-4 h-4" />
               <span>{t('dashboard.newTask')}</span>
