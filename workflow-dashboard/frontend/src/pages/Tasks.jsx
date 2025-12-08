@@ -383,8 +383,8 @@ export default function Tasks() {
         animate={{ x: 0 }}
         exit={{ x: '100%' }}
         transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-        className={`fixed right-0 top-0 h-full bg-white dark:bg-zinc-900 border-l border-zinc-200 dark:border-zinc-800 shadow-2xl z-50 flex flex-col ${
-          isExpanded ? 'w-full md:w-2/3' : 'w-full md:w-[450px]'
+        className={`fixed right-0 top-0 h-[100dvh] bg-white dark:bg-zinc-900 border-l border-zinc-200 dark:border-zinc-800 shadow-2xl z-50 flex flex-col transition-all duration-300 ${
+          isExpanded ? 'w-full md:w-2/3' : 'w-full md:w-[450px] max-w-[100vw]'
         }`}
       >
         {/* ヘッダー */}
