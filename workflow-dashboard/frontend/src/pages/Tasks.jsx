@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { 
   Plus, 
@@ -229,7 +229,7 @@ export default function Tasks() {
           initial={{ scale: 0.95, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.95, opacity: 0 }}
-          className="bg-white dark:bg-zinc-900 rounded-xl shadow-2xl w-full max-w-md p-6"
+          className="glass-card rounded-sm shadow-2xl w-full max-w-md p-6 font-mono"
           onClick={(e) => e.stopPropagation()}
         >
           <h2 className="text-xl font-bold mb-4">
@@ -244,7 +244,7 @@ export default function Tasks() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder={t('taskBoard.projectNamePlaceholder')}
-                className="w-full px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+                className="w-full px-3 py-2 rounded-sm border border-zinc-200 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
                 required
               />
             </div>
@@ -255,7 +255,7 @@ export default function Tasks() {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={3}
-                className="w-full px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none resize-none"
+                className="w-full px-3 py-2 rounded-sm border border-zinc-200 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none resize-none"
               />
             </div>
             
@@ -267,7 +267,7 @@ export default function Tasks() {
                     key={c}
                     type="button"
                     onClick={() => setColor(c)}
-                    className={`w-8 h-8 rounded-lg transition-transform ${color === c ? 'ring-2 ring-offset-2 ring-primary scale-110' : 'hover:scale-105'}`}
+                    className={`w-8 h-8 rounded-sm transition-transform ${color === c ? 'ring-2 ring-offset-2 ring-primary scale-110' : 'hover:scale-105'}`}
                     style={{ backgroundColor: c }}
                   />
                 ))}
@@ -278,13 +278,13 @@ export default function Tasks() {
               <button
                 type="button"
                 onClick={() => { setShowProjectForm(false); setEditingProject(null) }}
-                className="flex-1 px-4 py-2 border border-zinc-200 dark:border-zinc-700 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                className="flex-1 px-4 py-2 border border-zinc-200 dark:border-zinc-700 rounded-sm hover:bg-zinc-100 dark:hover:bg-zinc-800 font-medium"
               >
                 {t('common.cancel')}
               </button>
               <button
                 type="submit"
-                className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
+                className="flex-1 px-4 py-2 bg-primary/10 text-primary border border-primary/30 rounded-sm hover:bg-primary/20 font-bold"
               >
                 {t('taskBoard.create')}
               </button>
@@ -551,7 +551,7 @@ export default function Tasks() {
         draggable
         onDragStart={() => handleDragStart(task)}
         onDragEnd={handleDragEnd}
-        className={`group bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-4 cursor-move hover:shadow-md transition-all ${
+        className={`group bg-white dark:bg-zinc-900 rounded-sm border border-zinc-200 dark:border-zinc-800 p-4 cursor-move hover:shadow-md hover:border-primary/50 transition-all ${
           draggedTask?.id === task.id ? 'opacity-50 scale-95' : ''
         }`}
         whileHover={{ scale: 1.02 }}
@@ -567,12 +567,12 @@ export default function Tasks() {
               <p className="text-sm text-muted-foreground line-clamp-2 mb-2">{task.description}</p>
             )}
             <div className="flex items-center gap-2 flex-wrap">
-              <div className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs ${config.bg} ${config.color}`}>
+              <div className={`flex items-center gap-1 px-2 py-0.5 rounded-sm text-xs ${config.bg} ${config.color}`}>
                 <LocationIcon className="w-3 h-3" />
                 {config.label}
               </div>
               {task.schedule && (
-                <div className="flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-zinc-100 dark:bg-zinc-700 text-muted-foreground">
+                <div className="flex items-center gap-1 px-2 py-0.5 rounded-sm text-xs bg-zinc-100 dark:bg-zinc-800 text-muted-foreground">
                   <Calendar className="w-3 h-3" />
                   {task.schedule}
                 </div>
@@ -583,7 +583,7 @@ export default function Tasks() {
             <button
               onClick={(e) => handleRun(e, task)}
               disabled={runningTaskId === task.id}
-              className="p-2 rounded-lg bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 transition-colors"
+              className="p-2 rounded-sm bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 transition-colors"
             >
               {runningTaskId === task.id ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -593,13 +593,13 @@ export default function Tasks() {
             </button>
             <button
               onClick={(e) => handleEdit(e, task)}
-              className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
+              className="p-2 rounded-sm hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
             >
               <Edit2 className="w-4 h-4 text-muted-foreground" />
             </button>
             <button
               onClick={(e) => handleDelete(e, task)}
-              className="p-2 rounded-lg hover:bg-rose-500/10 text-rose-500 transition-colors"
+              className="p-2 rounded-sm hover:bg-rose-500/10 text-rose-500 transition-colors"
             >
               <Trash2 className="w-4 h-4" />
             </button>
@@ -619,7 +619,7 @@ export default function Tasks() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className={`bg-white dark:bg-zinc-900 rounded-xl border-2 overflow-hidden transition-all ${
+        className={`bg-white dark:bg-zinc-900 rounded-sm border-2 overflow-hidden transition-all ${
           draggedTask ? 'border-dashed border-primary/50' : 'border-zinc-200 dark:border-zinc-800'
         }`}
         onDragOver={(e) => e.preventDefault()}
@@ -632,13 +632,13 @@ export default function Tasks() {
         >
           <button
             onClick={() => setExpandedProjects(prev => ({ ...prev, [project.id]: !isExpanded }))}
-            className="p-1 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded transition-colors"
+            className="p-1 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-sm transition-colors"
           >
             {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
           </button>
           
           <div 
-            className="w-8 h-8 rounded-lg flex items-center justify-center"
+            className="w-8 h-8 rounded-sm flex items-center justify-center"
             style={{ backgroundColor: `${project.color}20` }}
           >
             <Folder className="w-4 h-4" style={{ color: project.color }} />
@@ -654,7 +654,7 @@ export default function Tasks() {
           <div className="flex items-center gap-2">
             <button
               onClick={(e) => { e.stopPropagation(); setShowChat(project.id) }}
-              className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground hover:text-primary transition-colors"
+              className="p-2 rounded-sm hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground hover:text-primary transition-colors"
               title={t('taskBoard.chatWithAI')}
             >
               <MessageSquare className="w-4 h-4" />
@@ -663,7 +663,7 @@ export default function Tasks() {
             <div className="relative">
               <button
                 onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu) }}
-                className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground"
+                className="p-2 rounded-sm hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground"
               >
                 <MoreVertical className="w-4 h-4" />
               </button>
@@ -671,7 +671,7 @@ export default function Tasks() {
               {showMenu && (
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
-                  <div className="absolute right-0 top-full mt-1 w-40 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 py-1 z-20">
+                  <div className="absolute right-0 top-full mt-1 w-40 bg-white dark:bg-zinc-900 rounded-sm shadow-lg border border-zinc-200 dark:border-zinc-800 py-1 z-20">
                     <button
                       onClick={() => { setEditingProject(project); setShowProjectForm(true); setShowMenu(false) }}
                       className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
@@ -704,7 +704,7 @@ export default function Tasks() {
             >
               <div className="p-4 space-y-3">
                 {projectTasks.length === 0 ? (
-                  <div className={`text-center py-8 rounded-lg border-2 border-dashed ${
+                  <div className={`text-center py-8 rounded-sm border-2 border-dashed ${
                     draggedTask ? 'border-primary bg-primary/5' : 'border-zinc-200 dark:border-zinc-700'
                   }`}>
                     <p className="text-sm text-muted-foreground">
@@ -737,21 +737,21 @@ export default function Tasks() {
             {/* 新規プロジェクト作成ボタン */}
             <button 
               onClick={() => setShowProjectForm(true)}
-              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-bold shadow-lg hover:scale-105 transition-all"
+              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-3 rounded-sm bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/30 text-emerald-500 font-bold hover:bg-emerald-500/20 transition-all"
             >
               <FolderPlus className="w-4 h-4" />
               <span>{t('taskBoard.newProject')}</span>
             </button>
             <Link 
               to="/tasks/wizard" 
-              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-bold shadow-lg hover:scale-105 transition-all"
+              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-3 rounded-sm bg-gradient-to-r from-indigo-500/10 to-purple-500/10 border border-indigo-500/30 text-indigo-500 font-bold hover:bg-indigo-500/20 transition-all"
             >
               <Wand2 className="w-4 h-4" />
               <span>{t('dashboard.aiWizard')}</span>
             </Link>
             <button 
               onClick={() => setShowForm(true)}
-              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-black dark:bg-white text-white dark:text-black font-bold shadow-lg hover:scale-105 transition-all"
+              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-3 rounded-sm bg-primary/10 text-primary border border-primary/30 font-bold hover:bg-primary/20 transition-all"
             >
               <Plus className="w-4 h-4" />
               <span>{t('dashboard.newTask')}</span>
@@ -768,7 +768,7 @@ export default function Tasks() {
           placeholder={t('tasks.searchPlaceholder')}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full h-12 pl-11 pr-4 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:ring-2 focus:ring-primary/20 focus:outline-none transition-all shadow-sm"
+          className="w-full h-12 pl-11 pr-4 rounded-sm bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:ring-2 focus:ring-primary/20 focus:outline-none transition-all shadow-sm font-mono"
         />
       </div>
       
@@ -791,7 +791,7 @@ export default function Tasks() {
           
           {/* 未割り当てタスク */}
           <div
-            className={`bg-zinc-50 dark:bg-zinc-900/50 rounded-xl border-2 border-dashed p-4 transition-all ${
+            className={`bg-zinc-50 dark:bg-zinc-900/50 rounded-sm border-2 border-dashed p-4 transition-all ${
               draggedTask ? 'border-primary bg-primary/5' : 'border-zinc-300 dark:border-zinc-700'
             }`}
             onDragOver={(e) => e.preventDefault()}
@@ -810,7 +810,7 @@ export default function Tasks() {
                 </p>
                 <button 
                   onClick={() => setShowForm(true)}
-                  className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary/90"
+                  className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-sm bg-primary/10 text-primary border border-primary/30 font-medium hover:bg-primary/20"
                 >
                   <Plus className="w-4 h-4" />
                   {t('tasks.createTask')}

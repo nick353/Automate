@@ -1333,3 +1333,4 @@ JSON形式で回答してください：
 
 # シングルトンインスタンス
 project_chat_service = ProjectChatService()
+

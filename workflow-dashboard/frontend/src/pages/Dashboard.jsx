@@ -139,7 +139,12 @@ export default function Dashboard() {
           }
           icon={<Play className="h-4 w-4 text-yellow-500" />}
           className="md:col-span-1"
-        />
+        >
+            {/* Spacer to match height with other cards */}
+            <div className="flex items-center gap-2 mt-2 text-xs font-mono text-transparent select-none">
+                <span>-</span>
+            </div>
+        </BentoItem>
 
         {/* Success Rate */}
         <BentoItem

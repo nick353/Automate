@@ -378,3 +378,4 @@ async def watch_trial(websocket: WebSocket, trial_id: str):
             trial_watchers[trial_id].discard(websocket)
 
 
+

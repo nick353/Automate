@@ -116,17 +116,17 @@ export default function TaskForm({ task, onClose }) {
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        className="bg-card border border-border rounded-2xl w-full max-w-3xl max-h-[90vh] shadow-2xl overflow-hidden flex flex-col"
+        className="glass-card rounded-sm w-full max-w-3xl max-h-[90vh] shadow-2xl overflow-hidden flex flex-col font-mono"
       >
         {/* Header */}
-        <div className="px-8 py-6 border-b border-border flex items-center justify-between bg-muted/10">
+        <div className="px-8 py-6 border-b border-border flex items-center justify-between bg-transparent">
           <div>
             <h2 className="text-2xl font-bold text-foreground">
               {task ? t('tasks.editTask') : t('tasks.newTaskTitle')}
             </h2>
             <p className="text-sm text-muted-foreground">{t('tasks.configureInstructions')}</p>
           </div>
-          <button onClick={onClose} className="p-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
+          <button onClick={onClose} className="p-2 rounded-sm hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -170,14 +170,14 @@ export default function TaskForm({ task, onClose }) {
                   key={type}
                   type="button"
                   onClick={() => handleLocationChange(type)}
-                  className={`relative p-5 rounded-xl border-2 transition-all text-left ${
+                  className={`relative p-5 rounded-sm border-2 transition-all text-left ${
                     formData.execution_location === type
                       ? 'border-primary bg-primary/5 shadow-lg shadow-primary/10'
                       : 'border-border hover:border-primary/30 hover:bg-muted/30'
                   }`}
                 >
                   <div className="flex items-center gap-3 mb-3">
-                    <div className={`p-2.5 rounded-xl ${formData.execution_location === type ? 'bg-primary/10' : 'bg-muted'}`}>
+                    <div className={`p-2.5 rounded-sm ${formData.execution_location === type ? 'bg-primary/10' : 'bg-muted'}`}>
                       <Icon className={`w-6 h-6 ${formData.execution_location === type ? 'text-primary' : color}`} />
                     </div>
                     <div>
@@ -190,7 +190,7 @@ export default function TaskForm({ task, onClose }) {
                   <p className="text-xs text-muted-foreground mb-3">{description}</p>
                   <div className="flex flex-wrap gap-1.5">
                     {features.map((feature, idx) => (
-                      <span key={idx} className="px-2 py-0.5 rounded-md bg-muted text-xs text-muted-foreground">
+                      <span key={idx} className="px-2 py-0.5 rounded-sm bg-muted text-xs text-muted-foreground">
                         {feature}
                       </span>
                     ))}
@@ -204,7 +204,7 @@ export default function TaskForm({ task, onClose }) {
             
             {/* ローカル実行の注意事項 */}
             {formData.execution_location === 'local' && (
-              <div className="mt-4 p-4 rounded-xl bg-purple-500/10 border border-purple-500/20">
+              <div className="mt-4 p-4 rounded-sm bg-purple-500/10 border border-purple-500/20">
                 <div className="flex items-start gap-3">
                   <Monitor className="w-5 h-5 text-purple-500 mt-0.5" />
                   <div className="flex-1">
@@ -217,7 +217,7 @@ export default function TaskForm({ task, onClose }) {
                     <button
                       type="button"
                       onClick={() => setShowPermissionChecker(true)}
-                      className="mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-500/20 text-purple-500 hover:bg-purple-500/30 transition-colors text-sm font-medium"
+                      className="mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-sm bg-purple-500/20 text-purple-500 hover:bg-purple-500/30 transition-colors text-sm font-medium"
                     >
                       <Settings className="w-4 h-4" />
                       {t('tasks.checkPermissions')}
@@ -229,7 +229,7 @@ export default function TaskForm({ task, onClose }) {
             
             {/* サーバー実行の説明 */}
             {formData.execution_location === 'server' && (
-              <div className="mt-4 p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
+              <div className="mt-4 p-4 rounded-sm bg-blue-500/10 border border-blue-500/20">
                 <div className="flex items-start gap-3">
                   <Globe className="w-5 h-5 text-blue-500 mt-0.5" />
                   <div>
@@ -258,9 +258,9 @@ export default function TaskForm({ task, onClose }) {
                 placeholder={formData.execution_type === 'desktop' 
                   ? t('tasks.instructionsPlaceholderDesktop')
                   : t('tasks.instructionsPlaceholderWeb')}
-                className="w-full p-4 bg-background border border-border rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all font-mono text-sm resize-none"
+                className="w-full p-4 bg-background border border-border rounded-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all font-mono text-sm resize-none"
               />
-              <div className="absolute bottom-4 right-4 text-xs text-muted-foreground bg-background/80 backdrop-blur px-2 py-1 rounded-md border border-border">
+              <div className="absolute bottom-4 right-4 text-xs text-muted-foreground bg-background/80 backdrop-blur px-2 py-1 rounded-sm border border-border">
                 {t('tasks.markdownSupported')}
               </div>
             </div>
@@ -385,14 +385,14 @@ export default function TaskForm({ task, onClose }) {
         </form>
         
         {/* Footer */}
-        <div className="px-8 py-6 border-t border-border bg-muted/10 flex justify-between gap-4">
+        <div className="px-8 py-6 border-t border-border bg-transparent flex justify-between gap-4">
           {/* 試運転ボタン（ローカルPC実行時のみ表示） */}
           <div>
             {formData.execution_location === 'local' && formData.task_prompt && (
               <button
                 type="button"
                 onClick={() => setShowTrialRun(true)}
-                className="px-4 py-2.5 rounded-xl bg-purple-500/10 text-purple-500 border border-purple-500/30 font-medium hover:bg-purple-500/20 transition-colors flex items-center gap-2"
+                className="px-4 py-2.5 rounded-sm bg-purple-500/10 text-purple-500 border border-purple-500/30 font-medium hover:bg-purple-500/20 transition-colors flex items-center gap-2"
               >
                 <Play className="w-4 h-4" />
                 {t('tasks.trialRun')}
@@ -403,14 +403,14 @@ export default function TaskForm({ task, onClose }) {
             <button
               type="button"
               onClick={onClose}
-              className="px-6 py-2.5 rounded-xl border border-border font-medium hover:bg-muted transition-colors"
+              className="px-6 py-2.5 rounded-sm border border-border font-medium hover:bg-muted transition-colors"
             >
               {t('common.cancel')}
             </button>
             <button
               onClick={handleSubmit}
               disabled={isLoading}
-              className="px-6 py-2.5 rounded-xl bg-primary text-primary-foreground font-medium shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all"
+              className="px-6 py-2.5 rounded-sm bg-primary/10 text-primary border border-primary/30 font-medium hover:bg-primary/20 transition-all"
             >
               {isLoading ? t('tasks.saving') : (task ? t('tasks.saveChanges') : t('tasks.createTask'))}
             </button>
