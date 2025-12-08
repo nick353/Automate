@@ -11,8 +11,7 @@ import {
   Sun,
   Moon,
   Zap,
-  Globe,
-  Kanban
+  Globe
 } from 'lucide-react'
 import useAuthStore from '../stores/authStore'
 import useThemeStore from '../stores/themeStore'
@@ -21,7 +20,6 @@ import useLanguageStore from '../stores/languageStore'
 const navItems = [
   { path: '/', icon: LayoutDashboard, labelKey: 'common.dashboard' },
   { path: '/tasks', icon: ListTodo, labelKey: 'common.tasks' },
-  { path: '/tasks/board', icon: Kanban, labelKey: 'taskBoard.title' },
   { path: '/tasks/wizard', icon: Zap, labelKey: 'common.wizard' },
   { path: '/credentials', icon: Key, labelKey: 'common.credentials' },
   { path: '/history', icon: History, labelKey: 'common.history' },

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { 
   Plus, 
@@ -10,7 +10,28 @@ import {
   Calendar,
   Sparkles,
   Globe,
-  Monitor
+  Monitor,
+  Folder,
+  FolderPlus,
+  ChevronDown,
+  ChevronRight,
+  MoreVertical,
+  X,
+  MessageSquare,
+  Bot,
+  User,
+  Send,
+  Loader2,
+  Info,
+  CheckCircle,
+  AlertCircle,
+  Zap,
+  Clock,
+  GitBranch,
+  Maximize2,
+  Minimize2,
+  Video,
+  GripVertical
 } from 'lucide-react'
 
 import { motion, AnimatePresence } from 'framer-motion'
@@ -19,15 +40,31 @@ import TaskForm from '../components/TaskForm'
 import StatusBadge from '../components/StatusBadge'
 import { BentoGrid, BentoItem } from '../components/Bento/BentoGrid'
 import useLanguageStore from '../stores/languageStore'
+import { projectsApi, tasksApi } from '../services/api'
 
 export default function Tasks() {
   const navigate = useNavigate()
-  const { tasks, isLoading, fetchTasks, toggleTask, deleteTask, runTask } = useTaskStore()
+  const { tasks, isLoading, fetchTasks, toggleTask, deleteTask, runTask, fetchBoardData, boardData } = useTaskStore()
   const [showForm, setShowForm] = useState(false)
   const [editingTask, setEditingTask] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [runningTaskId, setRunningTaskId] = useState(null)
   const { t } = useLanguageStore()
+  
+  // プロジェクト関連のState
+  const [showProjectForm, setShowProjectForm] = useState(false)
+  const [editingProject, setEditingProject] = useState(null)
+  const [expandedProjects, setExpandedProjects] = useState({})
+  const [draggedTask, setDraggedTask] = useState(null)
+  
+  // チャット関連のState
+  const [showChat, setShowChat] = useState(null) // project_id
+  const [chatHistory, setChatHistory] = useState([])
+  const [chatInput, setChatInput] = useState('')
+  const [isChatLoading, setIsChatLoading] = useState(false)
+  const [pendingActions, setPendingActions] = useState(null)
+  const [isExpanded, setIsExpanded] = useState(false)
+  const chatEndRef = useRef(null)
   
   // 実行場所のアイコンと色
   const EXECUTION_LOCATION_CONFIG = {
@@ -37,7 +74,19 @@ export default function Tasks() {
 
   useEffect(() => {
     fetchTasks()
-  }, [fetchTasks])
+    fetchBoardData()
+  }, [fetchTasks, fetchBoardData])
+  
+  // プロジェクト展開状態の初期化
+  useEffect(() => {
+    if (boardData?.projects) {
+      const expanded = {}
+      boardData.projects.forEach(p => {
+        expanded[p.id] = true
+      })
+      setExpandedProjects(prev => ({ ...expanded, ...prev }))
+    }
+  }, [boardData?.projects])
   
   const handleEdit = (e, task) => {
     e.stopPropagation()
@@ -49,6 +98,7 @@ export default function Tasks() {
     e.stopPropagation()
     if (window.confirm(t('tasks.confirmDelete').replace('{name}', task.name))) {
       await deleteTask(task.id)
+      fetchBoardData()
     }
   }
   
@@ -74,38 +124,639 @@ export default function Tasks() {
     setShowForm(false)
     setEditingTask(null)
     fetchTasks()
+    fetchBoardData()
   }
   
+  // プロジェクト作成
+  const handleCreateProject = async (projectData) => {
+    try {
+      await projectsApi.create(projectData)
+      setShowProjectForm(false)
+      setEditingProject(null)
+      fetchBoardData()
+    } catch (error) {
+      console.error('Failed to create project:', error)
+    }
+  }
+  
+  // プロジェクト削除
+  const handleDeleteProject = async (projectId, projectName) => {
+    if (window.confirm(t('taskBoard.confirmDeleteProject').replace('{name}', projectName))) {
+      try {
+        await projectsApi.delete(projectId)
+        fetchBoardData()
+      } catch (error) {
+        console.error('Failed to delete project:', error)
+      }
+    }
+  }
+  
+  // ドラッグ&ドロップ
+  const handleDragStart = (task) => {
+    setDraggedTask(task)
+  }
+  
+  const handleDragEnd = () => {
+    setDraggedTask(null)
+  }
+  
+  const handleDropOnProject = async (projectId) => {
+    if (!draggedTask) return
+    
+    try {
+      await tasksApi.batchUpdate({
+        tasks: [{ id: draggedTask.id, project_id: projectId }]
+      })
+      fetchBoardData()
+      fetchTasks()
+    } catch (error) {
+      console.error('Failed to move task:', error)
+    }
+    setDraggedTask(null)
+  }
+  
+  const handleDropOnUnassigned = async () => {
+    if (!draggedTask) return
+    
+    try {
+      await tasksApi.batchUpdate({
+        tasks: [{ id: draggedTask.id, project_id: 0 }] // 0 = unassigned
+      })
+      fetchBoardData()
+      fetchTasks()
+    } catch (error) {
+      console.error('Failed to move task:', error)
+    }
+    setDraggedTask(null)
+  }
+  
+  // フィルター
   const filteredTasks = tasks.filter(task =>
     task.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     task.description?.toLowerCase().includes(searchQuery.toLowerCase())
   )
+  
+  // プロジェクトごとのタスク
+  const getProjectTasks = (projectId) => {
+    return filteredTasks.filter(task => task.project_id === projectId)
+  }
+  
+  // 未割り当てタスク
+  const unassignedTasks = filteredTasks.filter(task => !task.project_id)
+  
+  // プロジェクト作成モーダル
+  const ProjectFormModal = () => {
+    const [name, setName] = useState(editingProject?.name || '')
+    const [description, setDescription] = useState(editingProject?.description || '')
+    const [color, setColor] = useState(editingProject?.color || '#6366f1')
+    
+    const colors = ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f97316', '#eab308', '#22c55e', '#14b8a6', '#0ea5e9', '#64748b']
+    
+    const handleSubmit = async (e) => {
+      e.preventDefault()
+      await handleCreateProject({ name, description, color })
+    }
+    
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        onClick={() => { setShowProjectForm(false); setEditingProject(null) }}
+      >
+        <motion.div
+          initial={{ scale: 0.95, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0.95, opacity: 0 }}
+          className="bg-white dark:bg-zinc-900 rounded-xl shadow-2xl w-full max-w-md p-6"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <h2 className="text-xl font-bold mb-4">
+            {editingProject ? t('taskBoard.editProject') : t('taskBoard.newProject')}
+          </h2>
+          
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">{t('taskBoard.projectName')}</label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder={t('taskBoard.projectNamePlaceholder')}
+                className="w-full px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+                required
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium mb-1">{t('taskBoard.description')}</label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={3}
+                className="w-full px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none resize-none"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium mb-2">{t('taskBoard.color')}</label>
+              <div className="flex gap-2 flex-wrap">
+                {colors.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setColor(c)}
+                    className={`w-8 h-8 rounded-lg transition-transform ${color === c ? 'ring-2 ring-offset-2 ring-primary scale-110' : 'hover:scale-105'}`}
+                    style={{ backgroundColor: c }}
+                  />
+                ))}
+              </div>
+            </div>
+            
+            <div className="flex gap-3 pt-4">
+              <button
+                type="button"
+                onClick={() => { setShowProjectForm(false); setEditingProject(null) }}
+                className="flex-1 px-4 py-2 border border-zinc-200 dark:border-zinc-700 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                type="submit"
+                className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
+              >
+                {t('taskBoard.create')}
+              </button>
+            </div>
+          </form>
+        </motion.div>
+      </motion.div>
+    )
+  }
+  
+  // プロジェクトチャットパネル
+  const ProjectChatPanel = () => {
+    const project = boardData?.projects?.find(p => p.id === showChat)
+    if (!project) return null
+    
+    useEffect(() => {
+      chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }, [chatHistory])
+    
+    const handleSendMessage = async () => {
+      if (!chatInput.trim() || isChatLoading) return
+      
+      const userMessage = chatInput.trim()
+      setChatInput('')
+      setIsChatLoading(true)
+      setPendingActions(null)
+      
+      try {
+        const projectTasks = getProjectTasks(showChat)
+        const isWizardMode = projectTasks.length === 0
+        
+        const response = isWizardMode
+          ? await projectsApi.wizardChat(showChat, userMessage, chatHistory)
+          : await projectsApi.chat(showChat, userMessage, chatHistory)
+        
+        setChatHistory(response.data.chat_history || [])
+        
+        if (response.data.actions?.actions) {
+          setPendingActions(response.data.actions.actions)
+        }
+      } catch (error) {
+        console.error('Chat error:', error)
+        setChatHistory(prev => [...prev, {
+          role: 'assistant',
+          content: `エラーが発生しました: ${error.message}`
+        }])
+      }
+      
+      setIsChatLoading(false)
+    }
+    
+    const handleExecuteActions = async () => {
+      if (!pendingActions) return
+      
+      setIsChatLoading(true)
+      try {
+        const response = await projectsApi.executeActions(showChat, pendingActions)
+        
+        setChatHistory(prev => [...prev, {
+          role: 'assistant',
+          content: `✅ **アクションを実行しました！**\n\n${response.data.message}`
+        }])
+        
+        setPendingActions(null)
+        fetchBoardData()
+        fetchTasks()
+      } catch (error) {
+        setChatHistory(prev => [...prev, {
+          role: 'assistant',
+          content: `❌ アクションの実行に失敗しました: ${error.message}`
+        }])
+      }
+      setIsChatLoading(false)
+    }
+    
+    const handleGetExplanation = async () => {
+      setIsChatLoading(true)
+      try {
+        const response = await projectsApi.getWorkflowExplanation(showChat)
+        setChatHistory(prev => [...prev, {
+          role: 'assistant',
+          content: response.data.explanation
+        }])
+      } catch (error) {
+        setChatHistory(prev => [...prev, {
+          role: 'assistant',
+          content: `エラーが発生しました: ${error.message}`
+        }])
+      }
+      setIsChatLoading(false)
+    }
+    
+    return (
+      <motion.div
+        initial={{ x: '100%' }}
+        animate={{ x: 0 }}
+        exit={{ x: '100%' }}
+        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+        className={`fixed right-0 top-0 h-full bg-white dark:bg-zinc-900 border-l border-zinc-200 dark:border-zinc-800 shadow-2xl z-50 flex flex-col ${
+          isExpanded ? 'w-full md:w-2/3' : 'w-full md:w-[450px]'
+        }`}
+      >
+        {/* ヘッダー */}
+        <div className="flex items-center gap-3 p-4 border-b border-zinc-200 dark:border-zinc-800 bg-gradient-to-r from-primary/5 to-purple-500/5">
+          <div 
+            className="w-10 h-10 rounded-lg flex items-center justify-center"
+            style={{ backgroundColor: `${project.color}20` }}
+          >
+            <Bot className="w-5 h-5" style={{ color: project.color }} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold text-foreground">{t('taskBoard.aiAssistant')}</h3>
+            <p className="text-xs text-muted-foreground truncate">{project.name}</p>
+          </div>
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground"
+          >
+            {isExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+          </button>
+          <button
+            onClick={() => { setShowChat(null); setChatHistory([]); setPendingActions(null) }}
+            className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        
+        {/* クイックアクション */}
+        <div className="flex items-center gap-2 p-3 border-b border-zinc-200 dark:border-zinc-800 overflow-x-auto">
+          <button
+            onClick={handleGetExplanation}
+            disabled={isChatLoading}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 rounded-full whitespace-nowrap hover:bg-blue-200 dark:hover:bg-blue-500/30 transition-colors"
+          >
+            <Info className="w-3.5 h-3.5" />
+            {t('taskBoard.explainWorkflow')}
+          </button>
+          <button
+            onClick={() => setChatInput('このワークフローを改善したい')}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded-full whitespace-nowrap hover:bg-amber-200 dark:hover:bg-amber-500/30 transition-colors"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            {t('taskBoard.suggest')}
+          </button>
+          <button
+            onClick={() => setChatInput('新しいタスクを追加したい')}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-full whitespace-nowrap hover:bg-emerald-200 dark:hover:bg-emerald-500/30 transition-colors"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            {t('taskBoard.addTask')}
+          </button>
+        </div>
+        
+        {/* チャット履歴 */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {chatHistory.length === 0 && (
+            <div className="text-center py-8 text-muted-foreground">
+              <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-30" />
+              <p className="text-sm">プロジェクトについて質問してください</p>
+              <p className="text-xs mt-1">ワークフローの管理・編集をサポートします</p>
+            </div>
+          )}
+          
+          {chatHistory.map((msg, idx) => (
+            <div key={idx} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+                msg.role === 'user' 
+                  ? 'bg-primary/10 text-primary' 
+                  : 'bg-gradient-to-br from-purple-500/20 to-blue-500/20 text-purple-500'
+              }`}>
+                {msg.role === 'user' ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
+              </div>
+              <div className={`flex-1 max-w-[85%] ${msg.role === 'user' ? 'text-right' : ''}`}>
+                <div className={`inline-block p-3 rounded-2xl text-sm whitespace-pre-wrap ${
+                  msg.role === 'user'
+                    ? 'bg-primary text-primary-foreground rounded-br-md'
+                    : 'bg-zinc-100 dark:bg-zinc-800 text-foreground rounded-bl-md'
+                }`}>
+                  {msg.content}
+                </div>
+              </div>
+            </div>
+          ))}
+          
+          {isChatLoading && (
+            <div className="flex gap-3">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500/20 to-blue-500/20 flex items-center justify-center">
+                <Loader2 className="w-4 h-4 text-purple-500 animate-spin" />
+              </div>
+              <div className="bg-zinc-100 dark:bg-zinc-800 p-3 rounded-2xl rounded-bl-md">
+                <div className="flex gap-1">
+                  <span className="w-2 h-2 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <span className="w-2 h-2 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <span className="w-2 h-2 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {pendingActions && pendingActions.length > 0 && (
+            <div className="bg-gradient-to-r from-primary/10 to-purple-500/10 border border-primary/30 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <AlertCircle className="w-5 h-5 text-primary" />
+                <span className="font-semibold text-foreground">{t('taskBoard.confirmActions')}</span>
+              </div>
+              <p className="text-sm text-muted-foreground mb-4">
+                {pendingActions.length}件のアクションを実行します
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleExecuteActions}
+                  disabled={isChatLoading}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  {t('taskBoard.executeActions')}
+                </button>
+                <button
+                  onClick={() => setPendingActions(null)}
+                  className="px-4 py-2.5 border border-zinc-300 dark:border-zinc-700 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                >
+                  {t('common.cancel')}
+                </button>
+              </div>
+            </div>
+          )}
+          
+          <div ref={chatEndRef} />
+        </div>
+        
+        {/* 入力フィールド */}
+        <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
+              placeholder={t('taskBoard.chatPlaceholder')}
+              disabled={isChatLoading}
+              className="flex-1 px-4 py-3 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all disabled:opacity-50"
+            />
+            <button
+              onClick={handleSendMessage}
+              disabled={!chatInput.trim() || isChatLoading}
+              className="px-4 py-3 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <Send className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      </motion.div>
+    )
+  }
+  
+  // タスクカード（ドラッグ可能）
+  const TaskCard = ({ task }) => {
+    const config = EXECUTION_LOCATION_CONFIG[task.execution_location] || EXECUTION_LOCATION_CONFIG.server
+    const LocationIcon = config.icon
+    
+    return (
+      <motion.div
+        draggable
+        onDragStart={() => handleDragStart(task)}
+        onDragEnd={handleDragEnd}
+        className={`group bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-4 cursor-move hover:shadow-md transition-all ${
+          draggedTask?.id === task.id ? 'opacity-50 scale-95' : ''
+        }`}
+        whileHover={{ scale: 1.02 }}
+      >
+        <div className="flex items-start gap-3">
+          <GripVertical className="w-4 h-4 text-zinc-400 mt-1 opacity-0 group-hover:opacity-100 transition-opacity" />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <h4 className="font-medium text-foreground truncate">{task.name}</h4>
+              <StatusBadge active={task.is_active} />
+            </div>
+            {task.description && (
+              <p className="text-sm text-muted-foreground line-clamp-2 mb-2">{task.description}</p>
+            )}
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs ${config.bg} ${config.color}`}>
+                <LocationIcon className="w-3 h-3" />
+                {config.label}
+              </div>
+              {task.schedule && (
+                <div className="flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-zinc-100 dark:bg-zinc-700 text-muted-foreground">
+                  <Calendar className="w-3 h-3" />
+                  {task.schedule}
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={(e) => handleRun(e, task)}
+              disabled={runningTaskId === task.id}
+              className="p-2 rounded-lg bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 transition-colors"
+            >
+              {runningTaskId === task.id ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Play className="w-4 h-4 fill-current" />
+              )}
+            </button>
+            <button
+              onClick={(e) => handleEdit(e, task)}
+              className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
+            >
+              <Edit2 className="w-4 h-4 text-muted-foreground" />
+            </button>
+            <button
+              onClick={(e) => handleDelete(e, task)}
+              className="p-2 rounded-lg hover:bg-rose-500/10 text-rose-500 transition-colors"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </motion.div>
+    )
+  }
+  
+  // プロジェクトカード
+  const ProjectCard = ({ project }) => {
+    const isExpanded = expandedProjects[project.id] !== false
+    const projectTasks = getProjectTasks(project.id)
+    const [showMenu, setShowMenu] = useState(false)
+    
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className={`bg-white dark:bg-zinc-900 rounded-xl border-2 overflow-hidden transition-all ${
+          draggedTask ? 'border-dashed border-primary/50' : 'border-zinc-200 dark:border-zinc-800'
+        }`}
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={() => handleDropOnProject(project.id)}
+      >
+        {/* プロジェクトヘッダー */}
+        <div 
+          className="flex items-center gap-3 p-4 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
+          style={{ borderLeft: `4px solid ${project.color}` }}
+        >
+          <button
+            onClick={() => setExpandedProjects(prev => ({ ...prev, [project.id]: !isExpanded }))}
+            className="p-1 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded transition-colors"
+          >
+            {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+          </button>
+          
+          <div 
+            className="w-8 h-8 rounded-lg flex items-center justify-center"
+            style={{ backgroundColor: `${project.color}20` }}
+          >
+            <Folder className="w-4 h-4" style={{ color: project.color }} />
+          </div>
+          
+          <div className="flex-1 min-w-0" onClick={() => setExpandedProjects(prev => ({ ...prev, [project.id]: !isExpanded }))}>
+            <h3 className="font-semibold text-foreground">{project.name}</h3>
+            <p className="text-xs text-muted-foreground">
+              {projectTasks.length} {t('taskBoard.tasks')}
+            </p>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowChat(project.id) }}
+              className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground hover:text-primary transition-colors"
+              title={t('taskBoard.chatWithAI')}
+            >
+              <MessageSquare className="w-4 h-4" />
+            </button>
+            
+            <div className="relative">
+              <button
+                onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu) }}
+                className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground"
+              >
+                <MoreVertical className="w-4 h-4" />
+              </button>
+              
+              {showMenu && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
+                  <div className="absolute right-0 top-full mt-1 w-40 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 py-1 z-20">
+                    <button
+                      onClick={() => { setEditingProject(project); setShowProjectForm(true); setShowMenu(false) }}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                      {t('common.edit')}
+                    </button>
+                    <button
+                      onClick={() => { handleDeleteProject(project.id, project.name); setShowMenu(false) }}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      {t('common.delete')}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+        
+        {/* タスク一覧 */}
+        <AnimatePresence>
+          {isExpanded && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="border-t border-zinc-200 dark:border-zinc-800"
+            >
+              <div className="p-4 space-y-3">
+                {projectTasks.length === 0 ? (
+                  <div className={`text-center py-8 rounded-lg border-2 border-dashed ${
+                    draggedTask ? 'border-primary bg-primary/5' : 'border-zinc-200 dark:border-zinc-700'
+                  }`}>
+                    <p className="text-sm text-muted-foreground">
+                      {draggedTask ? 'ここにドロップ' : 'タスクをドラッグして追加'}
+                    </p>
+                  </div>
+                ) : (
+                  projectTasks.map(task => (
+                    <TaskCard key={task.id} task={task} />
+                  ))
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+    )
+  }
   
   return (
     <div className="space-y-6 sm:space-y-8">
       {/* Header */}
       <div className="flex flex-col gap-4">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div>
+          <div>
             <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">{t('tasks.title')}</h1>
             <p className="text-muted-foreground mt-1 text-lg">{t('tasks.subtitle')}</p>
-            </div>
-            <div className="flex items-center gap-3 w-full sm:w-auto">
-            <Link 
-                to="/tasks/wizard" 
-                className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-3 rounded-sm bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-bold shadow-lg hover:scale-105 transition-all"
+          </div>
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            {/* 新規プロジェクト作成ボタン */}
+            <button 
+              onClick={() => setShowProjectForm(true)}
+              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-bold shadow-lg hover:scale-105 transition-all"
             >
-                <Wand2 className="w-4 h-4" />
-                <span>{t('dashboard.aiWizard')}</span>
+              <FolderPlus className="w-4 h-4" />
+              <span>{t('taskBoard.newProject')}</span>
+            </button>
+            <Link 
+              to="/tasks/wizard" 
+              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-bold shadow-lg hover:scale-105 transition-all"
+            >
+              <Wand2 className="w-4 h-4" />
+              <span>{t('dashboard.aiWizard')}</span>
             </Link>
             <button 
-                onClick={() => setShowForm(true)}
-                className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-3 rounded-sm bg-black dark:bg-white text-white dark:text-black font-bold shadow-lg hover:scale-105 transition-all"
+              onClick={() => setShowForm(true)}
+              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-black dark:bg-white text-white dark:text-black font-bold shadow-lg hover:scale-105 transition-all"
             >
-                <Plus className="w-4 h-4" />
-                <span>{t('dashboard.newTask')}</span>
+              <Plus className="w-4 h-4" />
+              <span>{t('dashboard.newTask')}</span>
             </button>
-            </div>
+          </div>
         </div>
       </div>
       
@@ -117,11 +768,11 @@ export default function Tasks() {
           placeholder={t('tasks.searchPlaceholder')}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full h-12 pl-11 pr-4 rounded-sm bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:ring-2 focus:ring-primary/20 focus:outline-none transition-all shadow-sm"
+          className="w-full h-12 pl-11 pr-4 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:ring-2 focus:ring-primary/20 focus:outline-none transition-all shadow-sm"
         />
       </div>
       
-      {/* Task Grid */}
+      {/* Content */}
       {isLoading ? (
         <div className="flex items-center justify-center h-64">
           <div className="relative">
@@ -131,93 +782,52 @@ export default function Tasks() {
             </div>
           </div>
         </div>
-      ) : filteredTasks.length === 0 ? (
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="rounded-sm border-2 border-dashed border-zinc-200 dark:border-zinc-800 p-12 text-center bg-zinc-50 dark:bg-zinc-900/50"
-        >
-          <div className="w-16 h-16 mx-auto mb-4 rounded-sm bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center">
-            <Plus className="w-8 h-8 text-zinc-400" />
-          </div>
-          <h3 className="text-xl font-bold text-foreground mb-2">{t('tasks.noTasks')}</h3>
-          <p className="text-muted-foreground mb-6">{t('tasks.createFirst')}</p>
-          <button 
-            onClick={() => setShowForm(true)}
-            className="inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-sm bg-primary text-primary-foreground font-bold hover:scale-105 transition-all"
-          >
-            <Plus className="w-4 h-4" />
-            {t('tasks.createTask')}
-          </button>
-        </motion.div>
       ) : (
-        <BentoGrid>
-          {filteredTasks.map((task) => (
-            <BentoItem 
-              key={task.id}
-              title={task.name}
-              description={task.description || 'No description'}
-              header={
-                  <div className="flex flex-1 w-full h-full min-h-[8rem] bg-gradient-to-br from-zinc-100 to-zinc-200 dark:from-zinc-800 dark:to-zinc-900 p-4 relative group-hover:scale-105 transition-transform duration-500">
-                      <div className="absolute top-3 right-3 flex gap-2">
-                           <StatusBadge active={task.is_active} />
-                      </div>
-                      <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
-                           {/* Execution Location */}
-                           {(() => {
-                                const config = EXECUTION_LOCATION_CONFIG[task.execution_location] || EXECUTION_LOCATION_CONFIG.server
-                                const LocationIcon = config.icon
-                                return (
-                                <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-xs font-medium bg-white/80 dark:bg-black/50 backdrop-blur-sm shadow-sm ${config.color}`}>
-                                    <LocationIcon className="w-3.5 h-3.5" />
-                                    <span>{config.label}</span>
-                                </div>
-                                )
-                            })()}
-                           <div className="flex items-center gap-1 text-xs text-zinc-500 font-mono bg-white/80 dark:bg-black/50 px-2 py-1 rounded-sm">
-                               <Calendar className="w-3 h-3" />
-                               {task.schedule || t('tasks.manual')}
-                           </div>
-                      </div>
-                  </div>
-              }
-              className="md:col-span-1 cursor-default"
-              onClick={() => {}}
-            >
-                <div className="flex items-center gap-2 mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800">
-                    <button
-                        onClick={(e) => handleRun(e, task)}
-                        disabled={runningTaskId === task.id}
-                        className="flex-1 flex items-center justify-center gap-2 p-2.5 rounded-sm bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 font-bold text-sm transition-colors disabled:opacity-50"
-                    >
-                        {runningTaskId === task.id ? (
-                            <div className="w-4 h-4 border-2 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin" />
-                        ) : (
-                            <>
-                                <Play className="w-4 h-4 fill-current" />
-                                <span>{t('tasks.run')}</span>
-                            </>
-                        )}
-                    </button>
-                    <button
-                        onClick={(e) => handleEdit(e, task)}
-                        className="p-2.5 rounded-sm bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
-                    >
-                        <Edit2 className="w-4 h-4" />
-                    </button>
-                    <button
-                        onClick={(e) => handleDelete(e, task)}
-                        className="p-2.5 rounded-sm bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-500/20 transition-colors"
-                    >
-                        <Trash2 className="w-4 h-4" />
-                    </button>
-                </div>
-            </BentoItem>
+        <div className="space-y-6">
+          {/* プロジェクト一覧 */}
+          {boardData?.projects?.map(project => (
+            <ProjectCard key={project.id} project={project} />
           ))}
-        </BentoGrid>
+          
+          {/* 未割り当てタスク */}
+          <div
+            className={`bg-zinc-50 dark:bg-zinc-900/50 rounded-xl border-2 border-dashed p-4 transition-all ${
+              draggedTask ? 'border-primary bg-primary/5' : 'border-zinc-300 dark:border-zinc-700'
+            }`}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={handleDropOnUnassigned}
+          >
+            <div className="flex items-center gap-2 mb-4">
+              <h3 className="font-semibold text-muted-foreground">{t('taskBoard.unassignedTasks')}</h3>
+              <span className="text-xs text-muted-foreground">({unassignedTasks.length})</span>
+            </div>
+            
+            {unassignedTasks.length === 0 ? (
+              <div className="text-center py-8">
+                <Plus className="w-8 h-8 mx-auto mb-2 text-zinc-300" />
+                <p className="text-sm text-muted-foreground">
+                  {t('tasks.noTasks')}
+                </p>
+                <button 
+                  onClick={() => setShowForm(true)}
+                  className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary/90"
+                >
+                  <Plus className="w-4 h-4" />
+                  {t('tasks.createTask')}
+                </button>
+              </div>
+            ) : (
+              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                {unassignedTasks.map(task => (
+                  <TaskCard key={task.id} task={task} />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       )}
       
-      {/* Task Form Modal */}
+      {/* Modals */}
       <AnimatePresence>
         {showForm && (
           <TaskForm
@@ -225,6 +835,8 @@ export default function Tasks() {
             onClose={handleFormClose}
           />
         )}
+        {showProjectForm && <ProjectFormModal />}
+        {showChat && <ProjectChatPanel />}
       </AnimatePresence>
     </div>
   )
