@@ -292,8 +292,8 @@ class ProjectChatService:
             saved_keys = self._detect_and_save_api_keys(db, user_message, user_id)
             saved_keys_message = ""
             if saved_keys:
-                key_names = [f"**{k['service'].upper()}**" for k in saved_keys]
-                saved_keys_message = f"\n\n✅ 以下のAPIキーを認証情報に保存しました（デフォルト設定）:\n- " + "\n- ".join(key_names) + "\n\n次回以降は自動的にこのキーが使用されます。"
+                key_names = [k['service'].upper() for k in saved_keys]
+                saved_keys_message = f"\n\n以下のAPIキーを認証情報に保存しました：\n- " + "\n- ".join(key_names) + "\n\n次回以降は自動的にこのキーが使用されます。"
             
             # プロジェクトとタスクを取得
             project = db.query(Project).filter(Project.id == project_id).first()
@@ -337,32 +337,27 @@ class ProjectChatService:
             
             api_key = cred["data"].get("api_key")
             
-            system_prompt = f"""あなたはプロジェクト「{project.name}」の**自動化ワークフロー作成を支援する**AIアシスタントです。
+            system_prompt = f"""あなたはプロジェクト「{project.name}」の自動化ワークフローを管理・改善するAIアシスタントです。
 
-## 🎯 最重要：あなたの使命
-**ユーザーが効率的な自動化フローを構築できるよう支援すること**
-
-このシステムは、ユーザーの繰り返し作業を自動化するためのワークフローを管理しています。
+このプロジェクトには既に自動化タスクが設定されています。
 あなたの役割は：
-1. 既存の自動化フローを分かりやすく説明する
-2. ユーザーの要望に応じてフローを改善・拡張する
-3. より効率的な自動化の方法を提案する
+- 既存フローの説明
+- ユーザーの要望に応じた改善・拡張
+- 新しいタスクの追加
 
 {project_context}
 
 {workflow_explanation}
 
-## あなたの役割
+【あなたの役割】
 
-### 1. ワークフローの説明
-- プロジェクト内のタスクがどのように連携して**作業を自動化**しているか説明
-- 各役割グループの責任範囲を説明
-- トリガーと依存関係による実行フローを解説
-- **この自動化によってユーザーがどれだけ時間を節約できるか**を伝える
+1. ワークフローの説明
+   - タスク同士がどう連携しているか
+   - トリガーや依存関係の流れ
+   - 自動化で節約できる時間
 
-### 2. タスクの編集支援
-ユーザーからの指示に基づいて、自動化フローの変更を提案します。
-変更が必要な場合は、以下のJSON形式で出力してください：
+2. タスクの編集
+   変更が必要な場合、以下のJSON形式で出力：
 
 ```json
 {{
@@ -417,19 +412,17 @@ class ProjectChatService:
 }}
 ```
 
-### 3. 質問への回答と改善提案
-- ワークフローに関する質問に答える
-- **より効率的な自動化方法**を提案する
-- 問題点を指摘し、改善策を提示する
-- ユーザーの作業負担をさらに減らすアイデアを提供
+3. 質問への回答と改善提案
+   - ワークフローに関する質問に答える
+   - より効率的な自動化方法を提案
+   - 問題点を指摘し改善策を提示
 
-## レスポンスのルール
-1. まず自然言語で説明・提案を行う
-2. 変更が必要な場合は、最後にJSONアクションを含める
-3. 日本語で回答
-4. 絵文字を適度に使用
-5. 変更は確認を取ってから実行するよう促す
-6. **自動化によるメリット**を具体的に伝える"""
+【文章スタイル】
+- 絵文字は使わない
+- 見出し記号（#や---）は使わない
+- 箇条書きはシンプルに
+- 日本語で回答
+- 変更が必要な場合は最後にJSONアクションを含める"""
 
             # メッセージを構築
             messages = [{"role": "system", "content": system_prompt}]
@@ -479,7 +472,7 @@ class ProjectChatService:
             # APIキー保存メッセージを追加
             final_response = assistant_message
             if saved_keys_message:
-                final_response = saved_keys_message + "\n\n---\n\n" + assistant_message
+                final_response = saved_keys_message + "\n\n" + assistant_message
             
             return {
                 "response": final_response,
@@ -510,6 +503,7 @@ class ProjectChatService:
     ) -> dict:
         """AIが提案したアクションを実行"""
         results = []
+        created_tasks = []  # 作成されたタスクの詳細情報
         
         try:
             for action in actions:
@@ -531,6 +525,7 @@ class ProjectChatService:
                 
                 elif action_type == "create_task":
                     data = action.get("data", {})
+                    execution_location = data.get("execution_location", "server")
                     task = Task(
                         project_id=project_id,
                         user_id=user_id,
@@ -539,12 +534,25 @@ class ProjectChatService:
                         task_prompt=data.get("task_prompt", ""),
                         schedule=data.get("schedule"),
                         role_group=data.get("role_group", "General"),
+                        execution_location=execution_location,
                         is_active=True
                     )
                     db.add(task)
                     db.commit()
                     db.refresh(task)
                     results.append({"type": "create_task", "task_id": task.id, "success": True})
+                    
+                    # 作成されたタスクの詳細情報を追加
+                    created_tasks.append({
+                        "id": task.id,
+                        "name": task.name,
+                        "description": task.description,
+                        "task_prompt": task.task_prompt,
+                        "schedule": task.schedule,
+                        "role_group": task.role_group,
+                        "execution_location": task.execution_location,
+                        "is_active": task.is_active
+                    })
                 
                 elif action_type == "delete_task":
                     task_id = action.get("task_id")
@@ -595,6 +603,7 @@ class ProjectChatService:
             return {
                 "success": True,
                 "results": results,
+                "created_tasks": created_tasks,
                 "message": f"{len(results)}件のアクションを実行しました"
             }
             
@@ -604,7 +613,8 @@ class ProjectChatService:
             return {
                 "success": False,
                 "error": str(e),
-                "results": results
+                "results": results,
+                "created_tasks": created_tasks
             }
     
     async def get_workflow_explanation(
@@ -880,8 +890,8 @@ JSON形式で回答してください：
             saved_keys = self._detect_and_save_api_keys(db, user_message, user_id)
             saved_keys_message = ""
             if saved_keys:
-                key_names = [f"**{k['service'].upper()}**" for k in saved_keys]
-                saved_keys_message = f"\n\n✅ 以下のAPIキーを認証情報に保存しました（デフォルト設定）:\n- " + "\n- ".join(key_names) + "\n\n次回以降は自動的にこのキーが使用されます。"
+                key_names = [k['service'].upper() for k in saved_keys]
+                saved_keys_message = f"\n\n以下のAPIキーを認証情報に保存しました：\n- " + "\n- ".join(key_names) + "\n\n次回以降は自動的にこのキーが使用されます。"
             
             project = db.query(Project).filter(Project.id == project_id).first()
             if not project:
@@ -920,100 +930,69 @@ JSON形式で回答してください：
                 for g in role_groups:
                     existing_context += f"- {g.name}: {g.description or '説明なし'}\n"
             
-            system_prompt = f"""あなたは**自動化ワークフロー構築**の専門家AIアシスタントです。
-ユーザーが新しいプロジェクト「{project.name}」の**自動化フローを作成する**のを手伝います。
-
-## 🎯 最重要：あなたの使命
-**ユーザーの繰り返し作業を自動化するワークフローを一緒に設計すること**
-
-ユーザーは以下のような作業を自動化したいと考えています：
-- 定期的なデータ収集・レポート作成
-- 複数サービス間の連携
-- 手作業で行っている定型業務
-- 情報の監視・通知
-
-あなたの役割は、これらの作業を**完全に自動化**するワークフローを設計することです。
+            system_prompt = f"""あなたはプロジェクト「{project.name}」の自動化フローを作成するAIアシスタントです。
 
 {existing_context}
 {additional_context}
 
-## あなたの役割
+【重要な行動指針】
 
-### 1. ヒアリング
-- ユーザーが**どんな作業を自動化したいのか**を正確に理解する
-- 「今その作業をどのように行っていますか？」と現状を確認
-- 「どのサービスを使いますか？」「どのくらいの頻度で実行しますか？」など具体的に質問
-- **ユーザーの時間をどれだけ節約できるか**を常に意識
+1. まずしっかりヒアリングする
+   - ユーザーが何を自動化したいのか詳しく聞く
+   - 現在どのように作業しているか確認
+   - 使用するサービス、頻度、出力先などを把握
+   - 不明な点は必ず質問する
 
-### 2. Webリサーチ提案
-トレンドやベストプラクティスを調べる必要がある場合は、以下の形式で提案：
+2. 全体像を説明する
+   - ヒアリング後、作成するタスクの全体像を説明
+   - 「合計○個のタスクを作成します」と数を伝える
+   - 各タスクの役割と連携を説明
+
+3. 最終確認を取る
+   - 全体像を説明した後「この内容で作成してよろしいですか？」と確認
+   - ユーザーが「作成してください」「お願いします」などと言ったら作成開始
+   - 勝手に作成しない
+
+4. 一つずつ作成する
+   - タスクは一つずつ作成
+   - 作成後「タスク○を作成しました。次のタスク○に進みますか？」と確認
+   - ユーザーの確認を得てから次へ
+
+5. Webリサーチが必要な場合
 ```json
 {{"web_search": {{"query": "検索クエリ", "reason": "調べる理由"}}}}
 ```
 
-### 3. ワークフロー設計
-要件が明確になったら、**自動化フロー**として以下を提案：
-- 必要な役割グループ（チーム分け）
-- 各グループに必要な自動化タスク
-- タスク間の依存関係と実行順序
-- 推奨スケジュール
-- **自動化により節約できる時間の見積もり**
-
-### 4. タスク作成
-ワークフローが確定したら、以下のJSON形式で作成を提案：
-
+【タスク作成時のJSON形式】
+作成する際は以下の形式で出力：
 ```json
 {{
     "actions": [
-        {{
-            "type": "create_role_group",
-            "data": {{
-                "name": "グループ名",
-                "description": "説明",
-                "color": "#6366f1"
-            }}
-        }},
         {{
             "type": "create_task",
             "data": {{
                 "name": "タスク名",
                 "description": "説明",
-                "task_prompt": "AIエージェントへの詳細な指示（自然言語）",
+                "task_prompt": "AIエージェントへの詳細な指示",
                 "role_group": "役割グループ名",
-                "schedule": "cron形式（例: 0 9 * * *）",
+                "schedule": "cron形式",
                 "execution_location": "server または local"
             }}
-        }},
-        {{
-            "type": "create_trigger",
-            "task_id": "new_task_名前",
-            "trigger": {{
-                "trigger_type": "dependency",
-                "depends_on_task_name": "前提タスク名",
-                "trigger_on_status": "completed",
-                "delay_minutes": 0
-            }}
         }}
-    ]
+    ],
+    "creating_info": {{
+        "current": 1,
+        "total": 3,
+        "task_name": "作成中のタスク名"
+    }}
 }}
 ```
 
-## 提案の例
-
-ユーザーが「SNSマーケティングの自動化」を希望した場合：
-1. SNS広告担当グループ：投稿作成、スケジュール投稿
-2. リサーチ担当グループ：トレンド調査、競合分析
-3. データ分析担当グループ：エンゲージメント分析、レポート作成
-
-→ これにより「週5時間かかっていた作業が30分に短縮」など具体的なメリットを伝える
-
-## レスポンスのルール
-1. 絵文字を使って親しみやすく
-2. 箇条書きで分かりやすく
-3. 不明点は必ず質問
-4. 日本語で回答
-5. 実行前に確認を取る
-6. **自動化によるメリット**を具体的に伝える"""
+【文章スタイル】
+- 絵文字は使わない
+- 見出し記号（#や---）は使わない
+- 箇条書きはシンプルに
+- 日本語で回答"""
 
             messages = [{"role": "system", "content": system_prompt}]
             messages.extend([{"role": msg["role"], "content": msg["content"]} for msg in chat_history])
@@ -1063,7 +1042,7 @@ JSON形式で回答してください：
             # APIキー保存メッセージを追加
             final_response = assistant_message
             if saved_keys_message:
-                final_response = saved_keys_message + "\n\n---\n\n" + assistant_message
+                final_response = saved_keys_message + "\n\n" + assistant_message
             
             return {
                 "response": final_response,
@@ -1102,8 +1081,8 @@ JSON形式で回答してください：
             saved_keys = self._detect_and_save_api_keys(db, user_message, user_id)
             saved_keys_message = ""
             if saved_keys:
-                key_names = [f"**{k['service'].upper()}**" for k in saved_keys]
-                saved_keys_message = f"\n\n✅ 以下のAPIキーを認証情報に保存しました（デフォルト設定）:\n- " + "\n- ".join(key_names) + "\n\n次回以降は自動的にこのキーが使用されます。"
+                key_names = [k['service'].upper() for k in saved_keys]
+                saved_keys_message = f"\n\n以下のAPIキーを認証情報に保存しました：\n- " + "\n- ".join(key_names) + "\n\n次回以降は自動的にこのキーが使用されます。"
             
             task = db.query(Task).filter(Task.id == task_id).first()
             if not task:
@@ -1135,20 +1114,18 @@ JSON形式で回答してください：
             api_key = cred["data"].get("api_key")
             
             # タスクコンテキストを構築
-            task_context = f"""## タスク情報
-- **名前**: {task.name}
-- **説明**: {task.description or "なし"}
-- **ステータス**: {"有効" if task.is_active else "無効"}
-- **実行場所**: {task.execution_location}
-- **スケジュール**: {task.schedule or "手動実行"}
-- **役割グループ**: {task.role_group or "未分類"}
+            task_context = f"""【タスク情報】
+- 名前: {task.name}
+- 説明: {task.description or "なし"}
+- ステータス: {"有効" if task.is_active else "無効"}
+- 実行場所: {task.execution_location}
+- スケジュール: {task.schedule or "手動実行"}
+- 役割グループ: {task.role_group or "未分類"}
 
-## 指示内容（プロンプト）
-```
+【指示内容】
 {task.task_prompt}
-```
 
-## トリガー設定
+【トリガー設定】
 """
             if triggers:
                 for t in triggers:
@@ -1163,42 +1140,37 @@ JSON形式で回答してください：
             else:
                 task_context += "- なし\n"
             
-            task_context += "\n## 依存関係\n"
+            task_context += "\n【依存関係】\n"
             if dep_tasks:
-                task_context += "**前提タスク（このタスクの前に実行）:**\n"
+                task_context += "前提タスク（このタスクの前に実行）:\n"
                 for dt in dep_tasks:
                     task_context += f"- {dt.name}\n"
             if dependents:
-                task_context += "**後続タスク（このタスクの後に実行）:**\n"
+                task_context += "後続タスク（このタスクの後に実行）:\n"
                 for dt in dependents:
                     task_context += f"- {dt.name}\n"
             if not dep_tasks and not dependents:
                 task_context += "- 依存関係なし（独立タスク）\n"
             
-            system_prompt = f"""あなたはタスク「{task.name}」の**自動化ロジックを調整する**専門アシスタントです。
-このタスクのロジックと設定を完全に理解しています。
+            system_prompt = f"""あなたはタスク「{task.name}」の自動化ロジックを調整するアシスタントです。
 
-## 🎯 最重要：あなたの使命
-**このタスクはユーザーの作業を自動化するために存在します**
-
-このタスクは、ユーザーが以前手動で行っていた作業を自動実行するものです。
-あなたの役割は：
-1. このタスクがどのような作業を自動化しているか説明する
-2. ユーザーの要望に応じてタスクの設定を調整する
-3. より効率的な自動化方法を提案する
+このタスクはユーザーの作業を自動化するために存在します。
+あなたの役割：
+- タスクの動作を説明する
+- ユーザーの要望に応じて設定を調整する
+- より効率的な方法を提案する
 
 {task_context}
 
-## あなたの役割
+【あなたの役割】
 
-### 1. タスクの説明
-- このタスクが**どんな作業を自動化しているか**説明
-- 指示内容（プロンプト）の解説
-- 実行フローの説明
-- **このタスクによって節約できる時間や労力**を伝える
+1. タスクの説明
+   - 何を自動化しているか
+   - 指示内容の解説
+   - 実行フローの説明
 
-### 2. 微調整の支援
-ユーザーが調整したい場合、以下のJSON形式で変更を提案：
+2. 調整の支援
+   変更が必要な場合、以下のJSON形式で出力：
 
 ```json
 {{
@@ -1207,11 +1179,11 @@ JSON形式で回答してください：
             "type": "update_task",
             "task_id": {task_id},
             "changes": {{
-                "name": "新しい名前（変更する場合）",
-                "description": "新しい説明（変更する場合）",
-                "task_prompt": "新しい指示（変更する場合）",
-                "schedule": "新しいスケジュール（変更する場合）",
-                "is_active": true/false（変更する場合）
+                "name": "新しい名前",
+                "description": "新しい説明",
+                "task_prompt": "新しい指示",
+                "schedule": "新しいスケジュール",
+                "is_active": true/false
             }}
         }},
         {{
@@ -1230,18 +1202,15 @@ JSON形式で回答してください：
 }}
 ```
 
-### 3. 問題の特定と改善提案
-- 指示内容の曖昧な部分を指摘
-- **より効率的な自動化方法**を提案
-- エラーが起きそうな箇所の警告
-- ユーザーの作業をさらに楽にするアイデアを提供
+3. 改善提案
+   - 指示内容の曖昧な部分を指摘
+   - より効率的な方法を提案
 
-## レスポンスのルール
-1. 日本語で回答
-2. 技術的な内容も分かりやすく説明
-3. 変更は確認を取ってから
-4. 絵文字で親しみやすく
-5. **自動化によるメリット**を常に意識して伝える"""
+【文章スタイル】
+- 絵文字は使わない
+- 見出し記号（#や---）は使わない
+- 箇条書きはシンプルに
+- 日本語で回答"""
 
             messages = [{"role": "system", "content": system_prompt}]
             messages.extend([{"role": msg["role"], "content": msg["content"]} for msg in chat_history])
@@ -1284,7 +1253,7 @@ JSON形式で回答してください：
             # APIキー保存メッセージを追加
             final_response = assistant_message
             if saved_keys_message:
-                final_response = saved_keys_message + "\n\n---\n\n" + assistant_message
+                final_response = saved_keys_message + "\n\n" + assistant_message
             
             return {
                 "response": final_response,
