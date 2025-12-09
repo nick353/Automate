@@ -17,6 +17,8 @@ from app.utils.logger import logger
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
 
+DEFAULT_CHAT_MODEL = "gpt-5.1-codex-max"
+
 # APIキーのパターン定義
 API_KEY_PATTERNS = {
     "openai": {
@@ -275,7 +277,7 @@ JSON形式で回答（説明は不要）:
                         "Content-Type": "application/json"
                     },
                     json={
-                        "model": "gpt-4o-mini",  # 軽量モデルで十分
+                        "model": DEFAULT_CHAT_MODEL,
                         "max_tokens": 1000,
                         "messages": [{"role": "user", "content": review_prompt}]
                     },
@@ -621,7 +623,7 @@ task_promptは具体的なステップを含めてください：
                         "Content-Type": "application/json"
                     },
                     json={
-                        "model": "gpt-4.1",
+                        "model": DEFAULT_CHAT_MODEL,
                         "max_tokens": 2048,
                         "messages": messages
                     },
@@ -891,7 +893,7 @@ task_promptは具体的なステップを含めてください：
                         "Content-Type": "application/json"
                     },
                     json={
-                        "model": "gpt-4.1",
+                        "model": DEFAULT_CHAT_MODEL,
                         "max_tokens": 1500,
                         "messages": [{"role": "user", "content": prompt}]
                     },
@@ -969,7 +971,7 @@ task_promptは具体的なステップを含めてください：
                         "Content-Type": "application/json"
                     },
                     json={
-                        "model": "gpt-4.1",
+                        "model": DEFAULT_CHAT_MODEL,
                         "max_tokens": 1500,
                         "messages": [
                             {
@@ -1389,7 +1391,7 @@ task_prompt（AIエージェントへの指示）は以下を含む詳細なも�
                         "Content-Type": "application/json"
                     },
                     json={
-                        "model": "gpt-4.1",
+                        "model": DEFAULT_CHAT_MODEL,
                         "max_tokens": 2500,
                         "messages": messages
                     },
@@ -1607,7 +1609,7 @@ task_prompt（AIエージェントへの指示）は以下を含む詳細なも�
                         "Content-Type": "application/json"
                     },
                     json={
-                        "model": "gpt-4.1",
+                        "model": DEFAULT_CHAT_MODEL,
                         "max_tokens": 2048,
                         "messages": messages
                     },

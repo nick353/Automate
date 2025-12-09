@@ -7,6 +7,8 @@ from app.models import WizardSession
 from app.services.credential_manager import credential_manager
 from app.utils.logger import logger
 
+DEFAULT_CHAT_MODEL = "gpt-5.1-codex-max"
+
 
 class WizardChatService:
     """AIによるヒアリングチャット"""
@@ -126,7 +128,7 @@ class WizardChatService:
                         "Content-Type": "application/json"
                     },
                     json={
-                        "model": "gpt-5.1",
+                        "model": DEFAULT_CHAT_MODEL,
                         "max_tokens": 1024,
                         "messages": messages
                     },
@@ -226,7 +228,7 @@ class WizardChatService:
                         "Content-Type": "application/json"
                     },
                     json={
-                        "model": "gpt-5.1",
+                        "model": DEFAULT_CHAT_MODEL,
                         "max_tokens": 2048,
                         "messages": [{"role": "user", "content": prompt}]
                     },
