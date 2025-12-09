@@ -1,6 +1,7 @@
 """プロジェクトチャットサービス（AIによるプロジェクト全体管理）"""
 import json
 import re
+import mimetypes
 import httpx
 import aiofiles
 from pathlib import Path
@@ -996,6 +997,104 @@ task_promptは具体的なステップを含めてください：
             
         except Exception as e:
             logger.error(f"Webリサーチエラー: {e}")
+            return {"success": False, "error": str(e)}
+    
+    # ==================== 汎用ファイル分析機能 ====================
+    
+    def _read_text_preview(self, file_path: Path, max_bytes: int = 4000) -> Optional[str]:
+        try:
+            data = file_path.read_bytes()[:max_bytes]
+            for enc in ["utf-8", "utf-8-sig", "shift_jis", "cp932", "latin-1"]:
+                try:
+                    return data.decode(enc)
+                except Exception:
+                    continue
+            return data.decode("utf-8", errors="ignore")
+        except Exception as e:
+            logger.warning(f"テキストプレビュー取得エラー: {e}")
+            return None
+    
+    def _summarize_text_preview(self, text_preview: str) -> str:
+        sample = (text_preview or "").strip()
+        if not sample:
+            return ""
+        
+        lowered = sample.lower()
+        if sample.startswith("{") or sample.startswith("["):
+            return "JSONまたは構造化データの可能性があります"
+        if "," in sample and "\n" in sample:
+            return "表形式（CSV/TSV）の可能性があります"
+        if "error" in lowered or "exception" in lowered or "エラー" in sample:
+            return "ログ/エラーログの可能性があります"
+        if len(sample) > 0 and len(sample.split()) < 80:
+            return "短文テキストです"
+        return "テキストファイルです"
+    
+    def _infer_intent_from_text(self, context: str, text_preview: Optional[str]) -> List[str]:
+        hints = []
+        combined = f"{context}\n{text_preview or ''}".lower()
+        if any(kw in combined for kw in ["error", "exception", "stack", "trace", "ログ", "失敗"]):
+            hints.append("不具合調査")
+        if any(kw in combined for kw in ["仕様", "spec", "要件", "design"]):
+            hints.append("仕様確認")
+        if any(kw in combined for kw in ["csv", "excel", "spreadsheet", "表", "一覧"]):
+            hints.append("データ取り込み/加工")
+        if any(kw in combined for kw in ["report", "レポート", "分析", "analytics"]):
+            hints.append("レポート生成/分析")
+        return hints
+    
+    async def analyze_file_for_project(
+        self,
+        db: Session,
+        project_id: int,
+        file_path: str,
+        original_name: str,
+        context: str = ""
+    ) -> dict:
+        """プロジェクト用に汎用ファイルを簡易分析"""
+        try:
+            path = Path(file_path)
+            mime, _ = mimetypes.guess_type(original_name)
+            extension = path.suffix.lower()
+            size_bytes = path.stat().st_size if path.exists() else None
+            
+            text_preview = None
+            summary = ""
+            kind = mime or extension or "unknown"
+            
+            text_like_ext = {".txt", ".md", ".csv", ".tsv", ".json", ".log", ".yaml", ".yml"}
+            doc_like_ext = {".pdf", ".doc", ".docx"}
+            sheet_like_ext = {".xlsx", ".xls"}
+            
+            if mime and mime.startswith("text"):
+                text_preview = self._read_text_preview(path)
+            elif extension in text_like_ext:
+                text_preview = self._read_text_preview(path)
+            elif extension in doc_like_ext:
+                summary = "ドキュメントファイルです（内容の抽出は簡易対応）"
+            elif extension in sheet_like_ext:
+                summary = "スプレッドシート/Excelファイルです（内容の抽出は未対応）"
+            
+            if not summary and text_preview:
+                summary = self._summarize_text_preview(text_preview)
+            
+            intent_hints = self._infer_intent_from_text(context, text_preview)
+            
+            return {
+                "success": True,
+                "summary": summary or "ファイルを受信しました。",
+                "file": {
+                    "name": original_name,
+                    "mime": mime,
+                    "extension": extension,
+                    "size_bytes": size_bytes,
+                    "kind": kind
+                },
+                "text_preview": text_preview[:800] if text_preview else None,
+                "intent_hints": intent_hints
+            }
+        except Exception as e:
+            logger.error(f"汎用ファイル分析エラー: {e}")
             return {"success": False, "error": str(e)}
     
     # ==================== 動画分析機能 ====================

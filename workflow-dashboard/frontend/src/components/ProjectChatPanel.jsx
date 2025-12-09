@@ -14,6 +14,7 @@ import {
   Maximize2,
   Minimize2,
   Video,
+  Paperclip,
   Search,
   Edit2,
   Trash2,
@@ -119,7 +120,7 @@ export default function ProjectChatPanel({
   }, [webResearchResults, project.id, setStoreWebResearchResults])
   
   // 添付ファイルのState
-  const [attachedFile, setAttachedFile] = useState(null) // { file: File, type: 'image'|'video', preview: string }
+  const [attachedFile, setAttachedFile] = useState(null) // { file: File, type: 'image'|'video'|'file', preview: string }
   
   // 音声入力のState
   const [isListening, setIsListening] = useState(false)
@@ -193,9 +194,10 @@ export default function ProjectChatPanel({
       // ユーザーメッセージを追加（画像プレビュー付き）
       setChatHistory(prev => [...prev, {
         role: 'user',
-        content: userMessage || `${currentAttachedFile.type === 'image' ? '画像' : '動画'}を添付しました`,
+        content: userMessage || `${currentAttachedFile.type === 'image' ? '画像' : currentAttachedFile.type === 'video' ? '動画' : 'ファイル'}を添付しました`,
         image: currentAttachedFile.type === 'image' ? currentAttachedFile.preview : null,
-        video: currentAttachedFile.type === 'video' ? currentAttachedFile.file.name : null
+        video: currentAttachedFile.type === 'video' ? currentAttachedFile.file.name : null,
+        file: currentAttachedFile.type === 'file' ? currentAttachedFile.file.name : null
       }])
       
       try {
@@ -209,11 +211,33 @@ export default function ProjectChatPanel({
             content: `動画を確認しました。\n\n概要: ${analysis.summary || '動画を分析中...'}\n\n${userMessage ? 'ご要望を踏まえて' : ''}自動化の提案をさせていただきます。\n\n自動化候補:\n${(analysis.automation_candidates || []).map(c => `- ${c}`).join('\n')}\n\n提案されたタスク:\n${(analysis.suggested_tasks || []).map(t => `- ${t.name}: ${t.description}`).join('\n')}\n\nこの方向で進めてよろしいですか？`
           }])
           setVideoAnalysis(analysis)
-        } else {
+        } else if (currentAttachedFile.type === 'image') {
           // 画像の場合
           setChatHistory(prev => [...prev, {
             role: 'assistant',
             content: `画像を確認しました。${userMessage ? '\n\nご要望：' + userMessage + '\n\n' : ''}この画像を参考に、どのような自動化を作成しますか？`
+          }])
+        } else {
+          // その他ファイル
+          const response = await projectsApi.analyzeFile(project.id, currentAttachedFile.file, userMessage)
+          const analysis = response.data || {}
+          const fileInfo = analysis.file || {}
+          
+          const intentText = (analysis.intent_hints || []).length > 0
+            ? `意図の推測: ${(analysis.intent_hints || []).join(' / ')}\n`
+            : ''
+          const snippetText = analysis.text_preview && typeof analysis.text_preview === 'string'
+            ? analysis.text_preview.slice(0, 600)
+            : ''
+          const snippet = snippetText
+            ? `内容の抜粋:\n${snippetText}${analysis.text_preview && analysis.text_preview.length > 600 ? '...' : ''}`
+            : ''
+          
+          const assistantText = `ファイルを確認しました。\n\n種類: ${fileInfo.kind || fileInfo.mime || '不明'}\nサイズ: ${formatBytes(fileInfo.size_bytes)}\n${analysis.summary ? `概要: ${analysis.summary}\n` : ''}${intentText}${snippet ? `\n${snippet}` : ''}\n${userMessage ? '\nご要望：' + userMessage + '\n' : ''}この内容を踏まえて、どのような自動化を進めますか？`
+          
+          setChatHistory(prev => [...prev, {
+            role: 'assistant',
+            content: assistantText
           }])
         }
       } catch (error) {
@@ -596,6 +620,18 @@ export default function ProjectChatPanel({
     setIsChatLoading(false)
   }
   
+  const formatBytes = (bytes) => {
+    if (bytes === undefined || bytes === null) return '不明'
+    const units = ['B', 'KB', 'MB', 'GB']
+    let size = bytes
+    let unitIndex = 0
+    while (size >= 1024 && unitIndex < units.length - 1) {
+      size /= 1024
+      unitIndex++
+    }
+    return `${size.toFixed(size >= 10 ? 0 : 1)} ${units[unitIndex]}`
+  }
+  
   // メッセージ内のJSONブロックをパース
   const parseMessage = (content) => {
     const parts = []
@@ -751,6 +787,24 @@ export default function ProjectChatPanel({
             e.target.value = ''
           }}
         />
+        {/* 汎用ファイルアップロード（添付用） */}
+        <input
+          id="file-upload-chat"
+          type="file"
+          accept="*/*"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0]
+            if (!file) return
+            
+            setAttachedFile({
+              file,
+              type: 'file',
+              preview: file.name
+            })
+            e.target.value = ''
+          }}
+        />
       </div>
       
       {/* チャット履歴 */}
@@ -781,6 +835,15 @@ export default function ProjectChatPanel({
                   <div className="inline-flex items-center gap-2 px-3 py-2 bg-purple-100 dark:bg-purple-500/20 rounded-lg">
                     <Video className="w-4 h-4 text-purple-500" />
                     <span className="text-sm text-purple-700 dark:text-purple-300">{msg.video}</span>
+                  </div>
+                </div>
+              )}
+              {/* 添付ファイルの表示 */}
+              {msg.file && (
+                <div className={`mb-2 ${msg.role === 'user' ? 'flex justify-end' : ''}`}>
+                  <div className="inline-flex items-center gap-2 px-3 py-2 bg-blue-100 dark:bg-blue-500/20 rounded-lg">
+                    <Paperclip className="w-4 h-4 text-blue-500" />
+                    <span className="text-sm text-blue-700 dark:text-blue-300">{msg.file}</span>
                   </div>
                 </div>
               )}
@@ -1023,9 +1086,13 @@ export default function ProjectChatPanel({
                 alt="添付画像" 
                 className="w-16 h-16 object-cover rounded-lg"
               />
-            ) : (
+            ) : attachedFile.type === 'video' ? (
               <div className="w-16 h-16 bg-purple-100 dark:bg-purple-500/20 rounded-lg flex items-center justify-center">
                 <Video className="w-8 h-8 text-purple-500" />
+              </div>
+            ) : (
+              <div className="w-16 h-16 bg-blue-100 dark:bg-blue-500/20 rounded-lg flex items-center justify-center">
+                <Paperclip className="w-8 h-8 text-blue-500" />
               </div>
             )}
             <div className="flex-1 min-w-0">
@@ -1033,7 +1100,7 @@ export default function ProjectChatPanel({
                 {attachedFile.file.name}
               </p>
               <p className="text-xs text-muted-foreground">
-                {attachedFile.type === 'image' ? '画像' : '動画'}を添付中
+                {attachedFile.type === 'image' ? '画像' : attachedFile.type === 'video' ? '動画' : 'ファイル'}を添付中
               </p>
             </div>
             <button
@@ -1063,16 +1130,30 @@ export default function ProjectChatPanel({
           >
             <Video className="w-5 h-5" />
           </button>
+          {/* 汎用ファイル添付ボタン */}
+          <button
+            onClick={() => document.getElementById('file-upload-chat')?.click()}
+            disabled={isChatLoading}
+            className="w-10 h-10 flex items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 hover:bg-blue-50 hover:text-blue-500 dark:hover:bg-blue-500/20 dark:hover:text-blue-400 transition-all disabled:opacity-50 shrink-0"
+            title="ファイルを添付"
+          >
+            <Paperclip className="w-5 h-5" />
+          </button>
           
           <div className="flex-1 relative min-w-0">
-            <input
-              type="text"
+            <textarea
+              rows={2}
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  handleSendMessage()
+                }
+              }}
               placeholder={isListening ? t('wizard.voiceListening') : (attachedFile ? 'メッセージを入力...' : t('taskBoard.chatPlaceholder'))}
               disabled={isChatLoading}
-              className={`w-full h-10 pl-4 pr-10 rounded-full bg-zinc-100 dark:bg-zinc-800 border-transparent focus:bg-white dark:focus:bg-zinc-900 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 outline-none transition-all disabled:opacity-50 ${
+              className={`w-full min-h-[44px] max-h-40 pr-10 pl-4 py-2 rounded-2xl bg-zinc-100 dark:bg-zinc-800 border-transparent focus:bg-white dark:focus:bg-zinc-900 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 outline-none transition-all disabled:opacity-50 resize-none ${
                 isListening ? 'border-red-500/50 bg-red-500/5' : ''
               }`}
             />

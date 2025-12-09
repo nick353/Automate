@@ -534,6 +534,55 @@ async def analyze_video_for_project(
     return result
 
 
+@router.post("/{project_id}/analyze-file")
+async def analyze_file_for_project(
+    project_id: int,
+    file: UploadFile = File(...),
+    context: str = Form(default=""),
+    db: Session = Depends(get_db),
+    current_user: Optional[UserInfo] = Depends(get_current_user)
+):
+    """プロジェクト用汎用ファイル分析（簡易メタ情報+テキスト抜粋）"""
+    import uuid
+    import aiofiles
+    from pathlib import Path
+    
+    user_id = get_user_filter(current_user)
+    project_query = db.query(Project).filter(Project.id == project_id)
+    if user_id:
+        project_query = project_query.filter(Project.user_id == user_id)
+    
+    project = project_query.first()
+    if not project:
+        raise HTTPException(status_code=404, detail="プロジェクトが見つかりません")
+    
+    upload_dir = Path("uploads")
+    upload_dir.mkdir(exist_ok=True)
+    
+    file_id = str(uuid.uuid4())
+    file_ext = Path(file.filename).suffix
+    file_path = upload_dir / f"{file_id}{file_ext}"
+    
+    async with aiofiles.open(file_path, "wb") as f:
+        content = await file.read()
+        await f.write(content)
+    
+    result = await project_chat_service.analyze_file_for_project(
+        db,
+        project_id,
+        str(file_path),
+        file.filename,
+        context
+    )
+    
+    try:
+        file_path.unlink()
+    except Exception:
+        pass
+    
+    return result
+
+
 # ==================== タスク検証・テストAPI ====================
 
 class CheckCredentialsRequest(BaseModel):

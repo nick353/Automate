@@ -105,6 +105,15 @@ export const projectsApi = {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
   },
+  // 汎用ファイル分析
+  analyzeFile: (projectId, file, context = '') => {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('context', context)
+    return api.post(`/projects/${projectId}/analyze-file`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+  },
   // 認証情報チェック
   checkCredentials: (projectId, taskPrompt, executionLocation = 'server') =>
     api.post(`/projects/${projectId}/check-credentials`, {
