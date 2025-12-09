@@ -60,7 +60,22 @@ class LiveViewAgent:
                 llm_credential = credential_manager.get_default(self.db, "api_key", "anthropic")
                 use_openai = False
             if not llm_credential:
-                raise ValueError("OpenAIまたはAnthropic APIキーが設定されていません。認証情報を追加してください。")
+                raise ValueError(
+                    "AIエージェントを実行するにはAPIキーが必要です。\n\n"
+                    "以下のいずれかを「認証情報」画面から登録してください：\n"
+                    "- OpenAI APIキー（推奨: GPT-4o使用）\n"
+                    "- Anthropic APIキー（Claude使用）\n\n"
+                    "APIキーの取得方法：\n"
+                    "OpenAI: https://platform.openai.com/api-keys\n"
+                    "Anthropic: https://console.anthropic.com/settings/keys"
+                )
+            
+            # task_promptの確認
+            if not self.task.task_prompt or len(self.task.task_prompt.strip()) < 10:
+                raise ValueError(
+                    "タスクの指示内容（task_prompt）が設定されていません。\n"
+                    "AIアシスタントでタスクを編集し、具体的な手順を記載してください。"
+                )
             
             api_key = llm_credential["data"]["api_key"]
             
@@ -83,7 +98,15 @@ class LiveViewAgent:
                 os.environ["OPENAI_API_KEY"] = api_key
             else:
                 os.environ["ANTHROPIC_API_KEY"] = api_key
-            os.environ["BROWSER_USE_API_KEY"] = "bu_UUWBoZnb471Uo4narZN1IoUqt5azNHovbY7XDU-ZFoM"
+            
+            # Browser Use APIキー（環境変数から取得、なければ認証情報から）
+            browser_use_key = os.environ.get("BROWSER_USE_API_KEY")
+            if not browser_use_key:
+                browser_use_cred = credential_manager.get_default(self.db, "api_key", "browser_use")
+                if browser_use_cred:
+                    browser_use_key = browser_use_cred["data"].get("api_key")
+            if browser_use_key:
+                os.environ["BROWSER_USE_API_KEY"] = browser_use_key
             
             # ブラウザを起動
             await live_view_manager.send_log(

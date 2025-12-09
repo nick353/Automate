@@ -13,10 +13,12 @@ import {
   Sparkles,
   Clock,
   Mic,
-  MicOff
+  MicOff,
+  RotateCcw
 } from 'lucide-react'
 import { tasksApi } from '../services/api'
 import useLanguageStore from '../stores/languageStore'
+import useTaskChatStore from '../stores/taskChatStore'
 
 export default function TaskChatPanel({
   task,
@@ -26,11 +28,37 @@ export default function TaskChatPanel({
   const { t } = useLanguageStore()
   const taskChatEndRef = useRef(null)
   
+  // ストアからチャット履歴を取得
+  const {
+    getChatHistory,
+    setChatHistory: setStoreChatHistory,
+    clearChatHistory
+  } = useTaskChatStore()
+  
+  // ストアから履歴を取得
+  const storedHistory = getChatHistory(task.id)
+  
   // ローカルState
-  const [taskChatHistory, setTaskChatHistory] = useState([])
+  const [taskChatHistory, setTaskChatHistory] = useState(storedHistory)
   const [taskChatInput, setTaskChatInput] = useState('')
   const [taskChatLoading, setTaskChatLoading] = useState(false)
   const [taskPendingActions, setTaskPendingActions] = useState(null)
+  
+  // チャット履歴が変更されたらストアに保存
+  useEffect(() => {
+    if (taskChatHistory.length > 0) {
+      setStoreChatHistory(task.id, taskChatHistory)
+    }
+  }, [taskChatHistory, task.id, setStoreChatHistory])
+  
+  // 履歴をクリアする関数
+  const handleClearHistory = () => {
+    if (confirm('チャット履歴をクリアしますか？')) {
+      clearChatHistory(task.id)
+      setTaskChatHistory([])
+      setTaskPendingActions(null)
+    }
+  }
   
   // 音声入力のState
   const [isTaskChatListening, setIsTaskChatListening] = useState(false)
@@ -154,6 +182,13 @@ export default function TaskChatPanel({
           <h3 className="font-semibold text-foreground">{t('taskBoard.taskChat')}</h3>
           <p className="text-xs text-muted-foreground truncate">{task.name}</p>
         </div>
+        <button
+          onClick={handleClearHistory}
+          className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground"
+          title="履歴をクリア"
+        >
+          <RotateCcw className="w-4 h-4" />
+        </button>
         <button
           onClick={onClose}
           className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground"

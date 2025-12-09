@@ -150,6 +150,159 @@ class ProjectChatService:
             return "*" * len(api_key)
         return api_key[:6] + "*" * (len(api_key) - 10) + api_key[-4:]
     
+    def check_required_credentials(self, db: Session, task_prompt: str, execution_location: str = "server") -> Dict:
+        """タスク実行に必要な認証情報が登録されているかチェック"""
+        missing = []
+        warnings = []
+        registered = []
+        
+        # 基本的に必要なもの: LLM APIキー（OpenAIまたはAnthropic）
+        openai_cred = credential_manager.get_default(db, "api_key", "openai")
+        anthropic_cred = credential_manager.get_default(db, "api_key", "anthropic")
+        
+        if openai_cred:
+            registered.append("OpenAI APIキー")
+        if anthropic_cred:
+            registered.append("Anthropic APIキー")
+        
+        if not openai_cred and not anthropic_cred:
+            missing.append({
+                "type": "api_key",
+                "service": "openai または anthropic",
+                "message": "AIエージェント実行にはOpenAIまたはAnthropic APIキーが必要です",
+                "how_to_get": "OpenAI: https://platform.openai.com/api-keys / Anthropic: https://console.anthropic.com/settings/keys"
+            })
+        
+        # task_promptの内容から必要な認証情報を推測
+        prompt_lower = task_prompt.lower()
+        
+        # ログインが必要そうな場合
+        login_keywords = ["ログイン", "login", "サインイン", "signin", "認証", "パスワード", "password"]
+        if any(kw in prompt_lower for kw in login_keywords):
+            # サイトログイン情報があるか確認
+            login_creds = db.query(Credential).filter(Credential.credential_type == "login").all()
+            if login_creds:
+                registered.append(f"サイトログイン情報 ({len(login_creds)}件)")
+            else:
+                warnings.append({
+                    "type": "login",
+                    "message": "ログインが必要なサイトの場合、認証情報画面から「サイトログイン」を登録してください"
+                })
+        
+        # Google系サービス
+        google_keywords = ["google", "gmail", "スプレッドシート", "spreadsheet", "ドライブ", "drive", "youtube"]
+        if any(kw in prompt_lower for kw in google_keywords):
+            google_cred = credential_manager.get_default(db, "api_key", "google")
+            if google_cred:
+                registered.append("Google APIキー")
+            else:
+                warnings.append({
+                    "type": "api_key",
+                    "service": "google",
+                    "message": "Google系サービスを使用する場合、Google APIキーの登録を推奨します"
+                })
+        
+        # Twitter/X
+        twitter_keywords = ["twitter", "ツイート", "tweet", "x.com"]
+        if any(kw in prompt_lower for kw in twitter_keywords):
+            warnings.append({
+                "type": "login",
+                "service": "twitter",
+                "message": "Twitter/Xの操作には、ログイン情報の事前登録が必要です"
+            })
+        
+        # ローカル実行の場合
+        if execution_location == "local":
+            # OAGI/Lux APIキーが必要
+            oagi_cred = credential_manager.get_default(db, "api_key", "oagi")
+            if oagi_cred:
+                registered.append("OAGI APIキー")
+            else:
+                missing.append({
+                    "type": "api_key",
+                    "service": "oagi",
+                    "message": "ローカルPC実行にはOAGI APIキーが必要です",
+                    "how_to_get": "https://oagi.ai でAPIキーを取得してください"
+                })
+        
+        return {
+            "is_ready": len(missing) == 0,
+            "missing": missing,
+            "warnings": warnings,
+            "registered": registered
+        }
+    
+    async def review_task_prompt(self, db: Session, task_prompt: str, task_name: str) -> Dict:
+        """task_promptの品質をAIでレビュー"""
+        try:
+            cred = credential_manager.get_default(db, "api_key", "openai")
+            if not cred:
+                # OpenAIキーがなければスキップ
+                return {"reviewed": False, "reason": "OpenAI APIキーがないためレビューをスキップ"}
+            
+            api_key = cred["data"].get("api_key")
+            
+            review_prompt = f"""以下のタスク指示内容をレビューしてください。
+
+タスク名: {task_name}
+指示内容:
+{task_prompt}
+
+以下の観点でチェックし、JSONで回答してください：
+
+1. 具体性: URLやサービス名が明記されているか
+2. 手順の明確さ: ステップバイステップで書かれているか
+3. 認証情報: ログインが必要な場合、その旨が明記されているか
+4. 完了条件: 何をもって完了とするか明確か
+
+JSON形式で回答（説明は不要）:
+```json
+{{
+    "score": 1-10の品質スコア,
+    "is_executable": true/false（このまま実行可能か）,
+    "issues": ["問題点1", "問題点2"],
+    "suggestions": ["改善案1", "改善案2"],
+    "improved_prompt": "改善されたtask_prompt（問題がある場合のみ）"
+}}
+```"""
+
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    "https://api.openai.com/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {api_key}",
+                        "Content-Type": "application/json"
+                    },
+                    json={
+                        "model": "gpt-4o-mini",  # 軽量モデルで十分
+                        "max_tokens": 1000,
+                        "messages": [{"role": "user", "content": review_prompt}]
+                    },
+                    timeout=30
+                )
+                
+                if response.status_code != 200:
+                    return {"reviewed": False, "reason": f"API Error: {response.status_code}"}
+                
+                result = response.json()
+                response_text = result["choices"][0]["message"]["content"]
+                
+                # JSONを抽出
+                json_start = response_text.find("```json")
+                json_end = response_text.find("```", json_start + 7)
+                
+                if json_start != -1 and json_end != -1:
+                    json_str = response_text[json_start + 7:json_end].strip()
+                    review_result = json.loads(json_str)
+                    review_result["reviewed"] = True
+                    return review_result
+                else:
+                    return {"reviewed": False, "reason": "レビュー結果のパースに失敗"}
+                    
+        except Exception as e:
+            logger.warning(f"task_promptレビューエラー: {e}")
+            return {"reviewed": False, "reason": str(e)}
+    
     def _build_project_context(self, project: Project, tasks: List[Task], role_groups: List[RoleGroup], triggers: List[TaskTrigger]) -> str:
         """プロジェクトのコンテキストを構築"""
         
@@ -337,6 +490,15 @@ class ProjectChatService:
             
             api_key = cred["data"].get("api_key")
             
+            # 登録済み認証情報を取得
+            all_credentials = db.query(Credential).all()
+            credential_context = "\n## 登録済みの認証情報:\n"
+            if all_credentials:
+                for cred in all_credentials:
+                    credential_context += f"- {cred.service_name}: {cred.name} ({'デフォルト' if cred.is_default else ''})\n"
+            else:
+                credential_context += "- なし（認証情報が未登録です）\n"
+            
             system_prompt = f"""あなたはプロジェクト「{project.name}」の自動化ワークフローを管理・改善するAIアシスタントです。
 
 このプロジェクトには既に自動化タスクが設定されています。
@@ -348,6 +510,20 @@ class ProjectChatService:
 {project_context}
 
 {workflow_explanation}
+
+{credential_context}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+【重要】新しいタスクを追加する場合
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+新しいタスクを作成する際は、必ず以下を確認してください：
+
+1. 具体的な作業内容（何をどこで行うか）
+2. 必要な認証情報が登録されているか
+3. ユーザーの明示的な許可
+
+勝手にタスクを作成しないでください。
 
 【あなたの役割】
 
@@ -368,7 +544,7 @@ class ProjectChatService:
             "changes": {{
                 "name": "新しい名前",
                 "description": "新しい説明",
-                "task_prompt": "新しい指示",
+                "task_prompt": "新しい指示（具体的なステップを含める）",
                 "schedule": "新しいスケジュール",
                 "is_active": true/false,
                 "role_group": "新しい役割グループ名"
@@ -377,11 +553,12 @@ class ProjectChatService:
         {{
             "type": "create_task",
             "data": {{
-                "name": "タスク名",
-                "description": "説明",
-                "task_prompt": "指示",
+                "name": "タスク名（具体的に）",
+                "description": "このタスクが何をするかの説明",
+                "task_prompt": "AIエージェントへの詳細な指示（ステップバイステップで具体的に）",
                 "role_group": "役割グループ名",
-                "schedule": "スケジュール"
+                "schedule": "スケジュール（cron形式）",
+                "execution_location": "server または local"
             }}
         }},
         {{
@@ -411,6 +588,11 @@ class ProjectChatService:
     ]
 }}
 ```
+
+【task_promptの書き方】
+task_promptは具体的なステップを含めてください：
+- 「〜にアクセスする」→「https://example.com にアクセスする」
+- 「データを取得する」→「画面上部の『レポート』ボタンをクリックし、表示されたCSVをダウンロードする」
 
 3. 質問への回答と改善提案
    - ワークフローに関する質問に答える
@@ -525,14 +707,49 @@ class ProjectChatService:
                 
                 elif action_type == "create_task":
                     data = action.get("data", {})
+                    task_prompt = data.get("task_prompt", "")
+                    task_name = data.get("name", "")
+                    
+                    # バリデーション: task_promptが十分な長さか確認
+                    if not task_prompt or len(task_prompt.strip()) < 20:
+                        results.append({
+                            "type": "create_task",
+                            "success": False,
+                            "error": "タスクの指示内容（task_prompt）が不十分です。具体的な手順を含めてください。"
+                        })
+                        continue
+                    
+                    # バリデーション: タスク名が空でないか
+                    if not task_name or len(task_name.strip()) < 2:
+                        results.append({
+                            "type": "create_task",
+                            "success": False,
+                            "error": "タスク名が設定されていません。"
+                        })
+                        continue
+                    
+                    # スケジュールのバリデーション（設定されている場合）
+                    schedule = data.get("schedule")
+                    if schedule:
+                        try:
+                            from apscheduler.triggers.cron import CronTrigger
+                            CronTrigger.from_crontab(schedule)
+                        except Exception as e:
+                            results.append({
+                                "type": "create_task",
+                                "success": False,
+                                "error": f"スケジュール形式が不正です: {schedule}。cron形式で指定してください（例: 0 9 * * *）"
+                            })
+                            continue
+                    
                     execution_location = data.get("execution_location", "server")
                     task = Task(
                         project_id=project_id,
                         user_id=user_id,
-                        name=data.get("name", "新規タスク"),
+                        name=task_name.strip(),
                         description=data.get("description"),
-                        task_prompt=data.get("task_prompt", ""),
-                        schedule=data.get("schedule"),
+                        task_prompt=task_prompt.strip(),
+                        schedule=schedule,
                         role_group=data.get("role_group", "General"),
                         execution_location=execution_location,
                         is_active=True
@@ -930,53 +1147,120 @@ JSON形式で回答してください：
                 for g in role_groups:
                     existing_context += f"- {g.name}: {g.description or '説明なし'}\n"
             
+            # 登録済み認証情報を取得
+            all_credentials = db.query(Credential).all()
+            credential_context = "\n\n## 登録済みの認証情報:\n"
+            if all_credentials:
+                for cred in all_credentials:
+                    credential_context += f"- {cred.service_name}: {cred.name} ({'デフォルト' if cred.is_default else ''})\n"
+            else:
+                credential_context += "- なし（認証情報が未登録です）\n"
+            
             system_prompt = f"""あなたはプロジェクト「{project.name}」の自動化フローを作成するAIアシスタントです。
 
 {existing_context}
+{credential_context}
 {additional_context}
 
-【重要な行動指針】
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+【最重要ルール】絶対にタスクを勝手に作成しないでください
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-1. まずしっかりヒアリングする
-   - ユーザーが何を自動化したいのか詳しく聞く
-   - 現在どのように作業しているか確認
-   - 使用するサービス、頻度、出力先などを把握
-   - 不明な点は必ず質問する
+以下の情報が全て揃うまで、JSONアクションを出力してはいけません：
 
-2. 全体像を説明する
-   - ヒアリング後、作成するタスクの全体像を説明
-   - 「合計○個のタスクを作成します」と数を伝える
-   - 各タスクの役割と連携を説明
+1. 自動化の目的と具体的な作業内容
+2. 対象サービス・サイト（URL、サービス名など）
+3. 実行頻度（毎日、毎週、手動など）
+4. 必要な認証情報の確認（下記参照）
+5. ユーザーからの明示的な作成許可（「作成して」「お願い」など）
 
-3. 最終確認を取る
-   - 全体像を説明した後「この内容で作成してよろしいですか？」と確認
-   - ユーザーが「作成してください」「お願いします」などと言ったら作成開始
-   - 勝手に作成しない
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+【認証情報の確認】必ず確認してください
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-4. 一つずつ作成する
-   - タスクは一つずつ作成
-   - 作成後「タスク○を作成しました。次のタスク○に進みますか？」と確認
-   - ユーザーの確認を得てから次へ
+タスク実行には認証情報が必要です。以下を必ず確認してください：
 
-5. Webリサーチが必要な場合
+■ Web操作（ログインが必要なサイト）の場合：
+  - サイトのログイン情報（ID/パスワード）は登録済みですか？
+  - 「認証情報」画面から事前登録が必要です
+
+■ API利用の場合：
+  - 必要なAPIキーは登録済みですか？
+  - 未登録の場合、チャットでキーを貼り付けるか、認証情報画面で登録するよう案内してください
+
+■ AIエージェント実行の場合：
+  - Anthropic APIキー（Claude用）またはOpenAI APIキーが必要
+  - デスクトップ操作にはOAGI APIキーも必要
+
+登録済みの認証情報は上記「登録済みの認証情報」セクションで確認できます。
+必要なものが不足している場合は、ユーザーに設定を促してください。
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+【会話の進め方】このステップを必ず踏んでください
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+STEP 1: ヒアリング（最低3回のやり取り）
+- 何を自動化したいですか？
+- どのサービス・サイトを使いますか？（具体的なURL）
+- どのくらいの頻度で実行しますか？
+- 現在どのように作業していますか？
+
+STEP 2: 認証情報の確認
+- 必要なAPIキーは登録されていますか？
+- サイトログイン情報は登録されていますか？
+- 不足があれば登録方法を案内
+
+STEP 3: 全体像の説明
+- 「以下のタスクを作成します」と説明
+- 各タスクの役割を説明
+- 作成するタスク数を明示
+
+STEP 4: 作成許可の確認
+- 「この内容で作成してよろしいですか？」と必ず確認
+- ユーザーが明示的に許可するまで待つ
+
+STEP 5: タスク作成（許可後のみ）
+- 1つずつ作成
+- 作成後「次に進みますか？」と確認
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+【task_promptの書き方】具体的に書いてください
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+task_prompt（AIエージェントへの指示）は以下を含む詳細なものにしてください：
+
+良い例：
+「Chromeブラウザを開いて https://example.com にアクセスする。
+ログイン画面が表示されたら、登録済みの認証情報を使ってログインする。
+ダッシュボードから「レポート」→「日次レポート」をクリック。
+表示されたデータをコピーして、Googleスプレッドシートに貼り付ける。
+スプレッドシートのURLは https://docs.google.com/... 」
+
+悪い例：
+「サイトからデータを取得する」（具体性がない）
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+【Webリサーチが必要な場合】
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```json
 {{"web_search": {{"query": "検索クエリ", "reason": "調べる理由"}}}}
 ```
 
-【タスク作成時のJSON形式】
-作成する際は以下の形式で出力：
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+【タスク作成時のJSON形式】許可を得てから出力
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```json
 {{
     "actions": [
         {{
             "type": "create_task",
             "data": {{
-                "name": "タスク名",
-                "description": "説明",
-                "task_prompt": "AIエージェントへの詳細な指示",
+                "name": "タスク名（具体的に）",
+                "description": "このタスクが何をするかの説明",
+                "task_prompt": "AIエージェントへの詳細な指示（ステップバイステップで）",
                 "role_group": "役割グループ名",
-                "schedule": "cron形式",
-                "execution_location": "server または local"
+                "schedule": "cron形式（例: 0 9 * * * = 毎日9時）または空文字",
+                "execution_location": "server（Web操作）または local（デスクトップ操作）"
             }}
         }}
     ],
@@ -992,7 +1276,8 @@ JSON形式で回答してください：
 - 絵文字は使わない
 - 見出し記号（#や---）は使わない
 - 箇条書きはシンプルに
-- 日本語で回答"""
+- 日本語で回答
+- 丁寧だが堅苦しくない"""
 
             messages = [{"role": "system", "content": system_prompt}]
             messages.extend([{"role": msg["role"], "content": msg["content"]} for msg in chat_history])

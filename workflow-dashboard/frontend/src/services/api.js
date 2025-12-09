@@ -104,7 +104,26 @@ export const projectsApi = {
     return api.post(`/projects/${projectId}/analyze-video`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
-  }
+  },
+  // 認証情報チェック
+  checkCredentials: (projectId, taskPrompt, executionLocation = 'server') =>
+    api.post(`/projects/${projectId}/check-credentials`, {
+      task_prompt: taskPrompt,
+      execution_location: executionLocation
+    }),
+  // task_promptのAIレビュー
+  reviewTaskPrompt: (projectId, taskPrompt, taskName) =>
+    api.post(`/projects/${projectId}/review-task-prompt`, {
+      task_prompt: taskPrompt,
+      task_name: taskName
+    }),
+  // 検証付きタスク作成
+  validateAndCreateTask: (projectId, taskData, skipReview = false, autoRunTest = false) =>
+    api.post(`/projects/${projectId}/validate-and-create-task`, {
+      task_data: taskData,
+      skip_review: skipReview,
+      auto_run_test: autoRunTest
+    })
 }
 
 // Tasks API

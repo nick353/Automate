@@ -23,10 +23,15 @@ import {
   Play,
   Clock,
   Settings,
-  Image
+  Image,
+  RotateCcw,
+  Shield,
+  FlaskConical,
+  AlertTriangle
 } from 'lucide-react'
 import { projectsApi, tasksApi } from '../services/api'
 import useLanguageStore from '../stores/languageStore'
+import useProjectChatStore from '../stores/projectChatStore'
 
 export default function ProjectChatPanel({
   project,
@@ -37,21 +42,81 @@ export default function ProjectChatPanel({
   const { t } = useLanguageStore()
   const chatEndRef = useRef(null)
   
-  // ローカルState（コンポーネント内で管理）
-  const [chatHistory, setChatHistory] = useState([{
+  // ストアからチャット履歴を取得
+  const {
+    getChatHistory,
+    setChatHistory: setStoreChatHistory,
+    getVideoAnalysis,
+    setVideoAnalysis: setStoreVideoAnalysis,
+    getWebResearchResults,
+    setWebResearchResults: setStoreWebResearchResults,
+    getCreatedTasks,
+    addCreatedTasks,
+    clearChatHistory
+  } = useProjectChatStore()
+  
+  // 初期メッセージを生成
+  const getInitialMessage = () => ({
     role: 'assistant',
-    content: `こんにちは！プロジェクト「${project.name}」の自動化フロー作成をお手伝いします。\n\nまず、どんな作業を自動化したいか教えてください。\n\n例えば：\n- 毎日のデータ収集・レポート作成\n- SNSへの投稿\n- メールの自動返信\n- ファイルの整理・バックアップ\n\n現在どのように作業しているかも教えていただけると、最適な自動化フローを提案できます。`
-  }])
+    content: `こんにちは！プロジェクト「${project.name}」の自動化フロー作成をお手伝いします。
+
+確実に動くタスクを作成するために、いくつか質問させてください。
+
+まず教えてください：
+
+1. どんな作業を自動化したいですか？
+   （例：毎日のデータ収集、SNS投稿、メール処理など）
+
+2. どのサービスやサイトを使いますか？
+   （例：Twitter、Googleスプレッドシート、特定のWebサイトなど）
+
+3. どのくらいの頻度で実行しますか？
+   （例：毎日9時、週1回、手動で実行など）
+
+具体的に教えていただくほど、失敗しにくいタスクを作成できます。`
+  })
+  
+  // ストアから履歴を取得、なければ初期メッセージを使用
+  const storedHistory = getChatHistory(project.id)
+  const initialHistory = storedHistory.length > 0 ? storedHistory : [getInitialMessage()]
+  
+  // ローカルState
+  const [chatHistory, setChatHistory] = useState(initialHistory)
   const [chatInput, setChatInput] = useState('')
   const [isChatLoading, setIsChatLoading] = useState(false)
   const [pendingActions, setPendingActions] = useState(null)
   const [isExpanded, setIsExpanded] = useState(false)
-  const [videoAnalysis, setVideoAnalysis] = useState(null)
-  const [webResearchResults, setWebResearchResults] = useState(null)
+  const [videoAnalysis, setVideoAnalysis] = useState(getVideoAnalysis(project.id))
+  const [webResearchResults, setWebResearchResults] = useState(getWebResearchResults(project.id))
   
   // 作成状態の管理
   const [creatingInfo, setCreatingInfo] = useState(null) // { current: 1, total: 3, task_name: "..." }
-  const [createdTasks, setCreatedTasks] = useState([]) // 作成されたタスクのリスト
+  const [createdTasks, setCreatedTasks] = useState(getCreatedTasks(project.id)) // 作成されたタスクのリスト
+  
+  // 検証状態の管理
+  const [validationResult, setValidationResult] = useState(null) // 検証結果
+  const [showTestOption, setShowTestOption] = useState(false) // テスト実行オプション表示
+  
+  // チャット履歴が変更されたらストアに保存
+  useEffect(() => {
+    if (chatHistory.length > 0) {
+      setStoreChatHistory(project.id, chatHistory)
+    }
+  }, [chatHistory, project.id, setStoreChatHistory])
+  
+  // 動画分析結果が変更されたらストアに保存
+  useEffect(() => {
+    if (videoAnalysis) {
+      setStoreVideoAnalysis(project.id, videoAnalysis)
+    }
+  }, [videoAnalysis, project.id, setStoreVideoAnalysis])
+  
+  // Webリサーチ結果が変更されたらストアに保存
+  useEffect(() => {
+    if (webResearchResults) {
+      setStoreWebResearchResults(project.id, webResearchResults)
+    }
+  }, [webResearchResults, project.id, setStoreWebResearchResults])
   
   // 添付ファイルのState
   const [attachedFile, setAttachedFile] = useState(null) // { file: File, type: 'image'|'video', preview: string }
@@ -255,10 +320,111 @@ export default function ProjectChatPanel({
     setIsChatLoading(false)
   }
   
-  const handleExecuteActions = async () => {
+  // 事前検証（認証情報チェック + AIレビュー）
+  const handlePreValidate = async () => {
     if (!pendingActions) return
     
     setIsChatLoading(true)
+    setValidationResult(null)
+    
+    const actions = pendingActions.actions || pendingActions
+    const createActions = actions.filter(a => a.type === 'create_task')
+    
+    if (createActions.length === 0) {
+      // タスク作成がない場合は通常実行
+      handleExecuteActions(false, false)
+      return
+    }
+    
+    try {
+      const taskData = createActions[0].data
+      
+      // 1. 認証情報チェック
+      const credCheck = await projectsApi.checkCredentials(
+        project.id,
+        taskData.task_prompt || '',
+        taskData.execution_location || 'server'
+      )
+      
+      // 2. AIレビュー
+      const review = await projectsApi.reviewTaskPrompt(
+        project.id,
+        taskData.task_prompt || '',
+        taskData.name || ''
+      )
+      
+      const result = {
+        credentials: credCheck.data,
+        review: review.data
+      }
+      setValidationResult(result)
+      
+      // 結果をチャットに表示
+      let validationMessage = '【タスク検証結果】\n\n'
+      
+      // 認証情報
+      if (result.credentials.registered?.length > 0) {
+        validationMessage += `✓ 登録済み認証情報: ${result.credentials.registered.join(', ')}\n`
+      }
+      if (result.credentials.missing?.length > 0) {
+        validationMessage += `✗ 不足: ${result.credentials.missing.map(m => m.message).join('\n  ')}\n`
+      }
+      if (result.credentials.warnings?.length > 0) {
+        validationMessage += `⚠ 注意: ${result.credentials.warnings.map(w => w.message).join('\n  ')}\n`
+      }
+      
+      validationMessage += '\n'
+      
+      // AIレビュー
+      if (result.review.reviewed) {
+        validationMessage += `【AI品質レビュー】\n`
+        validationMessage += `スコア: ${result.review.score}/10\n`
+        validationMessage += `実行可能: ${result.review.is_executable ? 'はい' : 'いいえ'}\n`
+        
+        if (result.review.issues?.length > 0) {
+          validationMessage += `問題点:\n${result.review.issues.map(i => `  - ${i}`).join('\n')}\n`
+        }
+        if (result.review.suggestions?.length > 0) {
+          validationMessage += `改善案:\n${result.review.suggestions.map(s => `  - ${s}`).join('\n')}\n`
+        }
+      }
+      
+      // 検証結果に基づいて推奨アクションを表示
+      const isReady = result.credentials.is_ready && 
+                      (!result.review.reviewed || result.review.score >= 5)
+      
+      if (isReady) {
+        validationMessage += '\n検証OK！「作成」または「テスト実行付きで作成」を選択してください。'
+        setShowTestOption(true)
+      } else {
+        validationMessage += '\n問題があります。内容を修正してから再度お試しください。'
+        
+        // 改善されたプロンプトがあれば提案
+        if (result.review.improved_prompt) {
+          validationMessage += `\n\n【改善案】\n${result.review.improved_prompt}`
+        }
+      }
+      
+      setChatHistory(prev => [...prev, {
+        role: 'assistant',
+        content: validationMessage
+      }])
+      
+    } catch (error) {
+      setChatHistory(prev => [...prev, {
+        role: 'assistant',
+        content: `検証中にエラーが発生しました: ${error.message}`
+      }])
+    }
+    
+    setIsChatLoading(false)
+  }
+  
+  const handleExecuteActions = async (skipReview = false, autoRunTest = false) => {
+    if (!pendingActions) return
+    
+    setIsChatLoading(true)
+    setShowTestOption(false)
     
     // 作成情報があれば設定
     if (pendingActions.creating_info) {
@@ -266,15 +432,90 @@ export default function ProjectChatPanel({
     }
     
     try {
-      const response = await projectsApi.executeActions(project.id, pendingActions.actions || pendingActions)
+      const actions = pendingActions.actions || pendingActions
+      const createActions = actions.filter(a => a.type === 'create_task')
+      
+      // タスク作成がある場合は検証付き作成APIを使用
+      if (createActions.length > 0 && !skipReview) {
+        const taskData = createActions[0].data
+        const response = await projectsApi.validateAndCreateTask(
+          project.id,
+          taskData,
+          true, // skipReview（既に検証済み）
+          autoRunTest
+        )
+        
+        // 即座にタスクボードを更新
+        onRefresh()
+        
+        if (!response.data.success) {
+          setChatHistory(prev => [...prev, {
+            role: 'assistant',
+            content: `タスク作成に失敗しました: ${response.data.error}\n\n${response.data.suggestions?.join('\n') || ''}`
+          }])
+          setPendingActions(null)
+          setCreatingInfo(null)
+          setValidationResult(null)
+          setIsChatLoading(false)
+          return
+        }
+        
+        const task = response.data.task
+        const createdTaskInfo = [task]
+        setCreatedTasks(prev => [...prev, ...createdTaskInfo])
+        addCreatedTasks(project.id, createdTaskInfo)
+        
+        let successMessage = `タスクを作成しました！\n\n`
+        successMessage += `【作成されたタスク】\n`
+        successMessage += `名前: ${task.name}\n`
+        successMessage += `説明: ${task.description || 'なし'}\n`
+        successMessage += `実行場所: ${task.execution_location === 'server' ? 'サーバー' : 'ローカル'}\n`
+        successMessage += `スケジュール: ${task.schedule || '手動実行'}\n\n`
+        
+        if (autoRunTest && response.data.validation?.test_execution) {
+          successMessage += `テスト実行を開始しました（実行ID: ${response.data.validation.test_execution.execution_id}）\n`
+          successMessage += `履歴画面で進捗を確認できます。`
+        }
+        
+        setChatHistory(prev => [...prev, {
+          role: 'assistant',
+          content: successMessage,
+          createdTasks: createdTaskInfo
+        }])
+        
+        setPendingActions(null)
+        setCreatingInfo(null)
+        setValidationResult(null)
+        setIsChatLoading(false)
+        return
+      }
+      
+      // タスク作成以外のアクション（編集、削除など）
+      const response = await projectsApi.executeActions(project.id, actions)
       
       // 即座にタスクボードを更新
       onRefresh()
+      
+      // バリデーションエラーのチェック
+      const failedResults = (response.data.results || []).filter(r => !r.success)
+      if (failedResults.length > 0) {
+        const errorMessages = failedResults.map(r => `- ${r.error || '不明なエラー'}`).join('\n')
+        setChatHistory(prev => [...prev, {
+          role: 'assistant',
+          content: `一部のアクションでエラーが発生しました:\n\n${errorMessages}\n\n内容を確認して、再度お試しください。`
+        }])
+        setPendingActions(null)
+        setCreatingInfo(null)
+        setValidationResult(null)
+        setIsChatLoading(false)
+        return
+      }
       
       // 作成されたタスクの情報を取得
       const createdTaskInfo = response.data.created_tasks || []
       if (createdTaskInfo.length > 0) {
         setCreatedTasks(prev => [...prev, ...createdTaskInfo])
+        addCreatedTasks(project.id, createdTaskInfo) // ストアにも保存
       }
       
       // 成功メッセージを追加（タスク詳細付き）
@@ -310,12 +551,14 @@ export default function ProjectChatPanel({
       
       setPendingActions(null)
       setCreatingInfo(null)
+      setValidationResult(null)
     } catch (error) {
       setChatHistory(prev => [...prev, {
         role: 'assistant',
         content: `アクションの実行に失敗しました: ${error.message}`
       }])
       setCreatingInfo(null)
+      setValidationResult(null)
     }
     setIsChatLoading(false)
   }
@@ -407,6 +650,22 @@ export default function ProjectChatPanel({
           <h3 className="font-semibold text-foreground">{t('taskBoard.aiAssistant')}</h3>
           <p className="text-xs text-muted-foreground truncate">{project.name}</p>
         </div>
+        <button
+          onClick={() => {
+            if (confirm('チャット履歴をクリアしますか？')) {
+              clearChatHistory(project.id)
+              setChatHistory([getInitialMessage()])
+              setVideoAnalysis(null)
+              setWebResearchResults(null)
+              setCreatedTasks([])
+              setPendingActions(null)
+            }
+          }}
+          className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground"
+          title="履歴をクリア"
+        >
+          <RotateCcw className="w-4 h-4" />
+        </button>
         <button
           onClick={() => setIsExpanded(!isExpanded)}
           className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground"
@@ -647,31 +906,106 @@ export default function ProjectChatPanel({
         )}
         
         {/* アクション実行ボタン */}
-        {pendingActions && pendingActions.length > 0 && (
+        {pendingActions && (pendingActions.length > 0 || pendingActions.actions?.length > 0) && (
           <div className="bg-gradient-to-r from-primary/10 to-purple-500/10 border border-primary/30 rounded-xl p-4">
             <div className="flex items-center gap-2 mb-3">
               <AlertCircle className="w-5 h-5 text-primary" />
               <span className="font-semibold text-foreground">{t('taskBoard.confirmActions')}</span>
             </div>
-            <p className="text-sm text-muted-foreground mb-4">
-              {t('taskBoard.actionsWillExecute').replace('{count}', pendingActions.length)}
+            <p className="text-sm text-muted-foreground mb-3">
+              {t('taskBoard.actionsWillExecute').replace('{count}', pendingActions.length || pendingActions.actions?.length || 0)}
             </p>
-            <div className="flex gap-2">
-              <button
-                onClick={handleExecuteActions}
-                disabled={isChatLoading}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50"
-              >
-                <CheckCircle className="w-4 h-4" />
-                {t('taskBoard.executeActions')}
-              </button>
-              <button
-                onClick={() => setPendingActions(null)}
-                className="px-4 py-2.5 border border-zinc-300 dark:border-zinc-700 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800"
-              >
-                {t('common.cancel')}
-              </button>
-            </div>
+            
+            {/* 検証結果がある場合の表示 */}
+            {validationResult && (
+              <div className="mb-4 p-3 bg-white/50 dark:bg-zinc-800/50 rounded-lg text-sm">
+                <div className="flex items-center gap-2 mb-2">
+                  {validationResult.credentials?.is_ready ? (
+                    <CheckCircle className="w-4 h-4 text-emerald-500" />
+                  ) : (
+                    <AlertTriangle className="w-4 h-4 text-amber-500" />
+                  )}
+                  <span className="font-medium">
+                    認証情報: {validationResult.credentials?.is_ready ? '準備OK' : '不足あり'}
+                  </span>
+                </div>
+                {validationResult.review?.reviewed && (
+                  <div className="flex items-center gap-2">
+                    {validationResult.review.score >= 5 ? (
+                      <CheckCircle className="w-4 h-4 text-emerald-500" />
+                    ) : (
+                      <AlertTriangle className="w-4 h-4 text-amber-500" />
+                    )}
+                    <span className="font-medium">
+                      品質スコア: {validationResult.review.score}/10
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {/* ボタン群 */}
+            {!showTestOption ? (
+              <div className="flex gap-2 flex-wrap">
+                <button
+                  onClick={handlePreValidate}
+                  disabled={isChatLoading}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-amber-500 text-white font-medium rounded-lg hover:bg-amber-600 disabled:opacity-50"
+                >
+                  <Shield className="w-4 h-4" />
+                  検証する
+                </button>
+                <button
+                  onClick={() => handleExecuteActions(true, false)}
+                  disabled={isChatLoading}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  作成する
+                </button>
+                <button
+                  onClick={() => {
+                    setPendingActions(null)
+                    setValidationResult(null)
+                    setShowTestOption(false)
+                  }}
+                  className="px-4 py-2.5 border border-zinc-300 dark:border-zinc-700 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                >
+                  {t('common.cancel')}
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleExecuteActions(true, false)}
+                    disabled={isChatLoading}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50"
+                  >
+                    <CheckCircle className="w-4 h-4" />
+                    作成のみ
+                  </button>
+                  <button
+                    onClick={() => handleExecuteActions(true, true)}
+                    disabled={isChatLoading}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-500 text-white font-medium rounded-lg hover:bg-emerald-600 disabled:opacity-50"
+                  >
+                    <FlaskConical className="w-4 h-4" />
+                    テスト実行付きで作成
+                  </button>
+                </div>
+                <button
+                  onClick={() => {
+                    setPendingActions(null)
+                    setValidationResult(null)
+                    setShowTestOption(false)
+                  }}
+                  className="w-full px-4 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-sm"
+                >
+                  {t('common.cancel')}
+                </button>
+              </div>
+            )}
           </div>
         )}
         

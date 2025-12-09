@@ -1,6 +1,6 @@
 """プロジェクト管理 API"""
 from typing import List, Optional, Any
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, BackgroundTasks
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
@@ -532,3 +532,178 @@ async def analyze_video_for_project(
         pass
     
     return result
+
+
+# ==================== タスク検証・テストAPI ====================
+
+class CheckCredentialsRequest(BaseModel):
+    """認証情報チェックリクエスト"""
+    task_prompt: str
+    execution_location: str = "server"
+
+
+class ReviewTaskPromptRequest(BaseModel):
+    """task_promptレビューリクエスト"""
+    task_prompt: str
+    task_name: str
+
+
+class ValidateAndCreateTaskRequest(BaseModel):
+    """検証付きタスク作成リクエスト"""
+    task_data: dict
+    skip_review: bool = False
+    auto_run_test: bool = False
+
+
+@router.post("/{project_id}/check-credentials")
+async def check_credentials(
+    project_id: int,
+    request: CheckCredentialsRequest,
+    db: Session = Depends(get_db),
+    current_user: Optional[UserInfo] = Depends(get_current_user)
+):
+    """タスク実行に必要な認証情報をチェック"""
+    result = project_chat_service.check_required_credentials(
+        db,
+        request.task_prompt,
+        request.execution_location
+    )
+    return result
+
+
+@router.post("/{project_id}/review-task-prompt")
+async def review_task_prompt(
+    project_id: int,
+    request: ReviewTaskPromptRequest,
+    db: Session = Depends(get_db),
+    current_user: Optional[UserInfo] = Depends(get_current_user)
+):
+    """task_promptの品質をAIでレビュー"""
+    result = await project_chat_service.review_task_prompt(
+        db,
+        request.task_prompt,
+        request.task_name
+    )
+    return result
+
+
+@router.post("/{project_id}/validate-and-create-task")
+async def validate_and_create_task(
+    project_id: int,
+    request: ValidateAndCreateTaskRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: Optional[UserInfo] = Depends(get_current_user)
+):
+    """タスクを検証してから作成（オプションでテスト実行）"""
+    from app.services.agent import run_task_with_live_view
+    from app.models import Execution
+    from datetime import datetime
+    
+    user_id = get_user_filter(current_user)
+    task_data = request.task_data
+    
+    # プロジェクトの存在確認
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="プロジェクトが見つかりません")
+    
+    validation_results = {
+        "credential_check": None,
+        "review": None,
+        "task_created": False,
+        "test_execution": None
+    }
+    
+    task_prompt = task_data.get("task_prompt", "")
+    task_name = task_data.get("name", "")
+    execution_location = task_data.get("execution_location", "server")
+    
+    # 1. 認証情報チェック
+    cred_check = project_chat_service.check_required_credentials(
+        db, task_prompt, execution_location
+    )
+    validation_results["credential_check"] = cred_check
+    
+    if not cred_check["is_ready"]:
+        return {
+            "success": False,
+            "error": "必要な認証情報が不足しています",
+            "validation": validation_results
+        }
+    
+    # 2. AIレビュー（スキップしない場合）
+    if not request.skip_review:
+        review = await project_chat_service.review_task_prompt(db, task_prompt, task_name)
+        validation_results["review"] = review
+        
+        if review.get("reviewed") and review.get("score", 10) < 5:
+            return {
+                "success": False,
+                "error": "タスク指示の品質が低いため、改善が必要です",
+                "validation": validation_results,
+                "suggestions": review.get("suggestions", []),
+                "improved_prompt": review.get("improved_prompt")
+            }
+    
+    # 3. タスク作成
+    try:
+        task = Task(
+            project_id=project_id,
+            user_id=user_id,
+            name=task_name,
+            description=task_data.get("description"),
+            task_prompt=task_prompt,
+            schedule=task_data.get("schedule"),
+            role_group=task_data.get("role_group", "General"),
+            execution_location=execution_location,
+            is_active=True
+        )
+        db.add(task)
+        db.commit()
+        db.refresh(task)
+        validation_results["task_created"] = True
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"タスク作成に失敗: {str(e)}",
+            "validation": validation_results
+        }
+    
+    # 4. テスト実行（オプション）
+    if request.auto_run_test:
+        try:
+            execution = Execution(
+                task_id=task.id,
+                status="pending",
+                triggered_by="test",
+                started_at=datetime.utcnow()
+            )
+            db.add(execution)
+            db.commit()
+            db.refresh(execution)
+            
+            # バックグラウンドで実行
+            background_tasks.add_task(run_task_with_live_view, task.id, execution.id)
+            
+            validation_results["test_execution"] = {
+                "execution_id": execution.id,
+                "status": "started"
+            }
+        except Exception as e:
+            validation_results["test_execution"] = {
+                "error": str(e)
+            }
+    
+    return {
+        "success": True,
+        "task": {
+            "id": task.id,
+            "name": task.name,
+            "description": task.description,
+            "task_prompt": task.task_prompt,
+            "schedule": task.schedule,
+            "execution_location": task.execution_location
+        },
+        "validation": validation_results
+    }
