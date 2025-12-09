@@ -36,7 +36,9 @@ import {
   Minimize2,
   Video,
   Search,
-  Globe
+  Globe,
+  Mic,
+  MicOff
 } from 'lucide-react'
 import useTaskStore from '../stores/taskStore'
 import useLanguageStore from '../stores/languageStore'
@@ -111,10 +113,102 @@ export default function TaskBoard() {
   const [taskPendingActions, setTaskPendingActions] = useState(null)
   const chatEndRef = useRef(null)
   const taskChatEndRef = useRef(null)
+  
+  // 音声入力のState
+  const [isListening, setIsListening] = useState(false)
+  const [isTaskChatListening, setIsTaskChatListening] = useState(false)
+  const [speechSupported, setSpeechSupported] = useState(false)
+  const recognitionRef = useRef(null)
+  const taskRecognitionRef = useRef(null)
 
   useEffect(() => {
     fetchBoardData()
   }, [fetchBoardData])
+
+  // 音声認識のセットアップ
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+    if (SpeechRecognition) {
+      setSpeechSupported(true)
+      
+      // プロジェクトチャット用の音声認識
+      const recognition = new SpeechRecognition()
+      recognition.continuous = false
+      recognition.interimResults = true
+      recognition.lang = 'ja-JP'
+
+      recognition.onresult = (event) => {
+        const transcript = Array.from(event.results)
+          .map(result => result[0].transcript)
+          .join('')
+        
+        if (event.results[event.results.length - 1].isFinal) {
+          setChatInput(prev => prev + transcript)
+        }
+      }
+
+      recognition.onerror = () => setIsListening(false)
+      recognition.onend = () => setIsListening(false)
+      recognitionRef.current = recognition
+      
+      // タスクチャット用の音声認識
+      const taskRecognition = new SpeechRecognition()
+      taskRecognition.continuous = false
+      taskRecognition.interimResults = true
+      taskRecognition.lang = 'ja-JP'
+
+      taskRecognition.onresult = (event) => {
+        const transcript = Array.from(event.results)
+          .map(result => result[0].transcript)
+          .join('')
+        
+        if (event.results[event.results.length - 1].isFinal) {
+          setTaskChatInput(prev => prev + transcript)
+        }
+      }
+
+      taskRecognition.onerror = () => setIsTaskChatListening(false)
+      taskRecognition.onend = () => setIsTaskChatListening(false)
+      taskRecognitionRef.current = taskRecognition
+    }
+
+    return () => {
+      if (recognitionRef.current) recognitionRef.current.abort()
+      if (taskRecognitionRef.current) taskRecognitionRef.current.abort()
+    }
+  }, [])
+
+  // 音声入力の開始/停止（プロジェクトチャット用）
+  const toggleListening = () => {
+    if (!recognitionRef.current) return
+
+    if (isListening) {
+      recognitionRef.current.stop()
+      setIsListening(false)
+    } else {
+      const langMap = { ja: 'ja-JP', en: 'en-US', zh: 'zh-CN' }
+      const currentLang = localStorage.getItem('language') || 'ja'
+      recognitionRef.current.lang = langMap[currentLang] || 'ja-JP'
+      recognitionRef.current.start()
+      setIsListening(true)
+    }
+  }
+
+  // 音声入力の開始/停止（タスクチャット用）
+  const toggleTaskChatListening = () => {
+    if (!taskRecognitionRef.current) return
+
+    if (isTaskChatListening) {
+      taskRecognitionRef.current.stop()
+      setIsTaskChatListening(false)
+    } else {
+      const langMap = { ja: 'ja-JP', en: 'en-US', zh: 'zh-CN' }
+      const currentLang = localStorage.getItem('language') || 'ja'
+      taskRecognitionRef.current.lang = langMap[currentLang] || 'ja-JP'
+      taskRecognitionRef.current.start()
+      setIsTaskChatListening(true)
+    }
+  }
 
   // 全プロジェクトを展開状態に初期化
   useEffect(() => {
@@ -1394,10 +1488,34 @@ export default function TaskBoard() {
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
-              placeholder={t('taskBoard.chatPlaceholder')}
+              placeholder={isListening ? t('wizard.voiceListening') : t('taskBoard.chatPlaceholder')}
               disabled={isChatLoading}
-              className="flex-1 px-4 py-3 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all disabled:opacity-50"
+              className={`flex-1 px-4 py-3 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all disabled:opacity-50 ${
+                isListening ? 'border-red-500/50 bg-red-500/5' : ''
+              }`}
             />
+            {/* 音声入力ボタン */}
+            {speechSupported ? (
+              <button
+                onClick={toggleListening}
+                disabled={isChatLoading}
+                className={`px-3 py-3 rounded-xl transition-colors ${
+                  isListening
+                    ? 'bg-red-500/20 text-red-500 hover:bg-red-500/30 animate-pulse'
+                    : 'bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 hover:bg-purple-200 dark:hover:bg-purple-500/30'
+                }`}
+                title={isListening ? t('wizard.voiceStop') : `${t('wizard.voiceStart')}\n${t('wizard.voiceMacHint')}`}
+              >
+                {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+              </button>
+            ) : (
+              <div 
+                className="px-3 py-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-400 cursor-help"
+                title={t('wizard.voiceNotSupported')}
+              >
+                <Mic className="w-5 h-5" />
+              </div>
+            )}
             <button
               onClick={handleSendMessage}
               disabled={!chatInput.trim() || isChatLoading}
@@ -1406,6 +1524,18 @@ export default function TaskBoard() {
               <Send className="w-5 h-5" />
             </button>
           </div>
+          {/* 音声入力のヒント */}
+          {isListening ? (
+            <div className="mt-2 text-xs text-red-500 animate-pulse flex items-center gap-2">
+              <span className="w-2 h-2 bg-red-500 rounded-full" />
+              {t('wizard.voiceListeningHint')}
+            </div>
+          ) : (
+            <div className="mt-2 text-xs text-muted-foreground flex items-center gap-2">
+              <span className="opacity-60">💡</span>
+              {t('wizard.voiceMacHint')}
+            </div>
+          )}
         </div>
       </motion.div>
     )
@@ -1631,10 +1761,34 @@ export default function TaskBoard() {
               value={taskChatInput}
               onChange={(e) => setTaskChatInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleTaskChatSend()}
-              placeholder={t('taskBoard.taskChatPlaceholder')}
+              placeholder={isTaskChatListening ? t('wizard.voiceListening') : t('taskBoard.taskChatPlaceholder')}
               disabled={taskChatLoading}
-              className="flex-1 px-4 py-3 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 outline-none transition-all disabled:opacity-50"
+              className={`flex-1 px-4 py-3 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 outline-none transition-all disabled:opacity-50 ${
+                isTaskChatListening ? 'border-red-500/50 bg-red-500/5' : ''
+              }`}
             />
+            {/* 音声入力ボタン */}
+            {speechSupported ? (
+              <button
+                onClick={toggleTaskChatListening}
+                disabled={taskChatLoading}
+                className={`px-3 py-3 rounded-xl transition-colors ${
+                  isTaskChatListening
+                    ? 'bg-red-500/20 text-red-500 hover:bg-red-500/30 animate-pulse'
+                    : 'bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 hover:bg-purple-200 dark:hover:bg-purple-500/30'
+                }`}
+                title={isTaskChatListening ? t('wizard.voiceStop') : `${t('wizard.voiceStart')}\n${t('wizard.voiceMacHint')}`}
+              >
+                {isTaskChatListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+              </button>
+            ) : (
+              <div 
+                className="px-3 py-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-400 cursor-help"
+                title={t('wizard.voiceNotSupported')}
+              >
+                <Mic className="w-5 h-5" />
+              </div>
+            )}
             <button
               onClick={handleTaskChatSend}
               disabled={!taskChatInput.trim() || taskChatLoading}
@@ -1643,6 +1797,18 @@ export default function TaskBoard() {
               <Send className="w-5 h-5" />
             </button>
           </div>
+          {/* 音声入力のヒント */}
+          {isTaskChatListening ? (
+            <div className="mt-2 text-xs text-red-500 animate-pulse flex items-center gap-2">
+              <span className="w-2 h-2 bg-red-500 rounded-full" />
+              {t('wizard.voiceListeningHint')}
+            </div>
+          ) : (
+            <div className="mt-2 text-xs text-muted-foreground flex items-center gap-2">
+              <span className="opacity-60">💡</span>
+              {t('wizard.voiceMacHint')}
+            </div>
+          )}
         </div>
       </motion.div>
     )

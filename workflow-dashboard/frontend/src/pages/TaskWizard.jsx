@@ -22,7 +22,9 @@ import {
   Globe,
   Code,
   LayoutGrid,
-  MonitorPlay
+  MonitorPlay,
+  Mic,
+  MicOff
 } from 'lucide-react'
 import { wizardApi, tasksApi } from '../services/api'
 import { cn } from '../utils/cn'
@@ -251,6 +253,11 @@ export default function TaskWizard() {
   const [showOnboarding, setShowOnboarding] = useState(true)
   const [showTemplateLibrary, setShowTemplateLibrary] = useState(false)
   const [showTrialRun, setShowTrialRun] = useState(false)
+  
+  // 音声入力のState
+  const [isListening, setIsListening] = useState(false)
+  const [speechSupported, setSpeechSupported] = useState(false)
+  const recognitionRef = useRef(null)
 
   // チャットを最下部にスクロール
   useEffect(() => {
@@ -258,6 +265,77 @@ export default function TaskWizard() {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight
     }
   }, [messages])
+
+  // 音声認識のセットアップ
+  useEffect(() => {
+    // Web Speech APIのサポートチェック
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+    if (SpeechRecognition) {
+      setSpeechSupported(true)
+      const recognition = new SpeechRecognition()
+      recognition.continuous = false
+      recognition.interimResults = true
+      recognition.lang = 'ja-JP' // デフォルトは日本語
+
+      recognition.onresult = (event) => {
+        const transcript = Array.from(event.results)
+          .map(result => result[0].transcript)
+          .join('')
+        
+        setInputMessage(prev => {
+          // 最終結果の場合のみ追加（interim resultsは上書き）
+          if (event.results[event.results.length - 1].isFinal) {
+            return prev + transcript
+          }
+          // interim results用の一時表示（最後のスペース以降を置換）
+          const lastSpaceIndex = prev.lastIndexOf(' ')
+          if (lastSpaceIndex === -1) {
+            return transcript
+          }
+          return prev.substring(0, lastSpaceIndex + 1) + transcript
+        })
+      }
+
+      recognition.onerror = (event) => {
+        console.error('Speech recognition error:', event.error)
+        setIsListening(false)
+      }
+
+      recognition.onend = () => {
+        setIsListening(false)
+      }
+
+      recognitionRef.current = recognition
+    }
+
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.abort()
+      }
+    }
+  }, [])
+
+  // 音声入力の開始/停止
+  const toggleListening = () => {
+    if (!recognitionRef.current) return
+
+    if (isListening) {
+      recognitionRef.current.stop()
+      setIsListening(false)
+    } else {
+      // 言語設定を取得（日本語/英語/中国語に対応）
+      const langMap = {
+        ja: 'ja-JP',
+        en: 'en-US',
+        zh: 'zh-CN'
+      }
+      const currentLang = localStorage.getItem('language') || 'ja'
+      recognitionRef.current.lang = langMap[currentLang] || 'ja-JP'
+      
+      recognitionRef.current.start()
+      setIsListening(true)
+    }
+  }
 
   // チャットセッションを開始
   const startChatSession = async (initialMessage = null) => {
@@ -655,10 +733,40 @@ export default function TaskWizard() {
                   value={inputMessage}
                   onChange={(e) => setInputMessage(e.target.value)}
                   onKeyPress={handleKeyPress}
-                  placeholder={t('wizard.enterInstructions')}
+                  placeholder={isListening ? t('wizard.voiceListening') : t('wizard.enterInstructions')}
                   rows={1}
-                  className="flex-1 input resize-none min-h-[48px] max-h-[120px] font-mono text-sm bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 focus:border-primary/60"
+                  className={cn(
+                    "flex-1 input resize-none min-h-[48px] max-h-[120px] font-mono text-sm bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 focus:border-primary/60",
+                    isListening && "border-red-500/50 bg-red-500/5"
+                  )}
                 />
+                {/* 音声入力ボタン */}
+                {speechSupported ? (
+                  <button
+                    onClick={toggleListening}
+                    className={cn(
+                      "w-12 h-12 rounded-sm border flex items-center justify-center transition-all",
+                      isListening
+                        ? "bg-red-500/20 border-red-500/50 text-red-500 hover:bg-red-500/30 animate-pulse"
+                        : "bg-secondary/20 border-secondary/50 text-secondary hover:bg-secondary/30 hover:shadow-[0_0_10px_rgba(168,85,247,0.3)]"
+                    )}
+                    title={isListening ? t('wizard.voiceStop') : `${t('wizard.voiceStart')}\n${t('wizard.voiceMacHint')}`}
+                  >
+                    {isListening ? (
+                      <MicOff className="w-5 h-5" />
+                    ) : (
+                      <Mic className="w-5 h-5" />
+                    )}
+                  </button>
+                ) : (
+                  /* Mac音声入力のみ対応の案内 */
+                  <div 
+                    className="w-12 h-12 rounded-sm border border-zinc-300 dark:border-zinc-600 flex items-center justify-center text-zinc-400 cursor-help"
+                    title={t('wizard.voiceNotSupported')}
+                  >
+                    <Mic className="w-5 h-5" />
+                  </div>
+                )}
                 <button
                   onClick={sendMessage}
                   disabled={!inputMessage.trim() || isSending}
@@ -667,6 +775,18 @@ export default function TaskWizard() {
                   <Send className="w-5 h-5" />
                 </button>
               </div>
+              {/* 音声入力のヒント */}
+              {isListening ? (
+                <div className="mt-2 text-xs text-red-500 font-mono animate-pulse flex items-center gap-2">
+                  <span className="w-2 h-2 bg-red-500 rounded-full" />
+                  {t('wizard.voiceListeningHint')}
+                </div>
+              ) : (
+                <div className="mt-2 text-xs text-muted-foreground font-mono flex items-center gap-2">
+                  <span className="opacity-60">💡</span>
+                  {t('wizard.voiceMacHint')}
+                </div>
+              )}
             </div>
           )}
         </motion.div>
