@@ -720,10 +720,10 @@ export default function TaskWizard() {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="flex flex-col h-[600px] glass-card rounded-lg overflow-hidden"
+          className="flex flex-col h-[calc(100dvh-140px)] min-h-[500px] glass-card rounded-lg overflow-hidden border border-primary/20 shadow-2xl"
         >
           {/* Chat Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-primary/20 bg-primary/5">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-primary/10 bg-gradient-to-r from-primary/5 via-transparent to-purple-500/5 shrink-0 backdrop-blur-sm">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-sm bg-primary/10 border border-primary/30 flex items-center justify-center">
                 <Bot className="w-5 h-5 text-primary" />
@@ -785,7 +785,7 @@ export default function TaskWizard() {
 
           {/* Input */}
           {!generatedTask && (
-            <div className="p-4 border-t border-primary/20 bg-transparent">
+            <div className="p-4 border-t border-primary/10 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-md shrink-0">
               {/* 添付ファイルのプレビュー */}
               {attachedFile && (
                 <div className="mb-3 p-2 bg-zinc-100 dark:bg-zinc-800 rounded-lg flex items-center gap-3">

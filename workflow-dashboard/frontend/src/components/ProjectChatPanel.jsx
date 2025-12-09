@@ -391,12 +391,12 @@ export default function ProjectChatPanel({
       animate={{ x: 0 }}
       exit={{ x: '100%' }}
       transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-      className={`fixed right-0 top-0 h-full bg-white dark:bg-zinc-900 border-l border-zinc-200 dark:border-zinc-800 shadow-2xl z-50 flex flex-col ${
-        isExpanded ? 'w-full md:w-2/3' : 'w-full md:w-[450px]'
+      className={`fixed right-0 top-0 bottom-0 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl border-l border-zinc-200/50 dark:border-zinc-800/50 shadow-2xl z-50 flex flex-col transition-all duration-300 ${
+        isExpanded ? 'w-full md:w-2/3' : 'w-full md:w-[450px] max-w-[100vw]'
       }`}
     >
       {/* ヘッダー */}
-      <div className="flex items-center gap-3 p-4 border-b border-zinc-200 dark:border-zinc-800 bg-gradient-to-r from-primary/5 to-purple-500/5">
+      <div className="flex items-center gap-3 p-4 border-b border-zinc-200/50 dark:border-zinc-800/50 bg-gradient-to-r from-primary/5 via-transparent to-purple-500/5 shrink-0 backdrop-blur-sm">
         <div 
           className="w-10 h-10 rounded-lg flex items-center justify-center"
           style={{ backgroundColor: `${project.color}20` }}
@@ -422,7 +422,7 @@ export default function ProjectChatPanel({
       </div>
       
       {/* クイックアクション */}
-      <div className="flex items-center gap-2 p-3 border-b border-zinc-200 dark:border-zinc-800 overflow-x-auto">
+      <div className="flex items-center gap-2 p-3 border-b border-zinc-200/50 dark:border-zinc-800/50 overflow-x-auto shrink-0 bg-zinc-50/50 dark:bg-zinc-900/30 backdrop-blur-sm">
         <button
           onClick={handleGetExplanation}
           disabled={isChatLoading}
@@ -679,7 +679,7 @@ export default function ProjectChatPanel({
       </div>
       
       {/* 入力フィールド */}
-      <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900">
+      <div className="p-4 border-t border-zinc-200/50 dark:border-zinc-800/50 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md shrink-0">
         {/* 添付ファイルのプレビュー */}
         {attachedFile && (
           <div className="mb-3 p-2 bg-zinc-100 dark:bg-zinc-800 rounded-lg flex items-center gap-3">
