@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { statsApi, executionsApi } from '../services/api'
+import { supabase, isSupabaseConfigured } from '../services/supabase'
 import { BentoGrid, BentoItem } from '../components/Bento/BentoGrid'
 import useLanguageStore from '../stores/languageStore'
 
@@ -41,8 +42,27 @@ export default function Dashboard() {
     }
     
     fetchData()
+    
+    // 30秒ポーリング
     const interval = setInterval(fetchData, 30000)
-    return () => clearInterval(interval)
+    
+    // Supabaseリアルタイム（設定されている場合のみ）
+    let channel = null
+    if (isSupabaseConfigured() && supabase) {
+      channel = supabase
+        .channel('executions-recent-activity')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'executions' },
+          () => fetchData()
+        )
+        .subscribe()
+    }
+    
+    return () => {
+      clearInterval(interval)
+      if (channel) supabase.removeChannel(channel)
+    }
   }, [])
   
   if (isLoading) {
