@@ -335,9 +335,27 @@ export default function ProjectChatPanel({
       }
     } catch (error) {
       console.error('Chat error:', error)
+      
+      // バックエンドからのエラー内容をできるだけ表示する
+      const status = error.response?.status
+      const data = error.response?.data
+      const detail =
+        (data && typeof data === 'object' && (data.response || data.error || data.detail || data.message)) ||
+        (typeof data === 'string' ? data : '')
+      const serializedData =
+        !detail && data && typeof data === 'object' ? JSON.stringify(data, null, 2) : null
+      
+      const errorLines = [
+        'エラーが発生しました',
+        status ? `ステータス: ${status}` : null,
+        detail ? `詳細: ${detail}` : null,
+        serializedData ? `レスポンス: ${serializedData}` : null,
+        `メッセージ: ${error.message}`
+      ].filter(Boolean)
+      
       setChatHistory(prev => [...prev, {
         role: 'assistant',
-        content: `エラーが発生しました: ${error.message}`
+        content: errorLines.join('\n')
       }])
     }
     
