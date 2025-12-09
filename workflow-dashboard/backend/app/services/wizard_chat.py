@@ -7,7 +7,7 @@ from app.models import WizardSession
 from app.services.credential_manager import credential_manager
 from app.utils.logger import logger
 
-DEFAULT_CHAT_MODEL = "gpt-5.1-codex-max"
+DEFAULT_CHAT_MODEL = "gpt-4.1"
 
 
 class WizardChatService:

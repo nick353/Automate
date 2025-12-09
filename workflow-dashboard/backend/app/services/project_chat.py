@@ -17,7 +17,7 @@ from app.utils.logger import logger
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
 
-DEFAULT_CHAT_MODEL = "gpt-5.1-codex-max"
+DEFAULT_CHAT_MODEL = "gpt-4.1"
 
 # APIキーのパターン定義
 API_KEY_PATTERNS = {
