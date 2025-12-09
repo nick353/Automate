@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { 
   Plus, 
@@ -18,19 +18,8 @@ import {
   MoreVertical,
   X,
   MessageSquare,
-  Bot,
-  User,
-  Send,
-  Loader2,
-  Info,
-  CheckCircle,
-  AlertCircle,
-  Zap,
   Clock,
   GitBranch,
-  Maximize2,
-  Minimize2,
-  Video,
   GripVertical
 } from 'lucide-react'
 
@@ -40,6 +29,7 @@ import TaskForm from '../components/TaskForm'
 import StatusBadge from '../components/StatusBadge'
 import { BentoGrid, BentoItem } from '../components/Bento/BentoGrid'
 import useLanguageStore from '../stores/languageStore'
+import ProjectChatPanel from '../components/ProjectChatPanel'
 import { projectsApi, tasksApi } from '../services/api'
 
 export default function Tasks() {
@@ -59,12 +49,6 @@ export default function Tasks() {
   
   // チャット関連のState
   const [showChat, setShowChat] = useState(null) // project_id
-  const [chatHistory, setChatHistory] = useState([])
-  const [chatInput, setChatInput] = useState('')
-  const [isChatLoading, setIsChatLoading] = useState(false)
-  const [pendingActions, setPendingActions] = useState(null)
-  const [isExpanded, setIsExpanded] = useState(false)
-  const chatEndRef = useRef(null)
   
   // 実行場所のアイコンと色
   const EXECUTION_LOCATION_CONFIG = {
@@ -291,252 +275,6 @@ export default function Tasks() {
             </div>
           </form>
         </motion.div>
-      </motion.div>
-    )
-  }
-  
-  // プロジェクトチャットパネル
-  const ProjectChatPanel = () => {
-    const project = boardData?.projects?.find(p => p.id === showChat)
-    if (!project) return null
-    
-    useEffect(() => {
-      chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-    }, [chatHistory])
-    
-    const handleSendMessage = async () => {
-      if (!chatInput.trim() || isChatLoading) return
-      
-      const userMessage = chatInput.trim()
-      setChatInput('')
-      setIsChatLoading(true)
-      setPendingActions(null)
-      
-      try {
-        const projectTasks = getProjectTasks(showChat)
-        const isWizardMode = projectTasks.length === 0
-        
-        const response = isWizardMode
-          ? await projectsApi.wizardChat(showChat, userMessage, chatHistory)
-          : await projectsApi.chat(showChat, userMessage, chatHistory)
-        
-        setChatHistory(response.data.chat_history || [])
-        
-        if (response.data.actions?.actions) {
-          setPendingActions(response.data.actions.actions)
-        }
-      } catch (error) {
-        console.error('Chat error:', error)
-        setChatHistory(prev => [...prev, {
-          role: 'assistant',
-          content: `エラーが発生しました: ${error.message}`
-        }])
-      }
-      
-      setIsChatLoading(false)
-    }
-    
-    const handleExecuteActions = async () => {
-      if (!pendingActions) return
-      
-      setIsChatLoading(true)
-      try {
-        const response = await projectsApi.executeActions(showChat, pendingActions)
-        
-        setChatHistory(prev => [...prev, {
-          role: 'assistant',
-          content: `✅ **アクションを実行しました！**\n\n${response.data.message}`
-        }])
-        
-        setPendingActions(null)
-        fetchBoardData()
-        fetchTasks()
-      } catch (error) {
-        setChatHistory(prev => [...prev, {
-          role: 'assistant',
-          content: `❌ アクションの実行に失敗しました: ${error.message}`
-        }])
-      }
-      setIsChatLoading(false)
-    }
-    
-    const handleGetExplanation = async () => {
-      setIsChatLoading(true)
-      try {
-        const response = await projectsApi.getWorkflowExplanation(showChat)
-        setChatHistory(prev => [...prev, {
-          role: 'assistant',
-          content: response.data.explanation
-        }])
-      } catch (error) {
-        setChatHistory(prev => [...prev, {
-          role: 'assistant',
-          content: `エラーが発生しました: ${error.message}`
-        }])
-      }
-      setIsChatLoading(false)
-    }
-    
-    return (
-      <motion.div
-        initial={{ x: '100%' }}
-        animate={{ x: 0 }}
-        exit={{ x: '100%' }}
-        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-        className={`fixed right-0 top-0 bottom-0 bg-white dark:bg-zinc-900 border-l border-zinc-200 dark:border-zinc-800 shadow-2xl z-50 flex flex-col transition-all duration-300 ${
-          isExpanded ? 'w-full md:w-2/3' : 'w-full md:w-[450px] max-w-[100vw]'
-        }`}
-      >
-        {/* ヘッダー */}
-        <div className="flex items-center gap-3 p-4 border-b border-zinc-200 dark:border-zinc-800 bg-gradient-to-r from-primary/5 to-purple-500/5 shrink-0">
-          <div 
-            className="w-10 h-10 rounded-lg flex items-center justify-center"
-            style={{ backgroundColor: `${project.color}20` }}
-          >
-            <Bot className="w-5 h-5" style={{ color: project.color }} />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-foreground">{t('taskBoard.aiAssistant')}</h3>
-            <p className="text-xs text-muted-foreground truncate">{project.name}</p>
-          </div>
-          <button
-            onClick={() => setIsExpanded(!isExpanded)}
-            className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground"
-          >
-            {isExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-          </button>
-          <button
-            onClick={() => { setShowChat(null); setChatHistory([]); setPendingActions(null) }}
-            className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-        
-        {/* クイックアクション */}
-        <div className="flex items-center gap-2 p-3 border-b border-zinc-200 dark:border-zinc-800 overflow-x-auto shrink-0">
-          <button
-            onClick={handleGetExplanation}
-            disabled={isChatLoading}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 rounded-full whitespace-nowrap hover:bg-blue-200 dark:hover:bg-blue-500/30 transition-colors"
-          >
-            <Info className="w-3.5 h-3.5" />
-            {t('taskBoard.explainWorkflow')}
-          </button>
-          <button
-            onClick={() => setChatInput('このワークフローを改善したい')}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded-full whitespace-nowrap hover:bg-amber-200 dark:hover:bg-amber-500/30 transition-colors"
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            {t('taskBoard.suggest')}
-          </button>
-          <button
-            onClick={() => setChatInput('新しいタスクを追加したい')}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-full whitespace-nowrap hover:bg-emerald-200 dark:hover:bg-emerald-500/30 transition-colors"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            {t('taskBoard.addTask')}
-          </button>
-        </div>
-        
-        {/* チャット履歴 */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {chatHistory.length === 0 && (
-            <div className="text-center py-8 text-muted-foreground">
-              <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-30" />
-              <p className="text-sm">プロジェクトについて質問してください</p>
-              <p className="text-xs mt-1">ワークフローの管理・編集をサポートします</p>
-            </div>
-          )}
-          
-          {chatHistory.map((msg, idx) => (
-            <div key={idx} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-                msg.role === 'user' 
-                  ? 'bg-primary/10 text-primary' 
-                  : 'bg-gradient-to-br from-purple-500/20 to-blue-500/20 text-purple-500'
-              }`}>
-                {msg.role === 'user' ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
-              </div>
-              <div className={`flex-1 max-w-[85%] ${msg.role === 'user' ? 'text-right' : ''}`}>
-                <div className={`inline-block p-3 rounded-2xl text-sm whitespace-pre-wrap ${
-                  msg.role === 'user'
-                    ? 'bg-primary text-primary-foreground rounded-br-md'
-                    : 'bg-zinc-100 dark:bg-zinc-800 text-foreground rounded-bl-md'
-                }`}>
-                  {msg.content}
-                </div>
-              </div>
-            </div>
-          ))}
-          
-          {isChatLoading && (
-            <div className="flex gap-3">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500/20 to-blue-500/20 flex items-center justify-center">
-                <Loader2 className="w-4 h-4 text-purple-500 animate-spin" />
-              </div>
-              <div className="bg-zinc-100 dark:bg-zinc-800 p-3 rounded-2xl rounded-bl-md">
-                <div className="flex gap-1">
-                  <span className="w-2 h-2 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <span className="w-2 h-2 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <span className="w-2 h-2 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                </div>
-              </div>
-            </div>
-          )}
-          
-          {pendingActions && pendingActions.length > 0 && (
-            <div className="bg-gradient-to-r from-primary/10 to-purple-500/10 border border-primary/30 rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <AlertCircle className="w-5 h-5 text-primary" />
-                <span className="font-semibold text-foreground">{t('taskBoard.confirmActions')}</span>
-              </div>
-              <p className="text-sm text-muted-foreground mb-4">
-                {pendingActions.length}件のアクションを実行します
-              </p>
-              <div className="flex gap-2">
-                <button
-                  onClick={handleExecuteActions}
-                  disabled={isChatLoading}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50"
-                >
-                  <CheckCircle className="w-4 h-4" />
-                  {t('taskBoard.executeActions')}
-                </button>
-                <button
-                  onClick={() => setPendingActions(null)}
-                  className="px-4 py-2.5 border border-zinc-300 dark:border-zinc-700 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                >
-                  {t('common.cancel')}
-                </button>
-              </div>
-            </div>
-          )}
-          
-          <div ref={chatEndRef} />
-        </div>
-        
-        {/* 入力フィールド */}
-        <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 shrink-0">
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
-              placeholder={t('taskBoard.chatPlaceholder')}
-              disabled={isChatLoading}
-              className="flex-1 px-4 py-3 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all disabled:opacity-50"
-            />
-            <button
-              onClick={handleSendMessage}
-              disabled={!chatInput.trim() || isChatLoading}
-              className="px-4 py-3 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              <Send className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
       </motion.div>
     )
   }
@@ -836,7 +574,22 @@ export default function Tasks() {
           />
         )}
         {showProjectForm && <ProjectFormModal />}
-        {showChat && <ProjectChatPanel />}
+        {showChat && (() => {
+          const project = boardData?.projects?.find(p => p.id === showChat)
+          if (!project) return null
+          return (
+            <ProjectChatPanel
+              key={`project-chat-${showChat}`}
+              project={project}
+              boardData={boardData}
+              onClose={() => setShowChat(null)}
+              onRefresh={() => {
+                fetchBoardData()
+                fetchTasks()
+              }}
+            />
+          )
+        })()}
       </AnimatePresence>
     </div>
   )

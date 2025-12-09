@@ -24,7 +24,8 @@ import {
   LayoutGrid,
   MonitorPlay,
   Mic,
-  MicOff
+  MicOff,
+  Image
 } from 'lucide-react'
 import { wizardApi, tasksApi } from '../services/api'
 import { cn } from '../utils/cn'
@@ -73,24 +74,48 @@ function ChatMessage({ message, isUser }) {
         )}
       </div>
       <div className={cn(
-        "flex-1 max-w-[85%] rounded-sm px-4 py-3 text-sm leading-relaxed border",
-        isUser 
-          ? "bg-primary/5 border-primary/20 text-foreground ml-auto" 
-          : "bg-secondary/5 border-secondary/20 text-foreground"
+        "flex-1 max-w-[85%]",
+        isUser ? "ml-auto" : ""
       )}>
-        <div className="prose prose-sm dark:prose-invert max-w-none">
-          {message.content.split('\n').map((line, i) => {
-            if (!line.trim()) {
-              return <br key={i} />
-            }
-            if (line.match(/^[-•]/)) {
-              return <p key={i} className="ml-2 my-0.5">{parseMarkdownBold(line)}</p>
-            }
-            if (line.match(/^[📧📊🔄💡✅❌🤖]/)) {
-              return <p key={i} className="font-medium mt-2 text-primary">{parseMarkdownBold(line)}</p>
-            }
-            return <p key={i} className="my-1">{parseMarkdownBold(line)}</p>
-          })}
+        {/* 添付画像の表示 */}
+        {message.image && (
+          <div className={`mb-2 ${isUser ? 'flex justify-end' : ''}`}>
+            <img 
+              src={message.image} 
+              alt="添付画像" 
+              className="max-w-[200px] max-h-[200px] rounded-lg object-cover"
+            />
+          </div>
+        )}
+        {/* 添付動画の表示 */}
+        {message.video && (
+          <div className={`mb-2 ${isUser ? 'flex justify-end' : ''}`}>
+            <div className="inline-flex items-center gap-2 px-3 py-2 bg-purple-100 dark:bg-purple-500/20 rounded-lg border border-purple-300 dark:border-purple-600">
+              <Video className="w-4 h-4 text-purple-500" />
+              <span className="text-sm text-purple-700 dark:text-purple-300 font-mono">{message.video}</span>
+            </div>
+          </div>
+        )}
+        <div className={cn(
+          "rounded-sm px-4 py-3 text-sm leading-relaxed border",
+          isUser 
+            ? "bg-primary/5 border-primary/20 text-foreground" 
+            : "bg-secondary/5 border-secondary/20 text-foreground"
+        )}>
+          <div className="prose prose-sm dark:prose-invert max-w-none">
+            {message.content.split('\n').map((line, i) => {
+              if (!line.trim()) {
+                return <br key={i} />
+              }
+              if (line.match(/^[-•]/)) {
+                return <p key={i} className="ml-2 my-0.5">{parseMarkdownBold(line)}</p>
+              }
+              if (line.match(/^[📧📊🔄💡✅❌🤖]/)) {
+                return <p key={i} className="font-medium mt-2 text-primary">{parseMarkdownBold(line)}</p>
+              }
+              return <p key={i} className="my-1">{parseMarkdownBold(line)}</p>
+            })}
+          </div>
         </div>
       </div>
     </motion.div>
@@ -258,6 +283,9 @@ export default function TaskWizard() {
   const [isListening, setIsListening] = useState(false)
   const [speechSupported, setSpeechSupported] = useState(false)
   const recognitionRef = useRef(null)
+  
+  // 添付ファイルのState
+  const [attachedFile, setAttachedFile] = useState(null) // { file: File, type: 'image'|'video', preview: string }
 
   // チャットを最下部にスクロール
   useEffect(() => {
@@ -405,24 +433,54 @@ export default function TaskWizard() {
 
   // メッセージを送信
   const sendMessage = async () => {
-    if (!inputMessage.trim() || isSending || !sessionId) return
+    if ((!inputMessage.trim() && !attachedFile) || isSending || !sessionId) return
     
     const userMessage = inputMessage.trim()
+    const currentAttachedFile = attachedFile
     setInputMessage('')
+    setAttachedFile(null)
     setIsSending(true)
     setError('')
     
-    setMessages(prev => [...prev, { role: 'user', content: userMessage }])
+    // メッセージを追加（添付ファイルがある場合はその情報も含める）
+    const userMessageContent = currentAttachedFile 
+      ? (userMessage || `${currentAttachedFile.type === 'image' ? '画像' : '動画'}を添付しました`)
+      : userMessage
+    
+    setMessages(prev => [...prev, { 
+      role: 'user', 
+      content: userMessageContent,
+      image: currentAttachedFile?.type === 'image' ? currentAttachedFile.preview : null,
+      video: currentAttachedFile?.type === 'video' ? currentAttachedFile.file.name : null
+    }])
     
     try {
-      const response = await wizardApi.chat(sessionId, userMessage)
-      
-      setMessages(prev => [...prev, { role: 'assistant', content: response.data.response }])
-      
-      if (response.data.is_ready_to_create) {
-        const taskResponse = await wizardApi.generateTask(sessionId)
-        setGeneratedTask(taskResponse.data.task)
-        setShowTrialRun(true)
+      // 添付ファイルがある場合は動画分析を実行
+      if (currentAttachedFile?.type === 'video') {
+        const uploadResponse = await wizardApi.uploadVideo(currentAttachedFile.file)
+        const videoSessionId = uploadResponse.data.session_id
+        const analyzeResponse = await wizardApi.analyzeVideo(videoSessionId, userMessage)
+        
+        setMessages(prev => [...prev, { 
+          role: 'assistant', 
+          content: `動画を確認しました。\n\n${userMessage ? 'ご要望：' + userMessage + '\n\n' : ''}この動画を参考に自動化フローを作成できます。どのような処理を自動化したいですか？` 
+        }])
+      } else if (currentAttachedFile?.type === 'image') {
+        setMessages(prev => [...prev, { 
+          role: 'assistant', 
+          content: `画像を確認しました。\n\n${userMessage ? 'ご要望：' + userMessage + '\n\n' : ''}この画像を参考に、どのような自動化を作成しますか？` 
+        }])
+      } else {
+        // テキストのみの場合は通常のチャット
+        const response = await wizardApi.chat(sessionId, userMessage)
+        
+        setMessages(prev => [...prev, { role: 'assistant', content: response.data.response }])
+        
+        if (response.data.is_ready_to_create) {
+          const taskResponse = await wizardApi.generateTask(sessionId)
+          setGeneratedTask(taskResponse.data.task)
+          setShowTrialRun(true)
+        }
       }
     } catch (err) {
       setError(t('common.error') + ': ' + (err.response?.data?.detail || err.message))
@@ -728,12 +786,60 @@ export default function TaskWizard() {
           {/* Input */}
           {!generatedTask && (
             <div className="p-4 border-t border-primary/20 bg-transparent">
+              {/* 添付ファイルのプレビュー */}
+              {attachedFile && (
+                <div className="mb-3 p-2 bg-zinc-100 dark:bg-zinc-800 rounded-lg flex items-center gap-3">
+                  {attachedFile.type === 'image' ? (
+                    <img 
+                      src={attachedFile.preview} 
+                      alt="添付画像" 
+                      className="w-16 h-16 object-cover rounded-lg"
+                    />
+                  ) : (
+                    <div className="w-16 h-16 bg-purple-100 dark:bg-purple-500/20 rounded-lg flex items-center justify-center">
+                      <Video className="w-8 h-8 text-purple-500" />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate font-mono">
+                      {attachedFile.file.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {attachedFile.type === 'image' ? '画像' : '動画'}を添付中
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setAttachedFile(null)}
+                    className="p-1.5 rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-700 text-muted-foreground"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
               <div className="flex gap-3">
+                {/* 画像添付ボタン */}
+                <button
+                  onClick={() => document.getElementById('wizard-image-upload')?.click()}
+                  disabled={isSending}
+                  className="w-12 h-12 rounded-sm bg-pink-500/20 border border-pink-500/50 text-pink-500 hover:bg-pink-500/30 flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="画像を添付"
+                >
+                  <Image className="w-5 h-5" />
+                </button>
+                {/* 動画添付ボタン */}
+                <button
+                  onClick={() => document.getElementById('wizard-video-upload')?.click()}
+                  disabled={isSending}
+                  className="w-12 h-12 rounded-sm bg-purple-500/20 border border-purple-500/50 text-purple-500 hover:bg-purple-500/30 flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="動画を添付"
+                >
+                  <Video className="w-5 h-5" />
+                </button>
                 <textarea
                   value={inputMessage}
                   onChange={(e) => setInputMessage(e.target.value)}
                   onKeyPress={handleKeyPress}
-                  placeholder={isListening ? t('wizard.voiceListening') : t('wizard.enterInstructions')}
+                  placeholder={isListening ? t('wizard.voiceListening') : (attachedFile ? 'メッセージを入力（省略可）...' : t('wizard.enterInstructions'))}
                   rows={1}
                   className={cn(
                     "flex-1 input resize-none min-h-[48px] max-h-[120px] font-mono text-sm bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 focus:border-primary/60",
@@ -769,22 +875,60 @@ export default function TaskWizard() {
                 )}
                 <button
                   onClick={sendMessage}
-                  disabled={!inputMessage.trim() || isSending}
+                  disabled={(!inputMessage.trim() && !attachedFile) || isSending}
                   className="w-12 h-12 rounded-sm bg-primary/20 border border-primary/50 text-primary hover:bg-primary/30 hover:shadow-[0_0_10px_rgba(6,182,212,0.3)] flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Send className="w-5 h-5" />
                 </button>
               </div>
-              {/* 音声入力のヒント */}
+              {/* 隠しファイル入力 */}
+              <input
+                id="wizard-image-upload"
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (!file) return
+                  
+                  const reader = new FileReader()
+                  reader.onload = () => {
+                    setAttachedFile({
+                      file,
+                      type: 'image',
+                      preview: reader.result
+                    })
+                  }
+                  reader.readAsDataURL(file)
+                  e.target.value = ''
+                }}
+              />
+              <input
+                id="wizard-video-upload"
+                type="file"
+                accept="video/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (!file) return
+                  
+                  setAttachedFile({
+                    file,
+                    type: 'video',
+                    preview: file.name
+                  })
+                  e.target.value = ''
+                }}
+              />
+              {/* ヒント */}
               {isListening ? (
                 <div className="mt-2 text-xs text-red-500 font-mono animate-pulse flex items-center gap-2">
                   <span className="w-2 h-2 bg-red-500 rounded-full" />
                   {t('wizard.voiceListeningHint')}
                 </div>
               ) : (
-                <div className="mt-2 text-xs text-muted-foreground font-mono flex items-center gap-2">
-                  <span className="opacity-60">💡</span>
-                  {t('wizard.voiceMacHint')}
+                <div className="mt-2 text-xs text-muted-foreground font-mono">
+                  画像・動画を添付してテキストと一緒に送信できます
                 </div>
               )}
             </div>

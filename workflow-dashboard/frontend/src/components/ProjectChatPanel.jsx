@@ -22,7 +22,8 @@ import {
   MicOff,
   Play,
   Clock,
-  Settings
+  Settings,
+  Image
 } from 'lucide-react'
 import { projectsApi, tasksApi } from '../services/api'
 import useLanguageStore from '../stores/languageStore'
@@ -51,6 +52,9 @@ export default function ProjectChatPanel({
   // 作成状態の管理
   const [creatingInfo, setCreatingInfo] = useState(null) // { current: 1, total: 3, task_name: "..." }
   const [createdTasks, setCreatedTasks] = useState([]) // 作成されたタスクのリスト
+  
+  // 添付ファイルのState
+  const [attachedFile, setAttachedFile] = useState(null) // { file: File, type: 'image'|'video', preview: string }
   
   // 音声入力のState
   const [isListening, setIsListening] = useState(false)
@@ -110,12 +114,53 @@ export default function ProjectChatPanel({
   }, [chatHistory])
 
   const handleSendMessage = async () => {
-    if (!chatInput.trim() || isChatLoading) return
+    if ((!chatInput.trim() && !attachedFile) || isChatLoading) return
     
     const userMessage = chatInput.trim()
+    const currentAttachedFile = attachedFile
     setChatInput('')
+    setAttachedFile(null)
     setIsChatLoading(true)
     setPendingActions(null)
+    
+    // 添付ファイルがある場合の処理
+    if (currentAttachedFile) {
+      // ユーザーメッセージを追加（画像プレビュー付き）
+      setChatHistory(prev => [...prev, {
+        role: 'user',
+        content: userMessage || `${currentAttachedFile.type === 'image' ? '画像' : '動画'}を添付しました`,
+        image: currentAttachedFile.type === 'image' ? currentAttachedFile.preview : null,
+        video: currentAttachedFile.type === 'video' ? currentAttachedFile.file.name : null
+      }])
+      
+      try {
+        if (currentAttachedFile.type === 'video') {
+          // 動画分析
+          const response = await projectsApi.analyzeVideo(project.id, currentAttachedFile.file, userMessage)
+          const analysis = response.data.analysis
+          
+          setChatHistory(prev => [...prev, {
+            role: 'assistant',
+            content: `動画を確認しました。\n\n概要: ${analysis.summary || '動画を分析中...'}\n\n${userMessage ? 'ご要望を踏まえて' : ''}自動化の提案をさせていただきます。\n\n自動化候補:\n${(analysis.automation_candidates || []).map(c => `- ${c}`).join('\n')}\n\n提案されたタスク:\n${(analysis.suggested_tasks || []).map(t => `- ${t.name}: ${t.description}`).join('\n')}\n\nこの方向で進めてよろしいですか？`
+          }])
+          setVideoAnalysis(analysis)
+        } else {
+          // 画像の場合
+          setChatHistory(prev => [...prev, {
+            role: 'assistant',
+            content: `画像を確認しました。${userMessage ? '\n\nご要望：' + userMessage + '\n\n' : ''}この画像を参考に、どのような自動化を作成しますか？`
+          }])
+        }
+      } catch (error) {
+        setChatHistory(prev => [...prev, {
+          role: 'assistant',
+          content: `ファイルを受け取りました。${userMessage ? '\n\nご要望：' + userMessage + '\n\n' : ''}この内容を参考に、どのような自動化を作成しますか？`
+        }])
+      }
+      
+      setIsChatLoading(false)
+      return
+    }
     
     // Webリサーチリクエストをチェック
     const webSearchMatch = userMessage.match(/(?:検索|調べて|リサーチ)[：:]\s*(.+)/i) || 
@@ -136,12 +181,12 @@ export default function ProjectChatPanel({
         setWebResearchResults(results)
         
         const resultsText = results.map((r, i) => 
-          `${i + 1}. **${r.title}**\n   ${r.snippet || r.content?.slice(0, 200) || ''}\n   ${r.url ? `🔗 ${r.url}` : ''}`
+          `${i + 1}. ${r.title}\n   ${r.snippet || r.content?.slice(0, 200) || ''}\n   ${r.url ? r.url : ''}`
         ).join('\n\n')
         
         setChatHistory(prev => [...prev, {
           role: 'assistant',
-          content: `🔍 **Webリサーチ結果:**\n\n${resultsText}\n\nこの情報を基にワークフローを提案しましょうか？`
+          content: `Webリサーチ結果:\n\n${resultsText}\n\nこの情報を基にワークフローを提案しましょうか？`
         }])
         
         setIsChatLoading(false)
@@ -401,54 +446,49 @@ export default function ProjectChatPanel({
           {t('taskBoard.addTask')}
         </button>
         <button
-          onClick={() => document.getElementById('video-upload-chat')?.click()}
-          disabled={isChatLoading}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 rounded-full whitespace-nowrap hover:bg-purple-200 dark:hover:bg-purple-500/30 transition-colors"
-        >
-          <Video className="w-3.5 h-3.5" />
-          {t('taskBoard.uploadVideo')}
-        </button>
-        <button
           onClick={() => setChatInput(t('taskBoard.webSearchPrompt'))}
           className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-cyan-100 dark:bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 rounded-full whitespace-nowrap hover:bg-cyan-200 dark:hover:bg-cyan-500/30 transition-colors"
         >
           <Search className="w-3.5 h-3.5" />
           {t('taskBoard.webSearch')}
         </button>
+        {/* 動画アップロード（添付用） */}
         <input
           id="video-upload-chat"
           type="file"
           accept="video/*"
           className="hidden"
-          onChange={async (e) => {
+          onChange={(e) => {
             const file = e.target.files?.[0]
             if (!file) return
             
-            setIsChatLoading(true)
-            setChatHistory(prev => [...prev, {
-              role: 'user',
-              content: `📹 動画をアップロードしました: ${file.name}`
-            }])
+            setAttachedFile({
+              file,
+              type: 'video',
+              preview: file.name
+            })
+            e.target.value = ''
+          }}
+        />
+        {/* 画像アップロード（添付用） */}
+        <input
+          id="image-upload-chat"
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0]
+            if (!file) return
             
-            try {
-              const response = await projectsApi.analyzeVideo(project.id, file)
-              const analysis = response.data.analysis
-              
-              setChatHistory(prev => [...prev, {
-                role: 'assistant',
-                content: `🎬 **動画分析完了！**\n\n**概要:** ${analysis.summary || '分析中...'}\n\n**自動化候補:**\n${(analysis.automation_candidates || []).map(c => `- ${c}`).join('\n')}\n\n**提案されたタスク:**\n${(analysis.suggested_tasks || []).map(t => `- **${t.name}**: ${t.description}`).join('\n')}\n\nこの分析結果を基にワークフローを構築しましょうか？`
-              }])
-              
-              // 分析結果を保存してウィザードモードで使用
-              setVideoAnalysis(analysis)
-            } catch (error) {
-              setChatHistory(prev => [...prev, {
-                role: 'assistant',
-                content: `❌ 動画分析に失敗しました: ${error.message}`
-              }])
+            const reader = new FileReader()
+            reader.onload = () => {
+              setAttachedFile({
+                file,
+                type: 'image',
+                preview: reader.result
+              })
             }
-            
-            setIsChatLoading(false)
+            reader.readAsDataURL(file)
             e.target.value = ''
           }}
         />
@@ -466,6 +506,25 @@ export default function ProjectChatPanel({
               {msg.role === 'user' ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
             </div>
             <div className={`flex-1 max-w-[85%] ${msg.role === 'user' ? 'text-right' : ''}`}>
+              {/* 添付画像の表示 */}
+              {msg.image && (
+                <div className={`mb-2 ${msg.role === 'user' ? 'flex justify-end' : ''}`}>
+                  <img 
+                    src={msg.image} 
+                    alt="添付画像" 
+                    className="max-w-[200px] max-h-[200px] rounded-lg object-cover"
+                  />
+                </div>
+              )}
+              {/* 添付動画の表示 */}
+              {msg.video && (
+                <div className={`mb-2 ${msg.role === 'user' ? 'flex justify-end' : ''}`}>
+                  <div className="inline-flex items-center gap-2 px-3 py-2 bg-purple-100 dark:bg-purple-500/20 rounded-lg">
+                    <Video className="w-4 h-4 text-purple-500" />
+                    <span className="text-sm text-purple-700 dark:text-purple-300">{msg.video}</span>
+                  </div>
+                </div>
+              )}
               <div className={`inline-block p-3 rounded-2xl text-sm ${
                 msg.role === 'user'
                   ? 'bg-primary text-primary-foreground rounded-br-md'
@@ -621,13 +680,61 @@ export default function ProjectChatPanel({
       
       {/* 入力フィールド */}
       <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900">
+        {/* 添付ファイルのプレビュー */}
+        {attachedFile && (
+          <div className="mb-3 p-2 bg-zinc-100 dark:bg-zinc-800 rounded-lg flex items-center gap-3">
+            {attachedFile.type === 'image' ? (
+              <img 
+                src={attachedFile.preview} 
+                alt="添付画像" 
+                className="w-16 h-16 object-cover rounded-lg"
+              />
+            ) : (
+              <div className="w-16 h-16 bg-purple-100 dark:bg-purple-500/20 rounded-lg flex items-center justify-center">
+                <Video className="w-8 h-8 text-purple-500" />
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-foreground truncate">
+                {attachedFile.file.name}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {attachedFile.type === 'image' ? '画像' : '動画'}を添付中
+              </p>
+            </div>
+            <button
+              onClick={() => setAttachedFile(null)}
+              className="p-1.5 rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-700 text-muted-foreground"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
         <div className="flex gap-2">
+          {/* 画像添付ボタン */}
+          <button
+            onClick={() => document.getElementById('image-upload-chat')?.click()}
+            disabled={isChatLoading}
+            className="px-3 py-3 rounded-xl bg-pink-100 dark:bg-pink-500/20 text-pink-600 dark:text-pink-400 hover:bg-pink-200 dark:hover:bg-pink-500/30 transition-colors disabled:opacity-50"
+            title="画像を添付"
+          >
+            <Image className="w-5 h-5" />
+          </button>
+          {/* 動画添付ボタン */}
+          <button
+            onClick={() => document.getElementById('video-upload-chat')?.click()}
+            disabled={isChatLoading}
+            className="px-3 py-3 rounded-xl bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 hover:bg-purple-200 dark:hover:bg-purple-500/30 transition-colors disabled:opacity-50"
+            title="動画を添付"
+          >
+            <Video className="w-5 h-5" />
+          </button>
           <input
             type="text"
             value={chatInput}
             onChange={(e) => setChatInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
-            placeholder={isListening ? t('wizard.voiceListening') : t('taskBoard.chatPlaceholder')}
+            placeholder={isListening ? t('wizard.voiceListening') : (attachedFile ? 'メッセージを入力（省略可）...' : t('taskBoard.chatPlaceholder'))}
             disabled={isChatLoading}
             className={`flex-1 px-4 py-3 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all disabled:opacity-50 ${
               isListening ? 'border-red-500/50 bg-red-500/5' : ''
@@ -641,7 +748,7 @@ export default function ProjectChatPanel({
               className={`px-3 py-3 rounded-xl transition-colors ${
                 isListening
                   ? 'bg-red-500/20 text-red-500 hover:bg-red-500/30 animate-pulse'
-                  : 'bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 hover:bg-purple-200 dark:hover:bg-purple-500/30'
+                  : 'bg-secondary/20 text-secondary hover:bg-secondary/30'
               }`}
               title={isListening ? t('wizard.voiceStop') : `${t('wizard.voiceStart')}\n${t('wizard.voiceMacHint')}`}
             >
@@ -657,22 +764,21 @@ export default function ProjectChatPanel({
           )}
           <button
             onClick={handleSendMessage}
-            disabled={!chatInput.trim() || isChatLoading}
+            disabled={(!chatInput.trim() && !attachedFile) || isChatLoading}
             className="px-4 py-3 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <Send className="w-5 h-5" />
           </button>
         </div>
-        {/* 音声入力のヒント */}
+        {/* ヒント */}
         {isListening ? (
           <div className="mt-2 text-xs text-red-500 animate-pulse flex items-center gap-2">
             <span className="w-2 h-2 bg-red-500 rounded-full" />
             {t('wizard.voiceListeningHint')}
           </div>
         ) : (
-          <div className="mt-2 text-xs text-muted-foreground flex items-center gap-2">
-            <span className="opacity-60">💡</span>
-            {t('wizard.voiceMacHint')}
+          <div className="mt-2 text-xs text-muted-foreground">
+            画像・動画を添付してテキストと一緒に送信できます
           </div>
         )}
       </div>
