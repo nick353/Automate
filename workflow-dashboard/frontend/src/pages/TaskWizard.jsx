@@ -816,7 +816,7 @@ export default function TaskWizard() {
                   </button>
                 </div>
               )}
-            <div className="flex gap-2 items-end">
+            <div className="flex gap-2 items-center">
               {/* 画像添付ボタン */}
               <button
                 onClick={() => document.getElementById('wizard-image-upload')?.click()}
@@ -844,7 +844,7 @@ export default function TaskWizard() {
                   placeholder={isListening ? t('wizard.voiceListening') : (attachedFile ? 'メッセージを入力（省略可）...' : t('wizard.enterInstructions'))}
                   rows={1}
                   className={cn(
-                    "w-full input resize-none min-h-[40px] max-h-[120px] font-mono text-sm bg-zinc-100 dark:bg-zinc-800 border-transparent focus:bg-white dark:focus:bg-zinc-900 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 rounded-xl px-4 py-3 pr-10",
+                    "w-full input resize-none min-h-[40px] max-h-[120px] font-mono text-sm bg-zinc-100 dark:bg-zinc-800 border-transparent focus:bg-white dark:focus:bg-zinc-900 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 rounded-full px-4 py-2.5 pr-10 leading-5 scrollbar-none",
                     isListening && "border-red-500/50 bg-red-500/5"
                   )}
                 />
