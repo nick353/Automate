@@ -816,25 +816,27 @@ export default function TaskWizard() {
                   </button>
                 </div>
               )}
-              <div className="flex gap-3">
-                {/* 画像添付ボタン */}
-                <button
-                  onClick={() => document.getElementById('wizard-image-upload')?.click()}
-                  disabled={isSending}
-                  className="w-12 h-12 rounded-sm bg-pink-500/20 border border-pink-500/50 text-pink-500 hover:bg-pink-500/30 flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="画像を添付"
-                >
-                  <Image className="w-5 h-5" />
-                </button>
-                {/* 動画添付ボタン */}
-                <button
-                  onClick={() => document.getElementById('wizard-video-upload')?.click()}
-                  disabled={isSending}
-                  className="w-12 h-12 rounded-sm bg-purple-500/20 border border-purple-500/50 text-purple-500 hover:bg-purple-500/30 flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="動画を添付"
-                >
-                  <Video className="w-5 h-5" />
-                </button>
+            <div className="flex gap-2 items-end">
+              {/* 画像添付ボタン */}
+              <button
+                onClick={() => document.getElementById('wizard-image-upload')?.click()}
+                disabled={isSending}
+                className="w-10 h-10 flex items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 hover:bg-pink-50 hover:text-pink-500 dark:hover:bg-pink-500/20 dark:hover:text-pink-400 transition-all disabled:opacity-50 shrink-0"
+                title="画像を添付"
+              >
+                <Image className="w-5 h-5" />
+              </button>
+              {/* 動画添付ボタン */}
+              <button
+                onClick={() => document.getElementById('wizard-video-upload')?.click()}
+                disabled={isSending}
+                className="w-10 h-10 flex items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 hover:bg-purple-50 hover:text-purple-500 dark:hover:bg-purple-500/20 dark:hover:text-purple-400 transition-all disabled:opacity-50 shrink-0"
+                title="動画を添付"
+              >
+                <Video className="w-5 h-5" />
+              </button>
+
+              <div className="flex-1 relative min-w-0">
                 <textarea
                   value={inputMessage}
                   onChange={(e) => setInputMessage(e.target.value)}
@@ -842,45 +844,39 @@ export default function TaskWizard() {
                   placeholder={isListening ? t('wizard.voiceListening') : (attachedFile ? 'メッセージを入力（省略可）...' : t('wizard.enterInstructions'))}
                   rows={1}
                   className={cn(
-                    "flex-1 input resize-none min-h-[48px] max-h-[120px] font-mono text-sm bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 focus:border-primary/60",
+                    "w-full input resize-none min-h-[40px] max-h-[120px] font-mono text-sm bg-zinc-100 dark:bg-zinc-800 border-transparent focus:bg-white dark:focus:bg-zinc-900 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 rounded-xl px-4 py-3 pr-10",
                     isListening && "border-red-500/50 bg-red-500/5"
                   )}
                 />
                 {/* 音声入力ボタン */}
-                {speechSupported ? (
+                {speechSupported && (
                   <button
                     onClick={toggleListening}
                     className={cn(
-                      "w-12 h-12 rounded-sm border flex items-center justify-center transition-all",
+                      "absolute right-1 top-1 w-8 h-8 flex items-center justify-center rounded-full transition-all",
                       isListening
-                        ? "bg-red-500/20 border-red-500/50 text-red-500 hover:bg-red-500/30 animate-pulse"
-                        : "bg-secondary/20 border-secondary/50 text-secondary hover:bg-secondary/30 hover:shadow-[0_0_10px_rgba(168,85,247,0.3)]"
+                        ? "text-red-500 animate-pulse"
+                        : "text-zinc-400 hover:text-primary hover:bg-zinc-200 dark:hover:bg-zinc-700"
                     )}
                     title={isListening ? t('wizard.voiceStop') : `${t('wizard.voiceStart')}\n${t('wizard.voiceMacHint')}`}
                   >
                     {isListening ? (
-                      <MicOff className="w-5 h-5" />
+                      <MicOff className="w-4 h-4" />
                     ) : (
-                      <Mic className="w-5 h-5" />
+                      <Mic className="w-4 h-4" />
                     )}
                   </button>
-                ) : (
-                  /* Mac音声入力のみ対応の案内 */
-                  <div 
-                    className="w-12 h-12 rounded-sm border border-zinc-300 dark:border-zinc-600 flex items-center justify-center text-zinc-400 cursor-help"
-                    title={t('wizard.voiceNotSupported')}
-                  >
-                    <Mic className="w-5 h-5" />
-                  </div>
                 )}
-                <button
-                  onClick={sendMessage}
-                  disabled={(!inputMessage.trim() && !attachedFile) || isSending}
-                  className="w-12 h-12 rounded-sm bg-primary/20 border border-primary/50 text-primary hover:bg-primary/30 hover:shadow-[0_0_10px_rgba(6,182,212,0.3)] flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Send className="w-5 h-5" />
-                </button>
               </div>
+
+              <button
+                onClick={sendMessage}
+                disabled={(!inputMessage.trim() && !attachedFile) || isSending}
+                className="w-10 h-10 flex items-center justify-center bg-primary text-primary-foreground rounded-full hover:bg-primary/90 shadow-lg shadow-primary/20 disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed transition-all shrink-0"
+              >
+                <Send className="w-4 h-4" />
+              </button>
+            </div>
               {/* 隠しファイル入力 */}
               <input
                 id="wizard-image-upload"

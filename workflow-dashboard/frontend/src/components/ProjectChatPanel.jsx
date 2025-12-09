@@ -391,7 +391,7 @@ export default function ProjectChatPanel({
       animate={{ x: 0 }}
       exit={{ x: '100%' }}
       transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-      className={`fixed right-0 top-0 bottom-0 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl border-l border-zinc-200/50 dark:border-zinc-800/50 shadow-2xl z-50 flex flex-col transition-all duration-300 ${
+      className={`fixed right-0 top-0 bottom-0 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl border-l border-zinc-200/50 dark:border-zinc-800/50 shadow-2xl z-50 flex flex-col transition-all duration-300 overflow-hidden ${
         isExpanded ? 'w-full md:w-2/3' : 'w-full md:w-[450px] max-w-[100vw]'
       }`}
     >
@@ -710,12 +710,12 @@ export default function ProjectChatPanel({
             </button>
           </div>
         )}
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-end">
           {/* 画像添付ボタン */}
           <button
             onClick={() => document.getElementById('image-upload-chat')?.click()}
             disabled={isChatLoading}
-            className="px-3 py-3 rounded-xl bg-pink-100 dark:bg-pink-500/20 text-pink-600 dark:text-pink-400 hover:bg-pink-200 dark:hover:bg-pink-500/30 transition-colors disabled:opacity-50"
+            className="w-10 h-10 flex items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 hover:bg-pink-50 hover:text-pink-500 dark:hover:bg-pink-500/20 dark:hover:text-pink-400 transition-all disabled:opacity-50 shrink-0"
             title="画像を添付"
           >
             <Image className="w-5 h-5" />
@@ -724,50 +724,47 @@ export default function ProjectChatPanel({
           <button
             onClick={() => document.getElementById('video-upload-chat')?.click()}
             disabled={isChatLoading}
-            className="px-3 py-3 rounded-xl bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 hover:bg-purple-200 dark:hover:bg-purple-500/30 transition-colors disabled:opacity-50"
+            className="w-10 h-10 flex items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 hover:bg-purple-50 hover:text-purple-500 dark:hover:bg-purple-500/20 dark:hover:text-purple-400 transition-all disabled:opacity-50 shrink-0"
             title="動画を添付"
           >
             <Video className="w-5 h-5" />
           </button>
-          <input
-            type="text"
-            value={chatInput}
-            onChange={(e) => setChatInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
-            placeholder={isListening ? t('wizard.voiceListening') : (attachedFile ? 'メッセージを入力（省略可）...' : t('taskBoard.chatPlaceholder'))}
-            disabled={isChatLoading}
-            className={`flex-1 px-4 py-3 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all disabled:opacity-50 ${
-              isListening ? 'border-red-500/50 bg-red-500/5' : ''
-            }`}
-          />
-          {/* 音声入力ボタン */}
-          {speechSupported ? (
-            <button
-              onClick={toggleListening}
+          
+          <div className="flex-1 relative min-w-0">
+            <input
+              type="text"
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
+              placeholder={isListening ? t('wizard.voiceListening') : (attachedFile ? 'メッセージを入力...' : t('taskBoard.chatPlaceholder'))}
               disabled={isChatLoading}
-              className={`px-3 py-3 rounded-xl transition-colors ${
-                isListening
-                  ? 'bg-red-500/20 text-red-500 hover:bg-red-500/30 animate-pulse'
-                  : 'bg-secondary/20 text-secondary hover:bg-secondary/30'
+              className={`w-full h-10 pl-4 pr-10 rounded-full bg-zinc-100 dark:bg-zinc-800 border-transparent focus:bg-white dark:focus:bg-zinc-900 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 outline-none transition-all disabled:opacity-50 ${
+                isListening ? 'border-red-500/50 bg-red-500/5' : ''
               }`}
-              title={isListening ? t('wizard.voiceStop') : `${t('wizard.voiceStart')}\n${t('wizard.voiceMacHint')}`}
-            >
-              {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-            </button>
-          ) : (
-            <div 
-              className="px-3 py-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-400 cursor-help"
-              title={t('wizard.voiceNotSupported')}
-            >
-              <Mic className="w-5 h-5" />
-            </div>
-          )}
+            />
+            {/* 音声入力ボタン (Input内に配置) */}
+            {speechSupported && (
+              <button
+                onClick={toggleListening}
+                disabled={isChatLoading}
+                className={`absolute right-1 top-1 w-8 h-8 flex items-center justify-center rounded-full transition-colors ${
+                  isListening
+                    ? 'text-red-500 animate-pulse'
+                    : 'text-zinc-400 hover:text-primary hover:bg-zinc-200 dark:hover:bg-zinc-700'
+                }`}
+                title={isListening ? t('wizard.voiceStop') : t('wizard.voiceStart')}
+              >
+                {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+              </button>
+            )}
+          </div>
+
           <button
             onClick={handleSendMessage}
             disabled={(!chatInput.trim() && !attachedFile) || isChatLoading}
-            className="px-4 py-3 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="w-10 h-10 flex items-center justify-center bg-primary text-primary-foreground rounded-full hover:bg-primary/90 shadow-lg shadow-primary/20 disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed transition-all shrink-0"
           >
-            <Send className="w-5 h-5" />
+            <Send className="w-4 h-4" />
           </button>
         </div>
         {/* ヒント */}
