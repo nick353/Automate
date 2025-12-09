@@ -1,5 +1,5 @@
 """プロジェクト管理 API"""
-from typing import List, Optional
+from typing import List, Optional, Any
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session, joinedload
 
@@ -427,7 +427,7 @@ class WizardChatRequest(BaseModel):
     message: str
     chat_history: Optional[List[dict]] = None
     video_analysis: Optional[dict] = None
-    web_research: Optional[dict] = None
+    web_research: Optional[Any] = None  # list または dict を許容
 
 
 class WebSearchRequest(BaseModel):

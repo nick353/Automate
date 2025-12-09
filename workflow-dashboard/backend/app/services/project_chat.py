@@ -4,7 +4,7 @@ import re
 import httpx
 import aiofiles
 from pathlib import Path
-from typing import Optional, List, Dict, Any, Tuple
+from typing import Optional, List, Dict, Any, Tuple, Union
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
@@ -881,7 +881,7 @@ JSON形式で回答してください：
         user_message: str,
         chat_history: List[Dict] = None,
         video_analysis: Dict = None,
-        web_research: Dict = None,
+        web_research: Any = None,  # list または dict を許容
         user_id: str = None
     ) -> dict:
         """空のプロジェクトでワークフローを構築するためのウィザードチャット"""
