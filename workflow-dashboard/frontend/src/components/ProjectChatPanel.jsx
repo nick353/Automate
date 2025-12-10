@@ -11,8 +11,6 @@ import {
   AlertCircle,
   Loader2,
   Info,
-  Maximize2,
-  Minimize2,
   Video,
   Paperclip,
   Search,
@@ -65,9 +63,17 @@ export default function ProjectChatPanel({
     role: 'assistant',
     content: `こんにちは！プロジェクト「${project.name}」の自動化フロー作成をお手伝いします。
 
-確実に動くタスクを作成するために、いくつか質問させてください。
+まず、自動化を実行するためにAPIキーが必要です。
+以下のAPIキーをお持ちでしたら、このチャットに貼り付けてください。自動的に登録されます：
 
-まず教えてください：
+- OpenAI APIキー（sk-で始まる文字列）
+- Anthropic APIキー（sk-ant-で始まる文字列）
+- Google APIキー（AIzaで始まる文字列）
+
+※APIキーは暗号化して安全に保存されます。
+※すでに登録済みの場合はスキップしてください。
+
+その後、以下を教えてください：
 
 1. どんな作業を自動化したいですか？
    （例：毎日のデータ収集、SNS投稿、メール処理など）
@@ -76,9 +82,7 @@ export default function ProjectChatPanel({
    （例：Twitter、Googleスプレッドシート、特定のWebサイトなど）
 
 3. どのくらいの頻度で実行しますか？
-   （例：毎日9時、週1回、手動で実行など）
-
-具体的に教えていただくほど、失敗しにくいタスクを作成できます。`
+   （例：毎日9時、週1回、手動で実行など）`
   })
   
   // ストアから履歴を取得、なければ初期メッセージを使用
@@ -90,12 +94,9 @@ export default function ProjectChatPanel({
   const [chatInput, setChatInput] = useState('')
   const [isChatLoading, setIsChatLoading] = useState(false)
   const [pendingActions, setPendingActions] = useState(null)
-  const [isExpanded, setIsExpanded] = useState(false)
-  const [showCredBar, setShowCredBar] = useState(false)
   const [toastMessage, setToastMessage] = useState(null)
   const [videoAnalysis, setVideoAnalysis] = useState(getVideoAnalysis(project.id))
   const [webResearchResults, setWebResearchResults] = useState(getWebResearchResults(project.id))
-  const [showChecklist, setShowChecklist] = useState(true)
   
   // 作成状態の管理
   const [creatingInfo, setCreatingInfo] = useState(null) // { current: 1, total: 3, task_name: "..." }
@@ -822,9 +823,7 @@ export default function ProjectChatPanel({
       animate={{ x: 0 }}
       exit={{ x: '100%' }}
       transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-      className={`fixed right-0 top-0 bottom-0 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl border-l border-zinc-200/50 dark:border-zinc-800/50 shadow-2xl z-50 flex flex-col transition-all duration-300 overflow-hidden ${
-        isExpanded ? 'w-full md:w-2/3' : 'w-full md:w-[450px] max-w-[100vw]'
-      }`}
+      className="fixed right-0 top-0 bottom-0 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl border-l border-zinc-200/50 dark:border-zinc-800/50 shadow-2xl z-50 flex flex-col transition-all duration-300 overflow-hidden w-full md:w-2/3"
     >
       {/* トースト */}
       {toastMessage && (
@@ -913,12 +912,6 @@ export default function ProjectChatPanel({
           <RotateCcw className="w-4 h-4" />
         </button>
         <button
-          onClick={() => setIsExpanded(!isExpanded)}
-          className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground"
-        >
-          {isExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-        </button>
-        <button
           onClick={onClose}
           className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground"
         >
@@ -926,62 +919,6 @@ export default function ProjectChatPanel({
         </button>
       </div>
       
-      {/* 認証情報ステータスバッジバー */}
-      <div className="px-3 py-2 border-b border-zinc-200/60 dark:border-zinc-800/60 bg-zinc-50/60 dark:bg-zinc-900/40">
-        <div className="flex items-center justify-between gap-2">
-          <button
-            onClick={() => setShowCredBar(!showCredBar)}
-            className="flex items-center gap-2 text-xs font-semibold text-foreground px-2 py-1 rounded-md hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 transition-colors"
-          >
-            <Shield className="w-4 h-4" />
-            認証情報
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-200">
-              {status.present?.length || 0} 登録
-            </span>
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-200">
-              {status.missing?.length || 0} 不足
-            </span>
-          </button>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => fetchStatus()}
-              className="text-[11px] px-2 py-1 rounded-md bg-zinc-200/70 dark:bg-zinc-800/70 hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors"
-            >
-              再取得
-            </button>
-            <button
-              onClick={() => window.open('/credentials', '_blank')}
-              className="text-[11px] px-2 py-1 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
-            >
-              追加・確認
-            </button>
-          </div>
-        </div>
-        {showCredBar && (
-          <div className="mt-2 flex flex-wrap gap-2">
-            {(status.details || []).map((item) => (
-              <span
-                key={item.service}
-                className={`text-[11px] px-2 py-1 rounded-full border ${
-                  item.has_key
-                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-900/30 dark:border-emerald-800 dark:text-emerald-100'
-                    : 'bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-900/30 dark:border-amber-800 dark:text-amber-100'
-                }`}
-              >
-                {item.service}
-              </span>
-            ))}
-            {status.missing && status.missing.length > 0 && (
-              <button
-                onClick={() => window.open('/credentials', '_blank')}
-                className="text-[11px] px-3 py-1 rounded-md bg-amber-500/80 text-white hover:bg-amber-500"
-              >
-                不足のキーを追加
-              </button>
-            )}
-          </div>
-        )}
-      </div>
       
       {/* クイックアクション */}
       <div className="flex items-center gap-2 p-3 border-b border-zinc-200/50 dark:border-zinc-800/50 overflow-x-auto shrink-0 bg-zinc-50/50 dark:bg-zinc-900/30 backdrop-blur-sm">
@@ -1074,43 +1011,6 @@ export default function ProjectChatPanel({
         />
       </div>
 
-      {/* やることリスト（初回/常時） */}
-      {showChecklist && (
-        <div className="px-4 py-3 border-b border-zinc-200/60 dark:border-zinc-800/60 bg-amber-50/60 dark:bg-amber-900/20 text-sm">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="font-semibold text-amber-800 dark:text-amber-100 flex items-center gap-2">
-                <Info className="w-4 h-4" />
-                やることリスト
-              </p>
-              <ul className="mt-1 space-y-1 text-amber-900 dark:text-amber-100">
-                <li>・APIキー登録: OpenAI/Anthropic/Google/OAGI/Serper を追加</li>
-                <li>・Webhook設定: 必要なら受信先URLを用意</li>
-                <li>・ローカルエージェント: OAGI SDK & APIキーを用意（ローカル実行時）</li>
-              </ul>
-              {status?.missing?.length > 0 && (
-                <div className="mt-2 text-xs text-amber-800 dark:text-amber-100">
-                  不足: {status.missing.join(', ')}
-                </div>
-              )}
-            </div>
-            <div className="flex flex-col gap-2">
-              <button
-                onClick={() => window.open('/credentials', '_blank')}
-                className="px-3 py-2 rounded-md bg-black text-white text-xs hover:opacity-90"
-              >
-                認証情報を開く
-              </button>
-              <button
-                onClick={() => setShowChecklist(false)}
-                className="px-3 py-2 rounded-md border text-xs text-muted-foreground hover:bg-zinc-100 dark:hover:bg-zinc-800"
-              >
-                非表示にする
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
       
       {/* チャット履歴 */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">

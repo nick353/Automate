@@ -95,18 +95,25 @@ async def _call_responses_api(
     
     logger.info(f"Calling Responses API with model: {model}")
     
+    # Responses APIのリクエストボディを構築
+    # Note: gpt-5.1-codex系モデルはtemperatureパラメータをサポートしていない
+    request_body = {
+        "model": model,
+        "input": input_text,
+        "max_output_tokens": max_tokens,
+    }
+    
+    # codex系モデル以外の場合のみtemperatureを追加
+    if "codex" not in model.lower():
+        request_body["temperature"] = temperature
+    
     response = await client.post(
         "https://api.openai.com/v1/responses",
         headers={
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json"
         },
-        json={
-            "model": model,
-            "input": input_text,
-            "max_output_tokens": max_tokens,
-            "temperature": temperature
-        },
+        json=request_body,
         timeout=timeout
     )
     
@@ -177,3 +184,4 @@ async def _call_chat_completions_api(
 def get_available_models() -> List[Dict]:
     """利用可能なモデルリストを返す"""
     return AVAILABLE_MODELS
+
