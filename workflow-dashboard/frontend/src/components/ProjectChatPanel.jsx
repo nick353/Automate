@@ -449,18 +449,58 @@ export default function ProjectChatPanel({
             setPendingActions(followUp.data.actions.actions)
           }
         } else if (response.data.actions?.actions) {
-          setPendingActions(response.data.actions.actions)
+          // JSONアクションがある場合は自動実行
+          const actions = response.data.actions.actions
+          // チャット履歴からJSONブロックを除去して表示
+          const cleanedHistory = (response.data.chat_history || []).map(msg => {
+            if (msg.role === 'assistant' && msg.content.includes('```json')) {
+              const jsonStart = msg.content.indexOf('```json')
+              const jsonEnd = msg.content.indexOf('```', jsonStart + 7)
+              if (jsonStart !== -1 && jsonEnd !== -1) {
+                const beforeJson = msg.content.slice(0, jsonStart).trim()
+                const afterJson = msg.content.slice(jsonEnd + 3).trim()
+                return { ...msg, content: beforeJson + (afterJson ? '\n\n' + afterJson : '') }
+              }
+            }
+            return msg
+          })
+          setChatHistory(cleanedHistory)
+          
+          // 自動で実行
+          setPendingActions(actions)
+          await autoExecuteActions(actions, response.data.actions.creating_info)
         }
         
         await handleSavedCredentials(response.data.saved_api_keys)
       } else {
         // 通常モード（既存タスクがあるプロジェクト）
         const response = await projectsApi.chat(project.id, userMessage, chatHistory, selectedModel)
-        setChatHistory(response.data.chat_history || [])
-        await handleSavedCredentials(response.data.saved_api_keys)
         
         if (response.data.actions?.actions) {
-          setPendingActions(response.data.actions.actions)
+          // JSONアクションがある場合は自動実行
+          const actions = response.data.actions.actions
+          // チャット履歴からJSONブロックを除去して表示
+          const cleanedHistory = (response.data.chat_history || []).map(msg => {
+            if (msg.role === 'assistant' && msg.content.includes('```json')) {
+              const jsonStart = msg.content.indexOf('```json')
+              const jsonEnd = msg.content.indexOf('```', jsonStart + 7)
+              if (jsonStart !== -1 && jsonEnd !== -1) {
+                const beforeJson = msg.content.slice(0, jsonStart).trim()
+                const afterJson = msg.content.slice(jsonEnd + 3).trim()
+                return { ...msg, content: beforeJson + (afterJson ? '\n\n' + afterJson : '') }
+              }
+            }
+            return msg
+          })
+          setChatHistory(cleanedHistory)
+          await handleSavedCredentials(response.data.saved_api_keys)
+          
+          // 自動で実行
+          setPendingActions(actions)
+          await autoExecuteActions(actions, response.data.actions.creating_info)
+        } else {
+          setChatHistory(response.data.chat_history || [])
+          await handleSavedCredentials(response.data.saved_api_keys)
         }
       }
     } catch (error) {
@@ -734,6 +774,171 @@ export default function ProjectChatPanel({
       }])
       setCreatingInfo(null)
       setValidationResult(null)
+    }
+    setIsChatLoading(false)
+  }
+
+  // AIがアクションを返したときの自動実行
+  const autoExecuteActions = async (actions, creatingInfo) => {
+    if (!actions || actions.length === 0) {
+      setIsChatLoading(false)
+      return
+    }
+    
+    const createActions = actions.filter(a => a.type === 'create_task')
+    
+    // タスク作成がある場合は事前検証を実行
+    if (createActions.length > 0) {
+      try {
+        const taskData = createActions[0].data
+        
+        // 検証中メッセージ
+        setChatHistory(prev => [...prev, {
+          role: 'assistant',
+          content: '🔍 タスクを検証中...'
+        }])
+        
+        // 1. 認証情報チェック
+        const credCheck = await projectsApi.checkCredentials(
+          project.id,
+          taskData.task_prompt || '',
+          taskData.execution_location || 'server'
+        )
+        
+        // 2. AIレビュー
+        const review = await projectsApi.reviewTaskPrompt(
+          project.id,
+          taskData.task_prompt || '',
+          taskData.name || ''
+        )
+        
+        const hasCredentialIssues = credCheck.data.missing?.length > 0
+        const hasQualityIssues = review.data.reviewed && review.data.score < 6
+        
+        // 問題がある場合は改善案を提示
+        if (hasCredentialIssues || hasQualityIssues) {
+          let issueMessage = '⚠️ 検証で問題が見つかりました。\n\n'
+          
+          if (hasCredentialIssues) {
+            issueMessage += '📌 認証情報の不足\n\n'
+            credCheck.data.missing.forEach(m => {
+              issueMessage += `・${m.message}\n`
+            })
+            issueMessage += '\n'
+          }
+          
+          if (hasQualityIssues) {
+            issueMessage += `📌 タスク品質スコア: ${review.data.score}/10\n\n`
+            if (review.data.issues?.length > 0) {
+              issueMessage += '問題点:\n'
+              review.data.issues.forEach(issue => {
+                issueMessage += `・${issue}\n`
+              })
+              issueMessage += '\n'
+            }
+            if (review.data.suggestions?.length > 0) {
+              issueMessage += '改善案:\n'
+              review.data.suggestions.forEach(s => {
+                issueMessage += `・${s}\n`
+              })
+              issueMessage += '\n'
+            }
+          }
+          
+          issueMessage += '\n🔧 修正してから「進めて」と言っていただくか、このまま作成する場合は「強制作成」と言ってください。'
+          
+          // 検証中メッセージを削除して問題メッセージを追加
+          setChatHistory(prev => {
+            const filtered = prev.filter(msg => msg.content !== '🔍 タスクを検証中...')
+            return [...filtered, {
+              role: 'assistant',
+              content: issueMessage
+            }]
+          })
+          
+          // pendingActionsを保持（ユーザーが「強制作成」と言えるように）
+          setPendingActions(actions)
+          setIsChatLoading(false)
+          return
+        }
+        
+        // 検証中メッセージを削除
+        setChatHistory(prev => prev.filter(msg => msg.content !== '🔍 タスクを検証中...'))
+        
+      } catch (error) {
+        console.error('Validation error:', error)
+        // 検証エラーでも作成は続行
+        setChatHistory(prev => prev.filter(msg => msg.content !== '🔍 タスクを検証中...'))
+      }
+    }
+    
+    // 検証OKまたはタスク作成以外のアクション → 実際に作成
+    if (creatingInfo) {
+      setCreatingInfo(creatingInfo)
+    }
+    
+    try {
+      const createActions = actions.filter(a => a.type === 'create_task')
+      
+      if (createActions.length > 0) {
+        const taskData = createActions[0].data
+        const response = await projectsApi.validateAndCreateTask(
+          project.id,
+          taskData,
+          true, // skipReview
+          false // autoRunTest
+        )
+        
+        // 即座にタスクボードを更新
+        onRefresh()
+        
+        if (!response.data.success) {
+          setChatHistory(prev => [...prev, {
+            role: 'assistant',
+            content: `❌ タスク作成に失敗しました: ${response.data.error}\n\n${response.data.suggestions?.join('\n') || ''}`
+          }])
+          setPendingActions(null)
+          setCreatingInfo(null)
+          setIsChatLoading(false)
+          return
+        }
+        
+        const task = response.data.task
+        const createdTaskInfo = [task]
+        setCreatedTasks(prev => [...prev, ...createdTaskInfo])
+        addCreatedTasks(project.id, createdTaskInfo)
+        
+        let successMessage = `✅ タスクを作成しました！\n\n`
+        successMessage += `📋 タスク名: ${task.name}\n`
+        successMessage += `📝 説明: ${task.description || 'なし'}\n`
+        successMessage += `🖥️ 実行場所: ${task.execution_location === 'server' ? 'サーバー' : 'ローカル'}\n`
+        successMessage += `⏰ スケジュール: ${task.schedule || '手動実行'}\n\n`
+        successMessage += `タスクボードで確認・編集できます。テスト実行しますか？`
+        
+        setChatHistory(prev => [...prev, {
+          role: 'assistant',
+          content: successMessage,
+          createdTasks: createdTaskInfo
+        }])
+      } else {
+        // タスク作成以外のアクション
+        const response = await projectsApi.executeActions(project.id, actions)
+        onRefresh()
+        
+        setChatHistory(prev => [...prev, {
+          role: 'assistant',
+          content: `✅ アクションを実行しました。`
+        }])
+      }
+      
+      setPendingActions(null)
+      setCreatingInfo(null)
+    } catch (error) {
+      setChatHistory(prev => [...prev, {
+        role: 'assistant',
+        content: `❌ 実行に失敗しました: ${error.message}`
+      }])
+      setCreatingInfo(null)
     }
     setIsChatLoading(false)
   }
