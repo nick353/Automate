@@ -443,7 +443,7 @@ export default function ProjectChatPanel({
             selectedModel
           )
           if (followUp.data.actions?.actions) {
-            // JSONアクションがある場合は自動実行
+            // JSONアクションがある場合は確認ボタンを表示
             const actions = followUp.data.actions.actions
             // チャット履歴からJSONを除去して表示
             const cleanedHistory = (followUp.data.chat_history || []).map(msg => {
@@ -463,22 +463,22 @@ export default function ProjectChatPanel({
                   const jsonStartIdx = content.indexOf(jsonMatch[0])
                   content = content.slice(0, jsonStartIdx).trim()
                 }
-                return { ...msg, content: content || 'タスクを作成します...' }
+                return { ...msg, content: content || 'タスクを作成する準備ができました。' }
               }
               return msg
             })
             setChatHistory(cleanedHistory)
             await handleSavedCredentials(followUp.data.saved_api_keys)
             
-            // 自動で実行
+            // 確認ボタン用にpendingActionsを設定
             setPendingActions(actions)
-            await autoExecuteActions(actions, followUp.data.actions.creating_info)
+            setCreatingInfo(followUp.data.actions.creating_info || null)
           } else {
             setChatHistory(followUp.data.chat_history || [])
             await handleSavedCredentials(followUp.data.saved_api_keys)
           }
         } else if (response.data.actions?.actions) {
-          // JSONアクションがある場合は自動実行
+          // JSONアクションがある場合は確認ボタンを表示
           const actions = response.data.actions.actions
           // チャット履歴からJSONを除去して表示
           const cleanedHistory = (response.data.chat_history || []).map(msg => {
@@ -500,15 +500,15 @@ export default function ProjectChatPanel({
                 const jsonStartIdx = content.indexOf(jsonMatch[0])
                 content = content.slice(0, jsonStartIdx).trim()
               }
-              return { ...msg, content: content || 'タスクを作成します...' }
+              return { ...msg, content: content || 'タスクを作成する準備ができました。' }
             }
             return msg
           })
           setChatHistory(cleanedHistory)
           
-          // 自動で実行
+          // 確認ボタン用にpendingActionsを設定
           setPendingActions(actions)
-          await autoExecuteActions(actions, response.data.actions.creating_info)
+          setCreatingInfo(response.data.actions.creating_info || null)
         } else {
           // actionsがない場合は通常のチャット履歴を設定
           setChatHistory(response.data.chat_history || [])
@@ -520,7 +520,7 @@ export default function ProjectChatPanel({
         const response = await projectsApi.chat(project.id, userMessage, chatHistory, selectedModel)
         
         if (response.data.actions?.actions) {
-          // JSONアクションがある場合は自動実行
+          // JSONアクションがある場合は確認ボタンを表示
           const actions = response.data.actions.actions
           // チャット履歴からJSONを除去して表示
           const cleanedHistory = (response.data.chat_history || []).map(msg => {
@@ -542,16 +542,16 @@ export default function ProjectChatPanel({
                 const jsonStartIdx = content.indexOf(jsonMatch[0])
                 content = content.slice(0, jsonStartIdx).trim()
               }
-              return { ...msg, content: content || 'タスクを作成します...' }
+              return { ...msg, content: content || 'タスクを作成する準備ができました。' }
             }
             return msg
           })
           setChatHistory(cleanedHistory)
           await handleSavedCredentials(response.data.saved_api_keys)
           
-          // 自動で実行
+          // 確認ボタン用にpendingActionsを設定
           setPendingActions(actions)
-          await autoExecuteActions(actions, response.data.actions.creating_info)
+          setCreatingInfo(response.data.actions.creating_info || null)
         } else {
           setChatHistory(response.data.chat_history || [])
           await handleSavedCredentials(response.data.saved_api_keys)
@@ -1546,14 +1546,22 @@ export default function ProjectChatPanel({
         )}
         
         {/* アクション実行ボタン */}
-        {pendingActions && (pendingActions.length > 0 || pendingActions.actions?.length > 0) && (
-          <div className="bg-gradient-to-r from-primary/10 to-purple-500/10 border border-primary/30 rounded-xl p-4">
+        {pendingActions && (Array.isArray(pendingActions) ? pendingActions.length > 0 : true) && (
+          <div className="bg-gradient-to-r from-emerald-500/10 to-blue-500/10 border-2 border-emerald-500/50 rounded-xl p-4 shadow-lg">
             <div className="flex items-center gap-2 mb-3">
-              <AlertCircle className="w-5 h-5 text-primary" />
-              <span className="font-semibold text-foreground">{t('taskBoard.confirmActions')}</span>
+              <CheckCircle className="w-6 h-6 text-emerald-500" />
+              <span className="font-bold text-lg text-foreground">タスク作成の準備完了</span>
             </div>
+            {creatingInfo && (
+              <div className="mb-3 p-3 bg-white/50 dark:bg-zinc-800/50 rounded-lg">
+                <p className="font-medium text-foreground">📋 {creatingInfo.task_name}</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {creatingInfo.current}/{creatingInfo.total} 件のタスクを作成します
+                </p>
+              </div>
+            )}
             <p className="text-sm text-muted-foreground mb-3">
-              {t('taskBoard.actionsWillExecute').replace('{count}', pendingActions.length || pendingActions.actions?.length || 0)}
+              下のボタンをクリックしてタスクを作成してください
             </p>
             
             {/* 検証結果がある場合の表示 */}
