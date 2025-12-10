@@ -167,10 +167,33 @@ class WizardChatService:
             # タスク作成の準備ができたかチェック
             is_ready = "タスクを作成する準備ができました" in assistant_message or "準備ができました" in assistant_message
             
+            # JSONアクションを抽出
+            actions = None
+            if "```json" in assistant_message:
+                try:
+                    json_start = assistant_message.find("```json")
+                    json_end = assistant_message.find("```", json_start + 7)
+                    if json_start != -1 and json_end != -1:
+                        json_str = assistant_message[json_start + 7:json_end].strip()
+                        actions = json.loads(json_str)
+                except:
+                    pass
+            
+            # ```json がなくても { "actions": で始まるJSONを検出
+            if not actions and '{"actions"' in assistant_message:
+                try:
+                    import re
+                    json_match = re.search(r'\{[\s\S]*"actions"[\s\S]*\}', assistant_message)
+                    if json_match:
+                        actions = json.loads(json_match.group())
+                except:
+                    pass
+            
             return {
                 "response": assistant_message,
                 "is_ready_to_create": is_ready,
-                "chat_history": chat_history
+                "chat_history": chat_history,
+                "actions": actions
             }
             
         except Exception as e:
