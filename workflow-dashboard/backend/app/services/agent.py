@@ -628,30 +628,31 @@ class LiveViewAgent:
             return None
 
 
-async def run_api_only_task(task: Task, execution: Execution, db: Session):
-    """ブラウザ不要のAPI専用タスク実行（簡易テンプレート）
+async def run_api_only_task(task: Task, execution: Execution, db: Session, mark_completed: bool = True):
+    """ブラウザ不要のAPI専用タスク実行（プレースホルダー）
     
-    ここでDrive/APIのみの処理を実装する。現状はプレースホルダー。
+    mark_completed=False の場合はハイブリッド実行の前処理として利用する。
     """
-    # ここでAPI専用の実処理を実装する（例：Drive監視→Agent2通知など）
     await live_view_manager.send_log(
         execution.id,
         "INFO",
         "APIモードで実行開始（ブラウザ未使用）"
     )
-    # TODO: 実処理を実装。とりあえず成功扱いで終了
-    execution.status = "completed"
-    execution.result = "APIモードで実行完了（ブラウザ未使用・プレースホルダー）"
-    execution.completed_at = datetime.now()
-    db.commit()
-    await live_view_manager.send_execution_complete(
-        execution.id,
-        status="completed",
-        result=execution.result
-    )
+    # TODO: ここにAPI専用の実処理を実装する（例：Drive監視→Agent2通知など）
+    result_msg = "APIモードで実行完了（ブラウザ未使用・プレースホルダー）"
+    if mark_completed:
+        execution.status = "completed"
+        execution.result = result_msg
+        execution.completed_at = datetime.now()
+        db.commit()
+        await live_view_manager.send_execution_complete(
+            execution.id,
+            status="completed",
+            result=execution.result
+        )
     return {
         "success": True,
-        "result": execution.result,
+        "result": result_msg,
         "total_steps": 0
     }
 
@@ -700,6 +701,26 @@ async def run_task_with_live_view(task_id: int, execution_id: int):
             db.commit()
             logger.info(f"タスク実行完了: task_id={task_id}, status={execution.status}, type={execution_type}")
             return
+        
+        # ハイブリッド: まずAPIパートを実行し、その後ブラウザ（ライブビューあり）
+        if execution_type == "hybrid":
+            execution.status = "running"
+            execution.started_at = datetime.now()
+            db.commit()
+            
+            logger.info(f"ハイブリッド実行開始（API前処理→ブラウザ）: task_id={task_id}")
+            api_result = await run_api_only_task(task, execution, db, mark_completed=False)
+            if not api_result.get("success"):
+                execution.status = "failed"
+                execution.error_message = api_result.get("error") or "API前処理で失敗しました"
+                execution.completed_at = datetime.now()
+                db.commit()
+                await live_view_manager.send_execution_complete(
+                    execution.id,
+                    status="failed",
+                    error=execution.error_message
+                )
+                return
         
         # ローカルエージェント経由の実行
         if execution_location == "local":
