@@ -30,9 +30,10 @@ import {
   FlaskConical,
   AlertTriangle
 } from 'lucide-react'
-import { projectsApi, tasksApi } from '../services/api'
+import { projectsApi, tasksApi, executionsApi } from '../services/api'
 import useLanguageStore from '../stores/languageStore'
 import useProjectChatStore from '../stores/projectChatStore'
+import useCredentialStore from '../stores/credentialStore'
 
 export default function ProjectChatPanel({
   project,
@@ -41,6 +42,7 @@ export default function ProjectChatPanel({
   onRefresh
 }) {
   const { t } = useLanguageStore()
+  const { fetchCredentials, fetchStatus, status } = useCredentialStore()
   const chatEndRef = useRef(null)
   
   // ストアからチャット履歴を取得
@@ -87,8 +89,11 @@ export default function ProjectChatPanel({
   const [isChatLoading, setIsChatLoading] = useState(false)
   const [pendingActions, setPendingActions] = useState(null)
   const [isExpanded, setIsExpanded] = useState(false)
+  const [showCredBar, setShowCredBar] = useState(false)
+  const [toastMessage, setToastMessage] = useState(null)
   const [videoAnalysis, setVideoAnalysis] = useState(getVideoAnalysis(project.id))
   const [webResearchResults, setWebResearchResults] = useState(getWebResearchResults(project.id))
+  const [showChecklist, setShowChecklist] = useState(true)
   
   // 作成状態の管理
   const [creatingInfo, setCreatingInfo] = useState(null) // { current: 1, total: 3, task_name: "..." }
@@ -97,6 +102,8 @@ export default function ProjectChatPanel({
   // 検証状態の管理
   const [validationResult, setValidationResult] = useState(null) // 検証結果
   const [showTestOption, setShowTestOption] = useState(false) // テスト実行オプション表示
+  const testMonitorRef = useRef(null) // { executionId, taskName }
+  const testMonitorTimerRef = useRef(null)
   
   // チャット履歴が変更されたらストアに保存
   useEffect(() => {
@@ -118,6 +125,20 @@ export default function ProjectChatPanel({
       setStoreWebResearchResults(project.id, webResearchResults)
     }
   }, [webResearchResults, project.id, setStoreWebResearchResults])
+
+  // テスト監視タイマーのクリーンアップ
+  useEffect(() => {
+    return () => {
+      if (testMonitorTimerRef.current) {
+        clearTimeout(testMonitorTimerRef.current)
+      }
+    }
+  }, [])
+
+  // 認証情報ステータスの初期取得
+  useEffect(() => {
+    fetchStatus()
+  }, [fetchStatus])
   
   // 添付ファイルのState
   const [attachedFile, setAttachedFile] = useState(null) // { file: File, type: 'image'|'video'|'file', preview: string }
@@ -189,6 +210,16 @@ export default function ProjectChatPanel({
     setIsChatLoading(true)
     setPendingActions(null)
     
+    // チャット応答内で保存された認証情報をUIに反映する
+    const handleSavedCredentials = async (saved) => {
+      if (saved && saved.length > 0) {
+        await fetchCredentials()
+        await fetchStatus()
+        setToastMessage('認証情報を更新しました')
+        setTimeout(() => setToastMessage(null), 4000)
+      }
+    }
+
     // 添付ファイルがある場合の処理
     if (currentAttachedFile) {
       // ユーザーメッセージを追加（画像プレビュー付き）
@@ -317,6 +348,7 @@ export default function ProjectChatPanel({
             searchResponse.data.results
           )
           setChatHistory(followUp.data.chat_history || [])
+          await handleSavedCredentials(followUp.data.saved_api_keys)
           
           if (followUp.data.actions?.actions) {
             setPendingActions(followUp.data.actions.actions)
@@ -324,10 +356,13 @@ export default function ProjectChatPanel({
         } else if (response.data.actions?.actions) {
           setPendingActions(response.data.actions.actions)
         }
+        
+        await handleSavedCredentials(response.data.saved_api_keys)
       } else {
         // 通常モード（既存タスクがあるプロジェクト）
         const response = await projectsApi.chat(project.id, userMessage, chatHistory)
         setChatHistory(response.data.chat_history || [])
+        await handleSavedCredentials(response.data.saved_api_keys)
         
         if (response.data.actions?.actions) {
           setPendingActions(response.data.actions.actions)
@@ -517,6 +552,9 @@ export default function ProjectChatPanel({
         if (autoRunTest && response.data.validation?.test_execution) {
           successMessage += `テスト実行を開始しました（実行ID: ${response.data.validation.test_execution.execution_id}）\n`
           successMessage += `履歴画面で進捗を確認できます。`
+          const execId = response.data.validation.test_execution.execution_id
+          testMonitorRef.current = { executionId: execId, taskName: task.name }
+          pollTestExecution(execId, task.name)
         }
         
         setChatHistory(prev => [...prev, {
@@ -603,6 +641,66 @@ export default function ProjectChatPanel({
       setValidationResult(null)
     }
     setIsChatLoading(false)
+  }
+
+  // テスト実行をポーリングして失敗理由をチャットに連携
+  const pollTestExecution = async (executionId, taskName) => {
+    try {
+      const execRes = await executionsApi.get(executionId)
+      const execData = execRes.data || {}
+      const statusValue = execData.status || execData.execution?.status
+
+      // 実行中は再ポーリング
+      if (!statusValue || ['running', 'pending', 'paused', 'starting'].includes(statusValue)) {
+        testMonitorTimerRef.current = setTimeout(() => pollTestExecution(executionId, taskName), 5000)
+        return
+      }
+
+      // 失敗時はログを取得して要約
+      let errorHint = ''
+      if (statusValue === 'failed') {
+        try {
+          const logsRes = await executionsApi.getLogs(executionId)
+          const logsList = logsRes.data?.logs || logsRes.data || []
+          const lastError = [...logsList].reverse().find(l => (l.level || '').toUpperCase() === 'ERROR')
+          if (lastError) {
+            errorHint = lastError.message || lastError.text || JSON.stringify(lastError)
+          } else if (logsList.length > 0) {
+            const tail = logsList[logsList.length - 1]
+            errorHint = tail.message || tail.text || JSON.stringify(tail)
+          }
+        } catch (logErr) {
+          errorHint = `ログ取得に失敗しました: ${logErr.message}`
+        }
+      }
+
+      let message = `テスト実行（ID: ${executionId}）が${statusValue === 'completed' ? '完了' : '失敗'}しました。\nタスク: ${taskName || '不明'}`
+      if (statusValue === 'failed') {
+        message += errorHint ? `\n\n推定エラー: ${errorHint}` : '\n\n推定エラー: 取得できませんでした'
+        message += `\n\nよくある対処案:\n- 認証情報や権限の不足を確認\n- 画面要素/セレクタの変更有無を確認\n- 入力値や前提データの有無を確認\n\n修正案を提案しましょうか？`
+      } else {
+        message += `\n\n結果を踏まえて次のステップを決めましょう。`
+      }
+
+      setChatHistory(prev => [...prev, {
+        role: 'assistant',
+        content: message
+      }])
+
+      testMonitorRef.current = null
+      if (testMonitorTimerRef.current) {
+        clearTimeout(testMonitorTimerRef.current)
+      }
+    } catch (error) {
+      setChatHistory(prev => [...prev, {
+        role: 'assistant',
+        content: `テスト結果の確認に失敗しました: ${error.message}`
+      }])
+      testMonitorRef.current = null
+      if (testMonitorTimerRef.current) {
+        clearTimeout(testMonitorTimerRef.current)
+      }
+    }
   }
   
   // タスクを実行
@@ -692,6 +790,13 @@ export default function ProjectChatPanel({
         isExpanded ? 'w-full md:w-2/3' : 'w-full md:w-[450px] max-w-[100vw]'
       }`}
     >
+      {/* トースト */}
+      {toastMessage && (
+        <div className="absolute top-4 right-4 z-50 px-4 py-3 rounded-lg bg-emerald-100 text-emerald-700 shadow-md border border-emerald-200">
+          {toastMessage}
+        </div>
+      )}
+
       {/* ヘッダー */}
       <div className="flex items-center gap-3 p-4 border-b border-zinc-200/50 dark:border-zinc-800/50 bg-gradient-to-r from-primary/5 via-transparent to-purple-500/5 shrink-0 backdrop-blur-sm">
         <div 
@@ -732,6 +837,63 @@ export default function ProjectChatPanel({
         >
           <X className="w-5 h-5" />
         </button>
+      </div>
+      
+      {/* 認証情報ステータスバッジバー */}
+      <div className="px-3 py-2 border-b border-zinc-200/60 dark:border-zinc-800/60 bg-zinc-50/60 dark:bg-zinc-900/40">
+        <div className="flex items-center justify-between gap-2">
+          <button
+            onClick={() => setShowCredBar(!showCredBar)}
+            className="flex items-center gap-2 text-xs font-semibold text-foreground px-2 py-1 rounded-md hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 transition-colors"
+          >
+            <Shield className="w-4 h-4" />
+            認証情報
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-200">
+              {status.present?.length || 0} 登録
+            </span>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-200">
+              {status.missing?.length || 0} 不足
+            </span>
+          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => fetchStatus()}
+              className="text-[11px] px-2 py-1 rounded-md bg-zinc-200/70 dark:bg-zinc-800/70 hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors"
+            >
+              再取得
+            </button>
+            <button
+              onClick={() => window.open('/credentials', '_blank')}
+              className="text-[11px] px-2 py-1 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+            >
+              追加・確認
+            </button>
+          </div>
+        </div>
+        {showCredBar && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {(status.details || []).map((item) => (
+              <span
+                key={item.service}
+                className={`text-[11px] px-2 py-1 rounded-full border ${
+                  item.has_key
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-900/30 dark:border-emerald-800 dark:text-emerald-100'
+                    : 'bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-900/30 dark:border-amber-800 dark:text-amber-100'
+                }`}
+              >
+                {item.service}
+              </span>
+            ))}
+            {status.missing && status.missing.length > 0 && (
+              <button
+                onClick={() => window.open('/credentials', '_blank')}
+                className="text-[11px] px-3 py-1 rounded-md bg-amber-500/80 text-white hover:bg-amber-500"
+              >
+                不足のキーを追加
+              </button>
+            )}
+          </div>
+        )}
       </div>
       
       {/* クイックアクション */}
@@ -824,6 +986,44 @@ export default function ProjectChatPanel({
           }}
         />
       </div>
+
+      {/* やることリスト（初回/常時） */}
+      {showChecklist && (
+        <div className="px-4 py-3 border-b border-zinc-200/60 dark:border-zinc-800/60 bg-amber-50/60 dark:bg-amber-900/20 text-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="font-semibold text-amber-800 dark:text-amber-100 flex items-center gap-2">
+                <Info className="w-4 h-4" />
+                やることリスト
+              </p>
+              <ul className="mt-1 space-y-1 text-amber-900 dark:text-amber-100">
+                <li>・APIキー登録: OpenAI/Anthropic/Google/OAGI/Serper を追加</li>
+                <li>・Webhook設定: 必要なら受信先URLを用意</li>
+                <li>・ローカルエージェント: OAGI SDK & APIキーを用意（ローカル実行時）</li>
+              </ul>
+              {status?.missing?.length > 0 && (
+                <div className="mt-2 text-xs text-amber-800 dark:text-amber-100">
+                  不足: {status.missing.join(', ')}
+                </div>
+              )}
+            </div>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => window.open('/credentials', '_blank')}
+                className="px-3 py-2 rounded-md bg-black text-white text-xs hover:opacity-90"
+              >
+                認証情報を開く
+              </button>
+              <button
+                onClick={() => setShowChecklist(false)}
+                className="px-3 py-2 rounded-md border text-xs text-muted-foreground hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              >
+                非表示にする
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* チャット履歴 */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">

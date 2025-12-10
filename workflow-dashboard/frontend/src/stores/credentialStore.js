@@ -5,6 +5,7 @@ const useCredentialStore = create((set, get) => ({
   // 状態
   credentials: [],
   credentialTypes: [],
+  status: { present: [], missing: [], details: [] },
   isLoading: false,
   error: null,
   
@@ -26,6 +27,18 @@ const useCredentialStore = create((set, get) => ({
       set({ credentialTypes: response.data })
     } catch (error) {
       console.error('Failed to fetch credential types:', error)
+    }
+  },
+
+  // ステータス取得
+  fetchStatus: async () => {
+    try {
+      const response = await credentialsApi.status()
+      set({ status: response.data })
+      return response.data
+    } catch (error) {
+      console.error('Failed to fetch credential status:', error)
+      return { present: [], missing: [], details: [] }
     }
   },
   

@@ -22,6 +22,29 @@ def get_user_id(user: Optional[UserInfo]) -> Optional[str]:
     return None
 
 
+def _credential_status_payload(db: Session, user_id: Optional[str]):
+    """主要サービスの認証情報ステータスを返す"""
+    services = ["openai", "anthropic", "google", "serper", "oagi", "browser_use"]
+    present = []
+    missing = []
+    details = []
+    
+    for service in services:
+        cred = credential_manager.get_default(db, "api_key", service, user_id)
+        has_key = bool(cred)
+        details.append({"service": service, "has_key": has_key})
+        if has_key:
+            present.append(service)
+        else:
+            missing.append(service)
+    
+    return {
+        "present": present,
+        "missing": missing,
+        "details": details
+    }
+
+
 @router.get("", response_model=List[CredentialResponse])
 async def get_credentials(
     db: Session = Depends(get_db),
@@ -137,4 +160,14 @@ async def test_credential(
         logger.error(f"認証情報テストエラー (credential_id={credential_id}): {str(e)}")
         logger.error(traceback.format_exc())
         return {"success": False, "message": f"テスト実行中にエラーが発生しました: {str(e)}"}
+
+
+@router.get("/status")
+async def get_credential_status(
+    db: Session = Depends(get_db),
+    current_user: Optional[UserInfo] = Depends(get_current_user)
+):
+    """主要サービスの認証情報ステータスを取得"""
+    user_id = get_user_id(current_user)
+    return _credential_status_payload(db, user_id)
 

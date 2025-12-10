@@ -166,7 +166,8 @@ export const credentialsApi = {
   create: (data) => api.post('/credentials', data),
   update: (id, data) => api.put(`/credentials/${id}`, data),
   delete: (id) => api.delete(`/credentials/${id}`),
-  test: (id) => api.post(`/credentials/${id}/test`)
+  test: (id) => api.post(`/credentials/${id}/test`),
+  status: () => api.get('/credentials/status')
 }
 
 // Executions API

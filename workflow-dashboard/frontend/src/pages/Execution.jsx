@@ -13,7 +13,7 @@ import {
   Video
 } from 'lucide-react'
 import useLiveViewStore from '../stores/liveViewStore'
-import { liveViewApi, executionsApi } from '../services/api'
+import { liveViewApi, executionsApi, tasksApi } from '../services/api'
 import LiveScreencast from '../components/LiveScreencast'
 import useLanguageStore from '../stores/languageStore'
 
@@ -23,6 +23,7 @@ export default function Execution() {
   const [task, setTask] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(null)
+  const [auxLoading, setAuxLoading] = useState(null)
   const timerRef = useRef(null)
   const logsEndRef = useRef(null)
   const { t, language } = useLanguageStore()
@@ -34,6 +35,7 @@ export default function Execution() {
     logs,
     elapsedTime,
     execution,
+    screenshot,
     connect,
     disconnect,
     setInitialData,
@@ -146,6 +148,18 @@ export default function Execution() {
     navigator.clipboard.writeText(logText)
     alert(t('common.copied'))
   }
+
+  const handleRerun = async () => {
+    if (!execution?.task_id) return
+    setAuxLoading('rerun')
+    try {
+      await tasksApi.run(execution.task_id)
+      alert('再実行を開始しました（新しい実行が作成されます）')
+    } catch (error) {
+      alert(t('common.error') + ': ' + (error.message || '再実行に失敗しました'))
+    }
+    setAuxLoading(null)
+  }
   
   const getStatusBadge = () => {
     const statusMap = {
@@ -197,6 +211,10 @@ export default function Execution() {
   const isRunning = controlStatus === 'running'
   const isPaused = controlStatus === 'paused'
   const canControl = isRunning || isPaused
+  const latestStep = steps.length > 0 ? steps[steps.length - 1] : null
+  const progressTotal = totalSteps || steps.length
+  const progressCurrent = currentStep || steps.filter(s => s.status === 'completed').length
+  const progressPct = progressTotal > 0 ? Math.min(100, Math.round((progressCurrent / progressTotal) * 100)) : 0
   
   return (
     <div className="space-y-6">
@@ -244,6 +262,69 @@ export default function Execution() {
           </div>
         </div>
       )}
+
+      {/* ステータスパネル（進行状況＋最新ステップ＋スクショサムネ） */}
+      <div className="card">
+        <div className="card-header flex items-center justify-between">
+          <h2 className="font-semibold text-foreground flex items-center gap-2">
+            <Clock className="w-5 h-5 text-primary" />
+            進行状況
+          </h2>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span>{progressCurrent}/{progressTotal || '??'} steps</span>
+            <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs">{progressPct}%</span>
+          </div>
+        </div>
+        <div className="card-body space-y-3">
+          <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
+            <div
+              className="h-2 bg-primary transition-all duration-300"
+              style={{ width: `${progressPct}%` }}
+            />
+          </div>
+          <div className="flex flex-col md:flex-row gap-3">
+            <div className="flex-1">
+              <p className="text-xs text-muted-foreground mb-1">最新ステップ</p>
+              {latestStep ? (
+                <div className="p-3 rounded-lg border border-border bg-muted">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-foreground">
+                      Step {latestStep.step_number}: {latestStep.action_type}
+                    </span>
+                    <span className="text-xs text-muted-foreground">{latestStep.status}</span>
+                  </div>
+                  {latestStep.description && (
+                    <p className="text-sm text-muted-foreground mt-1">{latestStep.description}</p>
+                  )}
+                  {latestStep.error_message && (
+                    <p className="text-sm text-red-500 mt-1">{latestStep.error_message}</p>
+                  )}
+                </div>
+              ) : (
+                <div className="p-3 rounded-lg border border-dashed border-border text-sm text-muted-foreground">
+                  ステップの受信を待機中…
+                </div>
+              )}
+            </div>
+            <div className="w-full md:w-56">
+              <p className="text-xs text-muted-foreground mb-1">最新スクリーンショット</p>
+              {status === 'connected' && screenshot ? (
+                <div className="rounded-lg overflow-hidden border border-border bg-black/80">
+                  <img
+                    src={`data:image/png;base64,${screenshot}`}
+                    alt="Latest screenshot"
+                    className="w-full h-36 object-cover"
+                  />
+                </div>
+              ) : (
+                <div className="w-full h-36 rounded-lg border border-dashed border-border flex items-center justify-center text-xs text-muted-foreground">
+                  スクリーンショットなし
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
       
       {/* Step Progress */}
       <div className="card">
@@ -339,6 +420,16 @@ export default function Execution() {
         <div className="p-4 flex items-center justify-between">
           <h2 className="font-semibold text-foreground">{t('execution.control')}</h2>
           <div className="flex gap-3">
+            {!isRunning && !isPaused && (
+              <button
+                onClick={handleRerun}
+                disabled={auxLoading === 'rerun'}
+                className="btn-primary"
+              >
+                <Play className="w-4 h-4 mr-2" />
+                再実行
+              </button>
+            )}
             {isRunning && (
               <button
                 onClick={handlePause}
