@@ -1473,7 +1473,17 @@ export default function ProjectChatPanel({
   const handleRunTask = async (taskId) => {
     try {
       const res = await tasksApi.run(taskId)
-      const execId = res.data?.execution_id || res.data?.status
+      // 実行IDは必ず数値で扱う。status(pending)は誤りなので使わない
+      let execId = res.data?.execution_id || res.data?.executionId || res.data?.execution?.id
+      // 返却されなかった場合は直近のexecutionを取得して補完
+      if (!execId) {
+        try {
+          const execList = await executionsApi.getAll({ task_id: taskId, limit: 1 })
+          execId = execList.data?.[0]?.id
+        } catch (_) {
+          // 補完できなくても続行
+        }
+      }
 
       // チャットに開始メッセージ
       setChatHistory(prev => [...prev, {
