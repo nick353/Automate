@@ -316,6 +316,18 @@ export default function ProjectChatPanel({
     setIsChatLoading(true)
     try {
       setChatHistory(prev => [...prev, { role: 'assistant', content: `タスク再実行を開始します (ID: ${taskId})...` }])
+      // 提案を適用してから再実行する場合は、task_promptに追記して保存
+      if (withSuggestion && retrySuggestion) {
+        try {
+          const taskRes = await tasksApi.get(taskId)
+          const task = taskRes.data
+          const patchedPrompt = `${task.task_prompt || ''}\n\n# 提案メモ\n${retrySuggestion}`
+          await tasksApi.update(taskId, { task_prompt: patchedPrompt })
+          setChatHistory(prev => [...prev, { role: 'assistant', content: '提案をタスクに反映しました。再実行します...' }])
+        } catch (e) {
+          setChatHistory(prev => [...prev, { role: 'assistant', content: `提案の適用に失敗しました: ${e.message}` }])
+        }
+      }
       const res = await tasksApi.run(taskId)
       const execId = res.data?.execution_id || res.data?.status
       if (execId) {
