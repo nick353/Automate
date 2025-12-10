@@ -243,6 +243,36 @@ export default function ProjectChatPanel({
     setChatInput('')
     setAttachedFile(null)
     setIsChatLoading(true)
+    
+    // 承認系キーワードをチェック（pendingActionsがある場合は自動実行）
+    const approvalKeywords = [
+      /^(進めて|すすめて|作成して|作って|実行して|OK|オッケー|おっけー|はい|うん|お願い|よろしく|それで|いいよ|いいです|あっています|合っています|問題ない|大丈夫|了解|りょうかい|承認|確定|決定|go|yes|create|execute)/i,
+      /^(この内容で|その内容で|それで)(進めて|作成|実行|OK|お願い)/i,
+    ]
+    
+    // 強制作成キーワード（検証スキップ）
+    const forceCreateKeywords = /^(強制作成|強制で作成|そのまま作成|検証スキップ|force|skip)/i
+    
+    const isApproval = approvalKeywords.some(pattern => pattern.test(userMessage))
+    const isForceCreate = forceCreateKeywords.test(userMessage)
+    
+    if ((isApproval || isForceCreate) && pendingActions) {
+      // ユーザーメッセージを追加
+      setChatHistory(prev => [...prev, {
+        role: 'user',
+        content: userMessage
+      }])
+      
+      if (isForceCreate) {
+        // 強制作成: 検証スキップで直接実行
+        await handleExecuteActions(true, false)
+      } else {
+        // 通常承認: 検証付きで実行
+        await handleExecuteActionsWithValidation()
+      }
+      return
+    }
+    
     setPendingActions(null)
     
     // チャット応答内で保存された認証情報をUIに反映する
@@ -708,6 +738,103 @@ export default function ProjectChatPanel({
     setIsChatLoading(false)
   }
 
+  // 承認時の自動実行（検証付き）
+  const handleExecuteActionsWithValidation = async () => {
+    if (!pendingActions) {
+      setIsChatLoading(false)
+      return
+    }
+    
+    const actions = pendingActions.actions || pendingActions
+    const createActions = actions.filter(a => a.type === 'create_task')
+    
+    // タスク作成がある場合は事前検証を実行
+    if (createActions.length > 0) {
+      try {
+        const taskData = createActions[0].data
+        
+        // 検証中メッセージ
+        setChatHistory(prev => [...prev, {
+          role: 'assistant',
+          content: '🔍 タスクを検証中...'
+        }])
+        
+        // 1. 認証情報チェック
+        const credCheck = await projectsApi.checkCredentials(
+          project.id,
+          taskData.task_prompt || '',
+          taskData.execution_location || 'server'
+        )
+        
+        // 2. AIレビュー
+        const review = await projectsApi.reviewTaskPrompt(
+          project.id,
+          taskData.task_prompt || '',
+          taskData.name || ''
+        )
+        
+        const hasCredentialIssues = credCheck.data.missing?.length > 0
+        const hasQualityIssues = review.data.reviewed && review.data.score < 6
+        
+        // 問題がある場合は改善案を提示
+        if (hasCredentialIssues || hasQualityIssues) {
+          let issueMessage = '⚠️ 検証で問題が見つかりました。\n\n'
+          
+          if (hasCredentialIssues) {
+            issueMessage += '📌 認証情報の不足\n\n'
+            credCheck.data.missing.forEach(m => {
+              issueMessage += `・${m.message}\n`
+            })
+            issueMessage += '\n'
+          }
+          
+          if (hasQualityIssues) {
+            issueMessage += `📌 タスク品質スコア: ${review.data.score}/10\n\n`
+            if (review.data.issues?.length > 0) {
+              issueMessage += '問題点:\n'
+              review.data.issues.forEach(issue => {
+                issueMessage += `・${issue}\n`
+              })
+              issueMessage += '\n'
+            }
+            if (review.data.suggestions?.length > 0) {
+              issueMessage += '改善案:\n'
+              review.data.suggestions.forEach(s => {
+                issueMessage += `・${s}\n`
+              })
+              issueMessage += '\n'
+            }
+          }
+          
+          issueMessage += '\n🔧 上記を修正してから再度「進めて」と言っていただくか、このまま作成する場合は「強制作成」と言ってください。'
+          
+          // 検証中メッセージを削除して問題メッセージを追加
+          setChatHistory(prev => {
+            const filtered = prev.filter(msg => msg.content !== '🔍 タスクを検証中...')
+            return [...filtered, {
+              role: 'assistant',
+              content: issueMessage
+            }]
+          })
+          
+          setIsChatLoading(false)
+          return
+        }
+        
+        // 検証中メッセージを削除
+        setChatHistory(prev => prev.filter(msg => msg.content !== '🔍 タスクを検証中...'))
+        
+      } catch (error) {
+        console.error('Validation error:', error)
+        // 検証エラーでも作成は続行
+        setChatHistory(prev => prev.filter(msg => msg.content !== '🔍 タスクを検証中...'))
+      }
+    }
+    
+    // 検証OKまたはタスク作成以外のアクション → 実行
+    await handleExecuteActions(true, false)
+  }
+
   // テスト実行をポーリングして失敗理由をチャットに連携
   const pollTestExecution = async (executionId, taskName) => {
     try {
@@ -1009,7 +1136,7 @@ export default function ProjectChatPanel({
             }`}>
               {msg.role === 'user' ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
             </div>
-            <div className={`flex-1 max-w-[85%] ${msg.role === 'user' ? 'text-right' : ''}`}>
+            <div className="flex-1 max-w-[85%]">
               {/* 添付画像の表示 */}
               {msg.image && (
                 <div className={`mb-2 ${msg.role === 'user' ? 'flex justify-end' : ''}`}>
@@ -1038,7 +1165,7 @@ export default function ProjectChatPanel({
                   </div>
                 </div>
               )}
-              <div className={`inline-block p-3 rounded-2xl text-sm ${
+              <div className={`inline-block p-3 rounded-2xl text-sm text-left break-all ${
                 msg.role === 'user'
                   ? 'bg-primary text-primary-foreground rounded-br-md'
                   : 'bg-zinc-100 dark:bg-zinc-800 text-foreground rounded-bl-md'
@@ -1046,7 +1173,7 @@ export default function ProjectChatPanel({
                 {parseMessage(msg.content).map((part, i) => {
                   if (part.type === 'text') {
                     return (
-                      <div key={i} className="whitespace-pre-wrap">
+                      <div key={i} className="whitespace-pre-wrap break-all">
                         {part.content.split('\n').map((line, j) => {
                           // マークダウン風の処理
                           if (line.startsWith('**') && line.endsWith('**')) {
