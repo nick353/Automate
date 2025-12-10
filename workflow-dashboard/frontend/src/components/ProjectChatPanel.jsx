@@ -100,6 +100,7 @@ export default function ProjectChatPanel({
   
   // 作成状態の管理
   const [creatingInfo, setCreatingInfo] = useState(null) // { current: 1, total: 3, task_name: "..." }
+  const [executionWatchers, setExecutionWatchers] = useState({})
   const [createdTasks, setCreatedTasks] = useState(getCreatedTasks(project.id)) // 作成されたタスクのリスト
   
   // 検証状態の管理
@@ -107,6 +108,8 @@ export default function ProjectChatPanel({
   const [showTestOption, setShowTestOption] = useState(false) // テスト実行オプション表示
   const testMonitorRef = useRef(null) // { executionId, taskName }
   const testMonitorTimerRef = useRef(null)
+  const executionPollerRef = useRef({})
+  const executionPollerRef = useRef({})
   
   // AIモデル選択
   const [availableModels, setAvailableModels] = useState([])
@@ -230,10 +233,70 @@ export default function ProjectChatPanel({
     }
   }
 
+  // 実行IDを監視してログをチャットに表示
+  const monitorExecution = (executionId, label = 'タスク実行') => {
+    if (!executionId) return
+    setExecutionWatchers((prev) => ({ ...prev, [executionId]: { status: 'pending', label } }))
+    setChatHistory((prev) => [
+      ...prev,
+      { role: 'assistant', content: `${label} (ID: ${executionId}) を開始しました。ログを取得しています...` }
+    ])
+
+    const poll = async () => {
+      try {
+        const execRes = await executionsApi.get(executionId)
+        const status = execRes.data?.status
+        if (status === 'running' || status === 'pending') {
+          executionPollerRef.current[executionId] = setTimeout(poll, 2000)
+          return
+        }
+        const logsRes = await executionsApi.getLogs(executionId)
+        const logs = logsRes.data || []
+        const tail = logs
+          .slice(-5)
+          .map((l) => {
+            const msg = l.message || l.text || ''
+            const lvl = l.level ? `[${l.level}] ` : ''
+            return `• ${lvl}${msg}`
+          })
+          .filter(Boolean)
+          .join('\n')
+        const error = execRes.data?.error_message
+        let msg = `${label} (ID: ${executionId}) が ${status || '完了'} で終了しました。`
+        if (tail) msg += `\n\nログ抜粋:\n${tail}`
+        if (error) msg += `\n\nエラー: ${error}`
+        setChatHistory((prev) => [...prev, { role: 'assistant', content: msg }])
+      } catch (err) {
+        setChatHistory((prev) => [
+          ...prev,
+          { role: 'assistant', content: `${label} (ID: ${executionId}) のログ取得に失敗しました: ${err.message}` }
+        ])
+      } finally {
+        setExecutionWatchers((prev) => {
+          const next = { ...prev }
+          delete next[executionId]
+          return next
+        })
+        if (executionPollerRef.current[executionId]) {
+          clearTimeout(executionPollerRef.current[executionId])
+          delete executionPollerRef.current[executionId]
+        }
+      }
+    }
+    poll()
+  }
+
   // チャットスクロール
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [chatHistory])
+
+  // 実行監視タイマーのクリーンアップ
+  useEffect(() => {
+    return () => {
+      Object.values(executionPollerRef.current || {}).forEach((timer) => clearTimeout(timer))
+    }
+  }, [])
 
   const handleSendMessage = async () => {
     if ((!chatInput.trim() && !attachedFile) || isChatLoading) return
@@ -974,6 +1037,12 @@ export default function ProjectChatPanel({
           content: successMessage,
           createdTasks: createdTaskInfo
         }])
+
+        // テスト実行IDがあればログ監視を開始
+        const testExecId = response.data.validation?.test_execution?.execution_id
+        if (testExecId) {
+          monitorExecution(testExecId, 'テスト実行')
+        }
       } else {
         // タスク作成以外のアクション
         const response = await projectsApi.executeActions(project.id, actions)
