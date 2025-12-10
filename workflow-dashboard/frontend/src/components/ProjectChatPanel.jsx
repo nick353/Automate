@@ -424,6 +424,12 @@ export default function ProjectChatPanel({
         const statusCode = err.response?.status
         const errorData = err.response?.data
         const reason = statusCode ? `HTTP ${statusCode}: ${errorMsg}` : errorMsg
+        // エラーボディをわかる範囲で文字列化
+        const errorBody = errorData
+          ? typeof errorData === 'string'
+            ? errorData
+            : errorData.detail || errorData.message || JSON.stringify(errorData)
+          : null
         
         // HTTPエラー（422など）の場合もエラー分析を実行
         if (statusCode && statusCode >= 400 && taskIdForRetry) {
@@ -487,7 +493,12 @@ export default function ProjectChatPanel({
         
         setChatHistory((prev) => [
           ...prev,
-          { role: 'assistant', content: `${label} (ID: ${executionId}) のログ取得に失敗しました: ${errorMsg}` }
+          {
+            role: 'assistant',
+            content: `${label} (ID: ${executionId}) のログ取得に失敗しました: ${reason}${
+              errorBody ? `\nエラーメッセージ: ${errorBody}` : ''
+            }\n手動実行IDで確認するか、再取得を試してください。`
+          }
         ])
         updatePendingNotice(
           'ログ取得に失敗しました',

@@ -627,32 +627,177 @@ class LiveViewAgent:
 
 
 async def run_api_only_task(task: Task, execution: Execution, db: Session, mark_completed: bool = True):
-    """ブラウザ不要のAPI専用タスク実行（プレースホルダー）
+    """ブラウザ不要のAPI専用タスク実行（Drive監視の簡易実装）
     
-    mark_completed=False の場合はハイブリッド実行の前処理として利用する。
+    - 01_Artworks / 02_Videos を監視し、新規・更新ファイルを検知
+    - 状態は 03_Processing/state.json に保存
+    - Agent2 への通知はプレースホルダー（ログ出力のみ）
     """
-    await live_view_manager.send_log(
-        execution.id,
-        "INFO",
-        "APIモードで実行開始（ブラウザ未使用）"
-    )
-    # TODO: ここにAPI専用の実処理を実装する（例：Drive監視→Agent2通知など）
-    result_msg = "APIモードで実行完了（ブラウザ未使用・プレースホルダー）"
-    if mark_completed:
-        execution.status = "completed"
-        execution.result = result_msg
-        execution.completed_at = datetime.now()
-        db.commit()
-        await live_view_manager.send_execution_complete(
-            execution.id,
-            status="completed",
-            result=execution.result
+    import json
+    import os
+    from pathlib import Path
+    from datetime import datetime, timezone
+    from google.oauth2 import service_account
+    from googleapiclient.discovery import build
+    from googleapiclient.errors import HttpError
+
+    await live_view_manager.send_log(execution.id, "INFO", "APIモードで実行開始（ブラウザ未使用）")
+
+    # フォルダIDの取得（環境変数優先、なければタスクプロンプトから抽出）
+    folder_art = os.getenv("DRIVE_FOLDER_ARTWORKS_ID")
+    folder_vid = os.getenv("DRIVE_FOLDER_VIDEOS_ID")
+
+    def extract_folder_id_from_prompt(prompt: str, default: str | None = None):
+        import re
+        m = re.search(r"/folders/([A-Za-z0-9_-]+)", prompt or "")
+        return m.group(1) if m else default
+
+    folder_art = folder_art or extract_folder_id_from_prompt(task.task_prompt, folder_art)
+    folder_vid = folder_vid or extract_folder_id_from_prompt(task.task_prompt, folder_vid)
+
+    if not folder_art or not folder_vid:
+        msg = "監視フォルダIDが見つかりません（DRIVE_FOLDER_ARTWORKS_ID, DRIVE_FOLDER_VIDEOS_ID か task_prompt を確認）"
+        await live_view_manager.send_log(execution.id, "ERROR", msg)
+        execution.status = "failed"
+        execution.error_message = msg
+        if mark_completed:
+            execution.completed_at = datetime.now()
+            db.commit()
+            await live_view_manager.send_execution_complete(execution.id, status="failed", error=msg)
+        return {"success": False, "error": msg, "total_steps": 0}
+
+    # 認証（サービスアカウント想定）
+    cred_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+    if not cred_path or not Path(cred_path).exists():
+        msg = "Google認証情報が見つかりません（GOOGLE_APPLICATION_CREDENTIALS を設定してください）"
+        await live_view_manager.send_log(execution.id, "ERROR", msg)
+        execution.status = "failed"
+        execution.error_message = msg
+        if mark_completed:
+            execution.completed_at = datetime.now()
+            db.commit()
+            await live_view_manager.send_execution_complete(execution.id, status="failed", error=msg)
+        return {"success": False, "error": msg, "total_steps": 0}
+
+    try:
+        creds = service_account.Credentials.from_service_account_file(
+            cred_path, scopes=["https://www.googleapis.com/auth/drive.readonly"]
         )
-    return {
-        "success": True,
-        "result": result_msg,
-        "total_steps": 0
-    }
+        drive = build("drive", "v3", credentials=creds, cache_discovery=False)
+    except Exception as e:
+        msg = f"Google Drive認証/初期化に失敗: {e}"
+        await live_view_manager.send_log(execution.id, "ERROR", msg)
+        execution.status = "failed"
+        execution.error_message = msg
+        if mark_completed:
+            execution.completed_at = datetime.now()
+            db.commit()
+            await live_view_manager.send_execution_complete(execution.id, status="failed", error=msg)
+        return {"success": False, "error": msg, "total_steps": 0}
+
+    # 状態ファイル
+    state_dir = Path("03_Processing")
+    state_dir.mkdir(parents=True, exist_ok=True)
+    state_path = state_dir / "state.json"
+    state = {"last_checked": None, "processed_ids": []}
+    if state_path.exists():
+        try:
+            state = json.loads(state_path.read_text("utf-8"))
+        except Exception:
+            state = {"last_checked": None, "processed_ids": []}
+
+    last_checked = state.get("last_checked")
+    processed_ids = set(state.get("processed_ids") or [])
+
+    def list_new_files(folder_id: str, mime_prefix: str | None = None):
+        q_parts = [f"'{folder_id}' in parents", "trashed = false"]
+        if mime_prefix:
+            q_parts.append(f"mimeType contains '{mime_prefix}/'")
+        if last_checked:
+            q_parts.append(f"modifiedTime > '{last_checked}'")
+        q = " and ".join(q_parts)
+        return drive.files().list(
+            q=q,
+            fields="files(id, name, mimeType, modifiedTime, webContentLink, webViewLink)",
+            orderBy="modifiedTime desc",
+            pageSize=50,
+        ).execute().get("files", [])
+
+    try:
+        await live_view_manager.send_log(execution.id, "INFO", "Step: Driveチェック開始")
+        img_files = list_new_files(folder_art, "image")
+        vid_files = list_new_files(folder_vid, "video")
+        new_files = img_files + vid_files
+
+        # processed_ids でフィルタ
+        new_files = [f for f in new_files if f["id"] not in processed_ids]
+
+        if new_files:
+            await live_view_manager.send_log(
+                execution.id,
+                "INFO",
+                f"Step: 新規{len(new_files)}件検知 → Agent2へ通知（プレースホルダー）"
+            )
+            # Agent2連携はプレースホルダー（実際の起動処理は別途実装）
+            # ここでは検知結果を結果に記録
+            result_msg = {
+                "detected": [
+                    {
+                        "file_id": f["id"],
+                        "file_name": f["name"],
+                        "mimeType": f.get("mimeType"),
+                        "modifiedTime": f.get("modifiedTime"),
+                        "download_url": f.get("webContentLink") or f.get("webViewLink"),
+                        "detected_at": datetime.now(timezone.utc).isoformat(),
+                    }
+                    for f in new_files
+                ]
+            }
+            execution.result = json.dumps(result_msg, ensure_ascii=False)
+        else:
+            await live_view_manager.send_log(
+                execution.id,
+                "INFO",
+                "Step: 新規ファイルなし"
+            )
+            execution.result = "新規ファイルなし"
+
+        # 状態更新
+        state["last_checked"] = datetime.now(timezone.utc).isoformat()
+        state["processed_ids"] = list(processed_ids.union({f["id"] for f in new_files}))
+        state_path.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+
+        if mark_completed:
+            execution.status = "completed"
+            execution.completed_at = datetime.now()
+            db.commit()
+            await live_view_manager.send_execution_complete(
+                execution.id,
+                status="completed",
+                result=execution.result
+            )
+        return {"success": True, "result": execution.result, "total_steps": 0}
+
+    except HttpError as e:
+        msg = f"Drive API呼び出しでエラー: {e}"
+        await live_view_manager.send_log(execution.id, "ERROR", msg)
+        execution.status = "failed"
+        execution.error_message = msg
+        if mark_completed:
+            execution.completed_at = datetime.now()
+            db.commit()
+            await live_view_manager.send_execution_complete(execution.id, status="failed", error=msg)
+        return {"success": False, "error": msg, "total_steps": 0}
+    except Exception as e:
+        msg = f"API実行中にエラー: {e}"
+        await live_view_manager.send_log(execution.id, "ERROR", msg)
+        execution.status = "failed"
+        execution.error_message = msg
+        if mark_completed:
+            execution.completed_at = datetime.now()
+            db.commit()
+            await live_view_manager.send_execution_complete(execution.id, status="failed", error=msg)
+        return {"success": False, "error": msg, "total_steps": 0}
 
 
 async def run_task_with_live_view(task_id: int, execution_id: int):
