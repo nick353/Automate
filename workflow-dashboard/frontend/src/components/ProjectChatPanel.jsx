@@ -33,6 +33,7 @@ import {
 import { projectsApi, tasksApi, executionsApi, systemApi } from '../services/api'
 import useLanguageStore from '../stores/languageStore'
 import useProjectChatStore from '../stores/projectChatStore'
+import useTaskStore from '../stores/taskStore'
 import useCredentialStore from '../stores/credentialStore'
 
 export default function ProjectChatPanel({
@@ -104,6 +105,7 @@ export default function ProjectChatPanel({
   const [createdTasks, setCreatedTasks] = useState(getCreatedTasks(project.id)) // 作成されたタスクのリスト
   const [retryTaskId, setRetryTaskId] = useState(null)
   const [retrySuggestion, setRetrySuggestion] = useState(null)
+  const executionPollerRef = useRef({})
   
   // 検証状態の管理
   const [validationResult, setValidationResult] = useState(null) // 検証結果
@@ -111,7 +113,7 @@ export default function ProjectChatPanel({
   const testMonitorRef = useRef(null) // { executionId, taskName }
   const testMonitorTimerRef = useRef(null)
   const executionPollerRef = useRef({})
-  const executionPollerRef = useRef({})
+  const { dequeueExecution } = useTaskStore()
   
   // AIモデル選択
   const [availableModels, setAvailableModels] = useState([])
@@ -309,6 +311,17 @@ export default function ProjectChatPanel({
       Object.values(executionPollerRef.current || {}).forEach((timer) => clearTimeout(timer))
     }
   }, [])
+
+  // タスク一覧など他画面から積まれたexecutionを拾って監視
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const item = dequeueExecution()
+      if (item?.execution_id) {
+        monitorExecution(item.execution_id, item.label || '手動実行')
+      }
+    }, 2000)
+    return () => clearInterval(timer)
+  }, [dequeueExecution])
 
   // 再実行（手動＆提案付き）
   const handleRetryTask = async (taskId, withSuggestion = false) => {

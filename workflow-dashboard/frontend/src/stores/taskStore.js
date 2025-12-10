@@ -7,6 +7,7 @@ const useTaskStore = create((set, get) => ({
   currentTask: null,
   isLoading: false,
   error: null,
+  executionQueue: [], // { execution_id, label }
   
   // ボード用データ
   boardData: null,
@@ -103,6 +104,13 @@ const useTaskStore = create((set, get) => ({
   runTask: async (id) => {
     try {
       const response = await tasksApi.run(id)
+      // execution_idをキューに積んでチャットで拾えるようにする
+      const execId = response.data?.execution_id || response.data?.status
+      if (execId) {
+        set((state) => ({
+          executionQueue: [...state.executionQueue, { execution_id: execId, label: '手動実行' }]
+        }))
+      }
       return response.data
     } catch (error) {
       set({ error: error.message })
@@ -112,6 +120,15 @@ const useTaskStore = create((set, get) => ({
   
   // エラーをクリア
   clearError: () => set({ error: null }),
+
+  // 実行キューをデキュー（チャット側が取得する）
+  dequeueExecution: () => {
+    const queue = get().executionQueue
+    if (!queue || queue.length === 0) return null
+    const [head, ...rest] = queue
+    set({ executionQueue: rest })
+    return head
+  },
   
   // 現在のタスクをクリア
   clearCurrentTask: () => set({ currentTask: null }),

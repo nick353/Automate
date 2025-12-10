@@ -96,11 +96,10 @@ export default function Tasks() {
     const result = await runTask(task.id)
     setRunningTaskId(null)
     
-    if (result) {
-      const executionId = result.status
-      if (executionId) {
-        navigate(`/execution/${executionId}`)
-      }
+    if (result?.execution_id || result?.status) {
+      const executionId = result.execution_id || result.status
+      // チャット側でログ表示するのでナビゲーションは任意
+      navigate(`/execution/${executionId}`)
     }
   }
   

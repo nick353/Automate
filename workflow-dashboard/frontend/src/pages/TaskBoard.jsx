@@ -160,8 +160,10 @@ export default function TaskBoard() {
     const result = await runTask(task.id)
     setRunningTaskId(null)
     
-    if (result?.status) {
-      navigate(`/execution/${result.status}`)
+    if (result?.execution_id || result?.status) {
+      const executionId = result.execution_id || result.status
+      // チャット側でログ表示するのでナビゲーションは任意
+      navigate(`/execution/${executionId}`)
     }
   }
 
