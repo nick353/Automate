@@ -399,11 +399,10 @@ class LiveViewAgent:
                     status="running"
                 )
 
-            # on_step_start/on_step_endコールバックを使用してステップを追跡
+            # Browser UseのAgent.run()はコールバック引数を受け付けないため、max_stepsのみを渡す
+            # ステップ追跡は別の方法で行う必要がある
             result = await agent.run(
-                max_steps=max_steps_limit,
-                on_step_start=on_step_start_callback,
-                on_step_end=on_step_end_callback
+                max_steps=max_steps_limit
             )
 
             # ステップが記録されなかった場合、初期ステップを完了にする
