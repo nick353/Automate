@@ -106,7 +106,9 @@ export default function ProjectChatPanel({
   const [retryTaskId, setRetryTaskId] = useState(null)
   const [retrySuggestion, setRetrySuggestion] = useState(null)
   const [errorAnalysis, setErrorAnalysis] = useState(null) // { analysis, taskId, executionId }
+  const [pendingNotice, setPendingNotice] = useState(null) // { message, subMessage }
   const executionPollerRef = useRef({})
+  const pendingNoticeTimerRef = useRef(null)
   
   // 検証状態の管理
   const [validationResult, setValidationResult] = useState(null) // 検証結果
@@ -114,6 +116,41 @@ export default function ProjectChatPanel({
   const testMonitorRef = useRef(null) // { executionId, taskName }
   const testMonitorTimerRef = useRef(null)
   const { dequeueExecution } = useTaskStore()
+  
+  // 長時間処理中のUI制御
+  const startPendingNotice = (message, subMessage = '処理中です。少々お待ちください…') => {
+    if (pendingNoticeTimerRef.current) clearTimeout(pendingNoticeTimerRef.current)
+    setPendingNotice({ message, subMessage })
+    // 12秒経過したら追記メッセージでユーザーに安心感を与える
+    pendingNoticeTimerRef.current = setTimeout(() => {
+      setPendingNotice((prev) =>
+        prev
+          ? {
+              ...prev,
+              subMessage: prev.subMessage || 'まだ処理中です。もう少々お待ちください…'
+            }
+          : null
+      )
+    }, 12000)
+  }
+  
+  const updatePendingNotice = (message, subMessage) => {
+    setPendingNotice((prev) => {
+      if (!prev && !message) return prev
+      return {
+        message: message || prev?.message,
+        subMessage: subMessage ?? prev?.subMessage
+      }
+    })
+  }
+  
+  const clearPendingNotice = () => {
+    if (pendingNoticeTimerRef.current) {
+      clearTimeout(pendingNoticeTimerRef.current)
+      pendingNoticeTimerRef.current = null
+    }
+    setPendingNotice(null)
+  }
   
   // AIモデル選択
   const [availableModels, setAvailableModels] = useState([])
@@ -127,6 +164,11 @@ export default function ProjectChatPanel({
       setStoreChatHistory(project.id, chatHistory)
     }
   }, [chatHistory, project.id, setStoreChatHistory])
+  
+  // アンマウント時にPending通知をクリア
+  useEffect(() => {
+    return () => clearPendingNotice()
+  }, [])
   
   // 動画分析結果が変更されたらストアに保存
   useEffect(() => {
@@ -245,6 +287,7 @@ export default function ProjectChatPanel({
       ...prev,
       { role: 'assistant', content: `${label} (ID: ${executionId}) を開始しました。ログを取得しています...` }
     ])
+    startPendingNotice(`ログ取得中… (ID: ${executionId})`, 'このままお待ちください。取得でき次第ここに表示します。')
 
     const poll = async () => {
       try {
@@ -365,6 +408,7 @@ export default function ProjectChatPanel({
         }
         
         setChatHistory((prev) => [...prev, { role: 'assistant', content: msg }])
+        clearPendingNotice()
       } catch (err) {
         const errorMsg = err.message || '不明なエラー'
         const statusCode = err.response?.status
@@ -415,6 +459,7 @@ export default function ProjectChatPanel({
                 taskId: taskIdForRetry,
                 executionId
               })
+              clearPendingNotice()
               
               setChatHistory((prev) => [
                 ...prev,
@@ -433,7 +478,9 @@ export default function ProjectChatPanel({
           ...prev,
           { role: 'assistant', content: `${label} (ID: ${executionId}) のログ取得に失敗しました: ${errorMsg}` }
         ])
+        updatePendingNotice('ログ取得に失敗しました', errorMsg)
       } finally {
+        clearPendingNotice()
         setExecutionWatchers((prev) => {
           const next = { ...prev }
           delete next[executionId]
@@ -1640,6 +1687,21 @@ export default function ProjectChatPanel({
       {toastMessage && (
         <div className="absolute top-4 right-4 z-50 px-4 py-3 rounded-lg bg-emerald-100 text-emerald-700 shadow-md border border-emerald-200">
           {toastMessage}
+        </div>
+      )}
+
+      {/* 長時間処理中の通知 */}
+      {pendingNotice && (
+        <div className="mx-4 mt-3 mb-0 p-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 flex items-start gap-3">
+          <Loader2 className="w-4 h-4 mt-0.5 text-blue-600 dark:text-blue-300 animate-spin" />
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-semibold text-foreground">{pendingNotice.message || '処理中です'}</div>
+            {pendingNotice.subMessage && (
+              <div className="text-xs text-muted-foreground whitespace-pre-wrap mt-1">
+                {pendingNotice.subMessage}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
