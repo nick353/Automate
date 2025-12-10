@@ -698,6 +698,27 @@ export default function ProjectChatPanel({
           if (extracted.actions) {
             setPendingActions(extracted.actions)
             setCreatingInfo(extracted.creatingInfo || null)
+          } else {
+            // JSONが抽出できなかった場合でも、最後のメッセージにJSONが含まれている可能性がある
+            const lastMessage = history[history.length - 1]
+            if (lastMessage && lastMessage.role === 'assistant') {
+              const lastExtracted = extractActionsFromHistory([lastMessage])
+              if (lastExtracted.actions) {
+                setPendingActions(lastExtracted.actions)
+                setCreatingInfo(lastExtracted.creatingInfo || null)
+                // 最後のメッセージをクリーンアップ
+                setChatHistory(prev => {
+                  const newHistory = [...prev]
+                  if (newHistory.length > 0 && newHistory[newHistory.length - 1].role === 'assistant') {
+                    newHistory[newHistory.length - 1] = {
+                      ...newHistory[newHistory.length - 1],
+                      content: lastExtracted.cleanedHistory[0]?.content || 'タスクを作成する準備ができました。下のボタンをクリックして作成してください。'
+                    }
+                  }
+                  return newHistory
+                })
+              }
+            }
           }
         }
       }
@@ -1401,9 +1422,9 @@ export default function ProjectChatPanel({
         }
       }
 
-      // 2) インラインの { "actions": [...] } 形式から抽出
+      // 2) インラインの { "actions": [...] } 形式から抽出（より柔軟なパターン）
       if (!found) {
-        const inlineMatch = content.match(/\{\s*"actions"\s*:\s*\[[\s\S]*?\}\s*\}/)
+        const inlineMatch = content.match(/\{\s*"actions"\s*:\s*\[[\s\S]*?\]\s*(?:,\s*"creating_info"\s*:\s*\{[\s\S]*?\}\s*)?\}/)
         if (inlineMatch) {
           try {
             const data = JSON.parse(inlineMatch[0])
@@ -1418,12 +1439,33 @@ export default function ProjectChatPanel({
         }
       }
 
+      // 3) メッセージ全体がJSONオブジェクトの場合
+      if (!found) {
+        try {
+          const stripped = content.trim()
+          if (stripped.startsWith('{') && stripped.endsWith('}')) {
+            const data = JSON.parse(stripped)
+            if (data.actions && Array.isArray(data.actions)) {
+              actions = data.actions
+              creatingInfo = data.creating_info || data.creatingInfo || creatingInfo
+              found = true
+            }
+          }
+        } catch (_) {
+          // 無視
+        }
+      }
+
       // 抽出できた場合は、表示用に JSON 部分を取り除く
       if (found) {
         // ```json ... ``` を除去
         content = content.replace(/```json\s*[\s\S]*?```/g, '').trim()
         // actions を含む JSON オブジェクト部分を除去
-        content = content.replace(/\{\s*"actions"\s*:\s*\[[\s\S]*?\}\s*\}/g, '').trim()
+        content = content.replace(/\{\s*"actions"\s*:\s*\[[\s\S]*?\]\s*(?:,\s*"creating_info"\s*:\s*\{[\s\S]*?\}\s*)?\}/g, '').trim()
+        // メッセージ全体がJSONだった場合は、代わりにメッセージを表示
+        if (!content || content.length < 10) {
+          content = 'タスクを作成する準備ができました。下のボタンをクリックして作成してください。'
+        }
       }
 
       return { ...msg, content }

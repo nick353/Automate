@@ -169,37 +169,56 @@ class WizardChatService:
             
             # JSONアクションを抽出
             actions = None
+            creating_info = None
+            
+            # 1. ```json ブロックから抽出を試みる
             if "```json" in assistant_message:
                 try:
                     json_start = assistant_message.find("```json")
                     json_end = assistant_message.find("```", json_start + 7)
                     if json_start != -1 and json_end != -1:
                         json_str = assistant_message[json_start + 7:json_end].strip()
-                        actions = json.loads(json_str)
+                        parsed = json.loads(json_str)
+                        if isinstance(parsed, dict) and "actions" in parsed:
+                            actions = parsed.get("actions")
+                            creating_info = parsed.get("creating_info")
+                        elif isinstance(parsed, list):
+                            actions = parsed
                 except:
                     pass
             
-            # ```json がなくても { "actions": で始まるJSONを検出
-            if not actions and '{"actions"' in assistant_message:
+            # 2. ```json ブロックがない場合、インラインJSONオブジェクトを抽出
+            if not actions:
                 try:
                     import re
-                    json_match = re.search(r'\{[\s\S]*"actions"[\s\S]*\}', assistant_message)
+                    json_match = re.search(r'\{\s*"actions"\s*:\s*\[[\s\S]*?\]\s*(?:,\s*"creating_info"\s*:\s*\{[\s\S]*?\}\s*)?\}', assistant_message)
                     if json_match:
-                        actions = json.loads(json_match.group())
+                        parsed = json.loads(json_match.group())
+                        if isinstance(parsed, dict) and "actions" in parsed:
+                            actions = parsed.get("actions")
+                            creating_info = parsed.get("creating_info")
+                except:
+                    pass
+            
+            # 3. それでも見つからない場合、メッセージ全体がJSONオブジェクトかチェック
+            if not actions:
+                try:
+                    stripped = assistant_message.strip()
+                    if stripped.startswith("{") and stripped.endswith("}"):
+                        parsed = json.loads(stripped)
+                        if isinstance(parsed, dict) and "actions" in parsed:
+                            actions = parsed.get("actions")
+                            creating_info = parsed.get("creating_info")
                 except:
                     pass
             
             # フロントエンドは actions.actions を期待するためラップして返す
             wrapped_actions = None
             if actions:
-                if isinstance(actions, dict) and "actions" in actions:
-                    wrapped_actions = {
-                        "actions": actions.get("actions"),
-                        "creating_info": actions.get("creating_info"),
-                    }
-                else:
-                    # actions配列のみだった場合に対応
-                    wrapped_actions = {"actions": actions}
+                wrapped_actions = {
+                    "actions": actions,
+                    "creating_info": creating_info
+                }
             
             return {
                 "response": assistant_message,
