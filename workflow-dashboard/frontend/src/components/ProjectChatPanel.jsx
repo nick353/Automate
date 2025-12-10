@@ -420,10 +420,10 @@ export default function ProjectChatPanel({
           webResearchResults,
           selectedModel
         )
-        setChatHistory(response.data.chat_history || [])
         
         // Webリサーチリクエストがあれば実行
         if (response.data.web_search_request) {
+          setChatHistory(response.data.chat_history || [])
           const { query, reason } = response.data.web_search_request
           setChatHistory(prev => [...prev, {
             role: 'assistant',
@@ -442,11 +442,40 @@ export default function ProjectChatPanel({
             searchResponse.data.results,
             selectedModel
           )
-          setChatHistory(followUp.data.chat_history || [])
-          await handleSavedCredentials(followUp.data.saved_api_keys)
-          
           if (followUp.data.actions?.actions) {
-            setPendingActions(followUp.data.actions.actions)
+            // JSONアクションがある場合は自動実行
+            const actions = followUp.data.actions.actions
+            // チャット履歴からJSONを除去して表示
+            const cleanedHistory = (followUp.data.chat_history || []).map(msg => {
+              if (msg.role === 'assistant') {
+                let content = msg.content
+                if (content.includes('```json')) {
+                  const jsonStart = content.indexOf('```json')
+                  const jsonEnd = content.indexOf('```', jsonStart + 7)
+                  if (jsonStart !== -1 && jsonEnd !== -1) {
+                    const beforeJson = content.slice(0, jsonStart).trim()
+                    const afterJson = content.slice(jsonEnd + 3).trim()
+                    content = beforeJson + (afterJson ? '\n\n' + afterJson : '')
+                  }
+                }
+                const jsonMatch = content.match(/\{\s*"actions"\s*:/s)
+                if (jsonMatch) {
+                  const jsonStartIdx = content.indexOf(jsonMatch[0])
+                  content = content.slice(0, jsonStartIdx).trim()
+                }
+                return { ...msg, content: content || 'タスクを作成します...' }
+              }
+              return msg
+            })
+            setChatHistory(cleanedHistory)
+            await handleSavedCredentials(followUp.data.saved_api_keys)
+            
+            // 自動で実行
+            setPendingActions(actions)
+            await autoExecuteActions(actions, followUp.data.actions.creating_info)
+          } else {
+            setChatHistory(followUp.data.chat_history || [])
+            await handleSavedCredentials(followUp.data.saved_api_keys)
           }
         } else if (response.data.actions?.actions) {
           // JSONアクションがある場合は自動実行
@@ -480,6 +509,9 @@ export default function ProjectChatPanel({
           // 自動で実行
           setPendingActions(actions)
           await autoExecuteActions(actions, response.data.actions.creating_info)
+        } else {
+          // actionsがない場合は通常のチャット履歴を設定
+          setChatHistory(response.data.chat_history || [])
         }
         
         await handleSavedCredentials(response.data.saved_api_keys)
