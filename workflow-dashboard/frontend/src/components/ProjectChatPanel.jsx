@@ -102,6 +102,8 @@ export default function ProjectChatPanel({
   const [creatingInfo, setCreatingInfo] = useState(null) // { current: 1, total: 3, task_name: "..." }
   const [executionWatchers, setExecutionWatchers] = useState({})
   const [createdTasks, setCreatedTasks] = useState(getCreatedTasks(project.id)) // 作成されたタスクのリスト
+  const [retryTaskId, setRetryTaskId] = useState(null)
+  const [retrySuggestion, setRetrySuggestion] = useState(null)
   
   // 検証状態の管理
   const [validationResult, setValidationResult] = useState(null) // 検証結果
@@ -266,6 +268,16 @@ export default function ProjectChatPanel({
         if (tail) msg += `\n\nログ抜粋:\n${tail}`
         if (error) msg += `\n\nエラー: ${error}`
         setChatHistory((prev) => [...prev, { role: 'assistant', content: msg }])
+
+        // 失敗時は再実行ボタンを出せるように保持
+        if (status === 'failed') {
+          // 直近で作成されたタスクを候補にする
+          const lastTask = createdTasks[createdTasks.length - 1]
+          if (lastTask?.id) {
+            setRetryTaskId(lastTask.id)
+            setRetrySuggestion(error || null)
+          }
+        }
       } catch (err) {
         setChatHistory((prev) => [
           ...prev,
@@ -297,6 +309,28 @@ export default function ProjectChatPanel({
       Object.values(executionPollerRef.current || {}).forEach((timer) => clearTimeout(timer))
     }
   }, [])
+
+  // 再実行（手動＆提案付き）
+  const handleRetryTask = async (taskId, withSuggestion = false) => {
+    if (!taskId) return
+    setIsChatLoading(true)
+    try {
+      setChatHistory(prev => [...prev, { role: 'assistant', content: `タスク再実行を開始します (ID: ${taskId})...` }])
+      const res = await tasksApi.run(taskId)
+      const execId = res.data?.execution_id || res.data?.status
+      if (execId) {
+        monitorExecution(execId, withSuggestion ? '提案適用後の再実行' : '再実行')
+      } else {
+        setChatHistory(prev => [...prev, { role: 'assistant', content: '実行IDを取得できませんでした。' }])
+      }
+    } catch (err) {
+      setChatHistory(prev => [...prev, { role: 'assistant', content: `再実行に失敗しました: ${err.message}` }])
+    } finally {
+      setIsChatLoading(false)
+      setRetryTaskId(null)
+      setRetrySuggestion(null)
+    }
+  }
 
   const handleSendMessage = async () => {
     if ((!chatInput.trim() && !attachedFile) || isChatLoading) return
@@ -1452,7 +1486,44 @@ export default function ProjectChatPanel({
         />
       </div>
 
-      
+      {/* 再実行カード（失敗時） */}
+      {retryTaskId && (
+        <div className="mx-4 mb-3 p-3 rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-900/20">
+          <div className="font-semibold text-foreground mb-2">実行が失敗しました。再実行しますか？</div>
+          {retrySuggestion && (
+            <div className="text-sm text-muted-foreground mb-2 whitespace-pre-wrap">
+              提案: {retrySuggestion}
+            </div>
+          )}
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={() => handleRetryTask(retryTaskId, false)}
+              className="px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              disabled={isChatLoading}
+            >
+              この設定で再実行
+            </button>
+            <button
+              onClick={() => handleRetryTask(retryTaskId, true)}
+              className="px-4 py-2 rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 disabled:opacity-50"
+              disabled={isChatLoading}
+            >
+              提案どおり修正して再実行
+            </button>
+            <button
+              onClick={() => {
+                setRetryTaskId(null)
+                setRetrySuggestion(null)
+              }}
+              className="px-4 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              disabled={isChatLoading}
+            >
+              キャンセル
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* チャット履歴 */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {chatHistory.map((msg, idx) => (
