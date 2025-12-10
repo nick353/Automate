@@ -130,6 +130,17 @@ async def delete_task(
     if not task:
         raise HTTPException(status_code=404, detail="タスクが見つかりません")
     
+    # タスクに関連するexecutionsを取得
+    executions = db.query(Execution).filter(Execution.task_id == task_id).all()
+    
+    # 各executionのcurrent_step_idをNULLに設定（外部キー制約を回避）
+    for execution in executions:
+        if execution.current_step_id is not None:
+            execution.current_step_id = None
+    
+    db.commit()
+    
+    # タスクを削除（cascadeでexecutionsとexecution_stepsも削除される）
     db.delete(task)
     db.commit()
     return {"message": "タスクを削除しました"}

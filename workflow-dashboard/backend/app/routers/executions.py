@@ -105,12 +105,18 @@ def delete_execution(execution_id: int, db: Session = Depends(get_db)):
     if not execution:
         raise HTTPException(status_code=404, detail="実行履歴が見つかりません")
     
+    # current_step_idをNULLに設定（外部キー制約を回避）
+    if execution.current_step_id is not None:
+        execution.current_step_id = None
+        db.commit()
+    
     # スクリーンショットファイルを削除
     screenshot_dir = Path("screenshots") / str(execution_id)
     if screenshot_dir.exists():
         import shutil
         shutil.rmtree(screenshot_dir)
     
+    # executionを削除（cascadeでexecution_stepsも削除される）
     db.delete(execution)
     db.commit()
     return {"message": "実行履歴を削除しました"}
