@@ -167,7 +167,23 @@ async def get_credential_status(
     db: Session = Depends(get_db),
     current_user: Optional[UserInfo] = Depends(get_current_user)
 ):
-    """主要サービスの認証情報ステータスを取得"""
+    """
+    主要サービスの認証情報ステータスを取得。
+    失敗時も200で空ステータスを返し、フロントの描画を止めない。
+    """
     user_id = get_user_id(current_user)
-    return _credential_status_payload(db, user_id)
+    try:
+        return _credential_status_payload(db, user_id)
+    except Exception as e:
+        # 例外時は空のステータスを返してUIを壊さない
+        from app.utils.logger import logger
+        logger.warning(f"credential status fallback: {e}")
+        return {
+            "present": [],
+            "missing": ["openai", "anthropic", "google", "serper", "oagi", "browser_use"],
+            "details": [
+                {"service": svc, "has_key": False}
+                for svc in ["openai", "anthropic", "google", "serper", "oagi", "browser_use"]
+            ]
+        }
 
