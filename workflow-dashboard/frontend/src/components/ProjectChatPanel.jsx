@@ -595,8 +595,14 @@ export default function ProjectChatPanel({
             setPendingActions(actions)
             setCreatingInfo(followUp.data.actions.creating_info || null)
           } else {
-            setChatHistory(followUp.data.chat_history || [])
-            await handleSavedCredentials(followUp.data.saved_api_keys)
+          const history = followUp.data.chat_history || []
+          const extracted = extractActionsFromHistory(history)
+          setChatHistory(extracted.actions ? extracted.cleanedHistory : history)
+          await handleSavedCredentials(followUp.data.saved_api_keys)
+          if (extracted.actions) {
+            setPendingActions(extracted.actions)
+            setCreatingInfo(extracted.creatingInfo || null)
+          }
           }
         } else if (response.data.actions?.actions) {
           // JSONアクションがある場合は確認ボタンを表示
@@ -631,8 +637,14 @@ export default function ProjectChatPanel({
           setPendingActions(actions)
           setCreatingInfo(response.data.actions.creating_info || null)
         } else {
-          // actionsがない場合は通常のチャット履歴を設定
-          setChatHistory(response.data.chat_history || [])
+          // actionsがない場合でも、メッセージ内のJSONから抽出を試みる
+          const history = response.data.chat_history || []
+          const extracted = extractActionsFromHistory(history)
+          setChatHistory(extracted.actions ? extracted.cleanedHistory : history)
+          if (extracted.actions) {
+            setPendingActions(extracted.actions)
+            setCreatingInfo(extracted.creatingInfo || null)
+          }
         }
         
         await handleSavedCredentials(response.data.saved_api_keys)
@@ -674,8 +686,14 @@ export default function ProjectChatPanel({
           setPendingActions(actions)
           setCreatingInfo(response.data.actions.creating_info || null)
         } else {
-          setChatHistory(response.data.chat_history || [])
+          const history = response.data.chat_history || []
+          const extracted = extractActionsFromHistory(history)
+          setChatHistory(extracted.actions ? extracted.cleanedHistory : history)
           await handleSavedCredentials(response.data.saved_api_keys)
+          if (extracted.actions) {
+            setPendingActions(extracted.actions)
+            setCreatingInfo(extracted.creatingInfo || null)
+          }
         }
       }
     } catch (error) {
@@ -1339,6 +1357,64 @@ export default function ProjectChatPanel({
     }
     
     return parts.length > 0 ? parts : [{ type: 'text', content }]
+  }
+
+  // チャット履歴から JSON の actions 定義を拾い、ボタン表示に利用する
+  const extractActionsFromHistory = (history = []) => {
+    let actions = null
+    let creatingInfo = null
+
+    const cleanedHistory = history.map((msg) => {
+      if (msg.role !== 'assistant' || !msg.content) return msg
+
+      let content = msg.content
+      let found = false
+
+      // 1) ```json ... ``` ブロックから抽出
+      const blockRegex = /```json\s*([\s\S]*?)```/g
+      let blockMatch
+      while ((blockMatch = blockRegex.exec(content)) !== null) {
+        try {
+          const data = JSON.parse(blockMatch[1])
+          if (data.actions && Array.isArray(data.actions)) {
+            actions = data.actions
+            creatingInfo = data.creating_info || data.creatingInfo || creatingInfo
+            found = true
+          }
+        } catch (_) {
+          // 解析できなければ無視
+        }
+      }
+
+      // 2) インラインの { "actions": [...] } 形式から抽出
+      if (!found) {
+        const inlineMatch = content.match(/\{\s*"actions"\s*:\s*\[[\s\S]*?\}\s*\}/)
+        if (inlineMatch) {
+          try {
+            const data = JSON.parse(inlineMatch[0])
+            if (data.actions && Array.isArray(data.actions)) {
+              actions = data.actions
+              creatingInfo = data.creating_info || data.creatingInfo || creatingInfo
+              found = true
+            }
+          } catch (_) {
+            // 無視
+          }
+        }
+      }
+
+      // 抽出できた場合は、表示用に JSON 部分を取り除く
+      if (found) {
+        // ```json ... ``` を除去
+        content = content.replace(/```json\s*[\s\S]*?```/g, '').trim()
+        // actions を含む JSON オブジェクト部分を除去
+        content = content.replace(/\{\s*"actions"\s*:\s*\[[\s\S]*?\}\s*\}/g, '').trim()
+      }
+
+      return { ...msg, content }
+    })
+
+    return { actions, creatingInfo, cleanedHistory }
   }
   
   return (
