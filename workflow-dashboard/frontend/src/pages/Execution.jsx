@@ -45,6 +45,8 @@ export default function Execution() {
     resetElapsedTime
   } = useLiveViewStore()
   
+  const [isApiTask, setIsApiTask] = useState(false)
+  
   useEffect(() => {
     const init = async () => {
       try {
@@ -55,9 +57,10 @@ export default function Execution() {
         // タスク情報を取得
         const execResponse = await executionsApi.get(executionId)
         setTask(execResponse.data.task || { name: `Task #${execResponse.data.task_id}` })
+        setIsApiTask(execResponse.data.task?.execution_type === 'api')
         
-        // WebSocket接続（実行中の場合のみ）
-        if (['running', 'pending', 'paused'].includes(liveResponse.data.execution?.status)) {
+        // WebSocket接続（実行中の場合のみ、APIタスクは接続しない）
+        if (execResponse.data.task?.execution_type !== 'api' && ['running', 'pending', 'paused'].includes(liveResponse.data.execution?.status)) {
           connect(executionId)
         }
         
@@ -247,7 +250,7 @@ export default function Execution() {
       </div>
       
       {/* Live Screencast - 実行中は最上部に表示 */}
-      {(isRunning || isPaused) && (
+      {(isRunning || isPaused) && !isApiTask && (
         <div className="card">
           <div className="card-header">
             <h2 className="font-semibold text-foreground flex items-center gap-2">
@@ -304,26 +307,28 @@ export default function Execution() {
                 </div>
               ) : (
                 <div className="p-3 rounded-lg border border-dashed border-border text-sm text-muted-foreground">
-                  ステップの受信を待機中…
+                  {isApiTask ? 'API実行タスクのためステップは記録されません' : 'ステップの受信を待機中…'}
                 </div>
               )}
             </div>
-            <div className="w-full md:w-56">
-              <p className="text-xs text-muted-foreground mb-1">最新スクリーンショット</p>
-              {status === 'connected' && screenshot ? (
-                <div className="rounded-lg overflow-hidden border border-border bg-black/80">
-                  <img
-                    src={`data:image/png;base64,${screenshot}`}
-                    alt="Latest screenshot"
-                    className="w-full h-36 object-cover"
-                  />
-                </div>
-              ) : (
-                <div className="w-full h-36 rounded-lg border border-dashed border-border flex items-center justify-center text-xs text-muted-foreground">
-                  スクリーンショットなし
-                </div>
-              )}
-            </div>
+            {!isApiTask && (
+              <div className="w-full md:w-56">
+                <p className="text-xs text-muted-foreground mb-1">最新スクリーンショット</p>
+                {status === 'connected' && screenshot ? (
+                  <div className="rounded-lg overflow-hidden border border-border bg-black/80">
+                    <img
+                      src={`data:image/png;base64,${screenshot}`}
+                      alt="Latest screenshot"
+                      className="w-full h-36 object-cover"
+                    />
+                  </div>
+                ) : (
+                  <div className="w-full h-36 rounded-lg border border-dashed border-border flex items-center justify-center text-xs text-muted-foreground">
+                    スクリーンショットなし
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

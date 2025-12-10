@@ -628,6 +628,34 @@ class LiveViewAgent:
             return None
 
 
+async def run_api_only_task(task: Task, execution: Execution, db: Session):
+    """ブラウザ不要のAPI専用タスク実行（簡易テンプレート）
+    
+    ここでDrive/APIのみの処理を実装する。現状はプレースホルダー。
+    """
+    # ここでAPI専用の実処理を実装する（例：Drive監視→Agent2通知など）
+    await live_view_manager.send_log(
+        execution.id,
+        "INFO",
+        "APIモードで実行開始（ブラウザ未使用）"
+    )
+    # TODO: 実処理を実装。とりあえず成功扱いで終了
+    execution.status = "completed"
+    execution.result = "APIモードで実行完了（ブラウザ未使用・プレースホルダー）"
+    execution.completed_at = datetime.now()
+    db.commit()
+    await live_view_manager.send_execution_complete(
+        execution.id,
+        status="completed",
+        result=execution.result
+    )
+    return {
+        "success": True,
+        "result": execution.result,
+        "total_steps": 0
+    }
+
+
 async def run_task_with_live_view(task_id: int, execution_id: int):
     """ライブビュー対応でタスクを実行（バックグラウンドタスク用）
     
@@ -652,6 +680,26 @@ async def run_task_with_live_view(task_id: int, execution_id: int):
         # 実行場所を確認
         execution_location = getattr(task, 'execution_location', 'server') or 'server'
         execution_type = getattr(task, 'execution_type', 'web') or 'web'
+        
+        # API専用タスク: ブラウザを使わずAPIのみで実行し、ライブビューは出さない
+        if execution_type == "api":
+            execution.status = "running"
+            execution.started_at = datetime.now()
+            db.commit()
+            
+            logger.info(f"APIモードで実行（ブラウザ未使用）: task_id={task_id}")
+            result = await run_api_only_task(task, execution, db)
+            
+            if result.get("success"):
+                execution.status = "completed"
+                execution.result = result.get("result")
+            else:
+                execution.status = "failed"
+                execution.error_message = result.get("error")
+            execution.completed_at = datetime.now()
+            db.commit()
+            logger.info(f"タスク実行完了: task_id={task_id}, status={execution.status}, type={execution_type}")
+            return
         
         # ローカルエージェント経由の実行
         if execution_location == "local":
