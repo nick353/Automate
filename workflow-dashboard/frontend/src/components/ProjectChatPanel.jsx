@@ -853,16 +853,16 @@ export default function ProjectChatPanel({
             title="AIモデルを選択"
           >
             <Cpu className="w-3.5 h-3.5" />
-            <span className="max-w-[100px] truncate">{selectedModel?.replace('gpt-', '') || 'モデル'}</span>
+            <span className="max-w-[150px] truncate">{selectedModel?.replace('gpt-', '') || 'モデル'}</span>
             <ChevronDown className={`w-3 h-3 transition-transform ${showModelSelector ? 'rotate-180' : ''}`} />
           </button>
           
           {showModelSelector && (
-            <div className="absolute right-0 top-full mt-1 w-64 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-xl z-50 overflow-hidden">
-              <div className="p-2 border-b border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50">
+            <div className="absolute right-0 top-full mt-1 w-80 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-xl z-50 overflow-hidden ring-1 ring-black/5">
+              <div className="px-3 py-2 border-b border-zinc-200 dark:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-800/50 backdrop-blur-sm">
                 <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">AIモデルを選択</p>
               </div>
-              <div className="max-h-64 overflow-y-auto">
+              <div className="max-h-[320px] overflow-y-auto">
                 {availableModels.map((model) => (
                   <button
                     key={model.id}
@@ -870,24 +870,28 @@ export default function ProjectChatPanel({
                       setSelectedModel(model.id)
                       setShowModelSelector(false)
                     }}
-                    className={`w-full text-left px-3 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors ${
-                      selectedModel === model.id ? 'bg-purple-50 dark:bg-purple-900/20' : ''
+                    className={`w-full text-left px-4 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-all border-b border-zinc-100 dark:border-zinc-800/50 last:border-0 ${
+                      selectedModel === model.id ? 'bg-purple-50/50 dark:bg-purple-900/10' : ''
                     }`}
                   >
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-foreground">{model.name}</span>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-sm font-medium text-foreground">{model.name}</span>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                            model.api === 'responses' 
+                              ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' 
+                              : 'bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400'
+                          }`}>
+                            {model.api === 'responses' ? 'Responses' : 'Chat'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground leading-relaxed">{model.description}</p>
+                      </div>
                       {selectedModel === model.id && (
-                        <CheckCircle className="w-4 h-4 text-purple-500" />
+                        <CheckCircle className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0 mt-0.5" />
                       )}
                     </div>
-                    <p className="text-xs text-muted-foreground mt-0.5">{model.description}</p>
-                    <span className={`inline-block mt-1 text-[10px] px-1.5 py-0.5 rounded ${
-                      model.api === 'responses' 
-                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' 
-                        : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
-                    }`}>
-                      {model.api === 'responses' ? 'Responses API' : 'Chat API'}
-                    </span>
                   </button>
                 ))}
               </div>
