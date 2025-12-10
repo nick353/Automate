@@ -489,7 +489,10 @@ export default function ProjectChatPanel({
           ...prev,
           { role: 'assistant', content: `${label} (ID: ${executionId}) のログ取得に失敗しました: ${errorMsg}` }
         ])
-        updatePendingNotice('ログ取得に失敗しました', `${reason}\n管理画面の手動実行IDで詳細ログを確認してください。`)
+        updatePendingNotice(
+          'ログ取得に失敗しました',
+          `${reason}\n再取得を試すか、管理画面で手動実行IDを指定してログを確認してください。`
+        )
       } finally {
         clearPendingNotice()
         setExecutionWatchers((prev) => {
