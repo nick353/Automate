@@ -321,7 +321,35 @@ export default function ProjectChatPanel({
     const webSearchMatch = userMessage.match(/(?:検索|調べて|リサーチ)[：:]\s*(.+)/i) || 
                            userMessage.match(/(?:search|research)[：:]\s*(.+)/i)
     
+    // ワークフロー解説のリクエストをチェック
+    const explanationMatch = userMessage.match(/^(?:ワークフロー|workflow)(?:の)?(?:解説|説明|explanation)/i) ||
+                             userMessage === t('taskBoard.explainWorkflow')
+    
     try {
+      // ワークフロー解説の場合
+      if (explanationMatch) {
+        setChatHistory(prev => [...prev, {
+          role: 'user',
+          content: userMessage
+        }])
+        
+        setIsChatLoading(true)
+        try {
+          const response = await projectsApi.getWorkflowExplanation(project.id)
+          setChatHistory(prev => [...prev, {
+            role: 'assistant',
+            content: response.data.explanation
+          }])
+        } catch (error) {
+          setChatHistory(prev => [...prev, {
+            role: 'assistant',
+            content: `エラーが発生しました: ${error.message}`
+          }])
+        }
+        setIsChatLoading(false)
+        return
+      }
+
       // Webリサーチが必要な場合
       if (webSearchMatch) {
         const searchQuery = webSearchMatch[1]
@@ -756,23 +784,6 @@ export default function ProjectChatPanel({
     }
   }
   
-  const handleGetExplanation = async () => {
-    setIsChatLoading(true)
-    try {
-      const response = await projectsApi.getWorkflowExplanation(project.id)
-      setChatHistory(prev => [...prev, {
-        role: 'assistant',
-        content: response.data.explanation
-      }])
-    } catch (error) {
-      setChatHistory(prev => [...prev, {
-        role: 'assistant',
-        content: `エラーが発生しました: ${error.message}`
-      }])
-    }
-    setIsChatLoading(false)
-  }
-  
   const formatBytes = (bytes) => {
     if (bytes === undefined || bytes === null) return '不明'
     const units = ['B', 'KB', 'MB', 'GB']
@@ -924,37 +935,8 @@ export default function ProjectChatPanel({
       </div>
       
       
-      {/* クイックアクション */}
-      <div className="flex items-center gap-2 p-3 border-b border-zinc-200/50 dark:border-zinc-800/50 overflow-x-auto shrink-0 bg-zinc-50/50 dark:bg-zinc-900/30 backdrop-blur-sm">
-        <button
-          onClick={handleGetExplanation}
-          disabled={isChatLoading}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 rounded-full whitespace-nowrap hover:bg-blue-200 dark:hover:bg-blue-500/30 transition-colors"
-        >
-          <Info className="w-3.5 h-3.5" />
-          {t('taskBoard.explainWorkflow')}
-        </button>
-        <button
-          onClick={() => setChatInput(t('taskBoard.suggestImprovements'))}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded-full whitespace-nowrap hover:bg-amber-200 dark:hover:bg-amber-500/30 transition-colors"
-        >
-          <Sparkles className="w-3.5 h-3.5" />
-          {t('taskBoard.suggest')}
-        </button>
-        <button
-          onClick={() => setChatInput(t('taskBoard.addNewTask'))}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-full whitespace-nowrap hover:bg-emerald-200 dark:hover:bg-emerald-500/30 transition-colors"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          {t('taskBoard.addTask')}
-        </button>
-        <button
-          onClick={() => setChatInput(t('taskBoard.webSearchPrompt'))}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-cyan-100 dark:bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 rounded-full whitespace-nowrap hover:bg-cyan-200 dark:hover:bg-cyan-500/30 transition-colors"
-        >
-          <Search className="w-3.5 h-3.5" />
-          {t('taskBoard.webSearch')}
-        </button>
+      {/* ファイルアップロード用input（非表示） */}
+      <div className="hidden">
         {/* 動画アップロード（添付用） */}
         <input
           id="video-upload-chat"

@@ -32,6 +32,23 @@ def is_responses_api_model(model: str) -> bool:
     return model in RESPONSES_API_MODELS or model.startswith("gpt-5")
 
 
+def _extract_output_text(result: Dict) -> str:
+    """Responses APIレスポンスからテキストを抽出"""
+    output_text = result.get("output_text", "")
+    if output_text:
+        return output_text
+    
+    outputs = result.get("output", [])
+    if outputs and isinstance(outputs, list):
+        for output in outputs:
+            if output.get("type") == "message":
+                content = output.get("content", [])
+                for c in content:
+                    if c.get("type") == "output_text":
+                        return c.get("text", "")
+    return ""
+
+
 def convert_messages_to_input(messages: List[Dict]) -> str:
     """Chat形式のメッセージをResponses API用のinputテキストに変換"""
     parts = []
@@ -90,59 +107,60 @@ async def _call_responses_api(
     timeout: int
 ) -> str:
     """Responses API を呼び出す"""
-    # メッセージをinputテキストに変換
     input_text = convert_messages_to_input(messages)
-    
     logger.info(f"Calling Responses API with model: {model}")
-    
-    # Responses APIのリクエストボディを構築
-    # Note: gpt-5.1-codex系モデルはtemperatureパラメータをサポートしていない
-    request_body = {
-        "model": model,
-        "input": input_text,
-        "max_output_tokens": max_tokens,
-    }
-    
-    # codex系モデル以外の場合のみtemperatureを追加
-    if "codex" not in model.lower():
-        request_body["temperature"] = temperature
-    
-    response = await client.post(
-        "https://api.openai.com/v1/responses",
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
-        },
-        json=request_body,
-        timeout=timeout
-    )
-    
-    if response.status_code != 200:
-        error_detail = response.text
-        logger.error(f"Responses API Error: {response.status_code} - {error_detail}")
-        raise Exception(f"API Error: {response.status_code} - {error_detail}")
-    
-    result = response.json()
-    
-    # Responses APIのレスポンス形式に対応
-    output_text = result.get("output_text", "")
-    if not output_text:
-        # フォールバック: output配列から取得
-        outputs = result.get("output", [])
-        if outputs and isinstance(outputs, list):
-            for output in outputs:
-                if output.get("type") == "message":
-                    content = output.get("content", [])
-                    for c in content:
-                        if c.get("type") == "output_text":
-                            output_text = c.get("text", "")
-                            break
-    
-    if not output_text:
+
+    current_max_tokens = max_tokens
+    # 1回目でトークン上限に達した場合のみ、上限を増やして再試行する
+    for attempt in range(2):
+        request_body = {
+            "model": model,
+            "input": input_text,
+            "max_output_tokens": current_max_tokens,
+        }
+        # codex系モデル以外の場合のみtemperatureを追加
+        if "codex" not in model.lower():
+            request_body["temperature"] = temperature
+        
+        response = await client.post(
+            "https://api.openai.com/v1/responses",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            },
+            json=request_body,
+            timeout=timeout
+        )
+        
+        if response.status_code != 200:
+            error_detail = response.text
+            logger.error(f"Responses API Error: {response.status_code} - {error_detail}")
+            raise Exception(f"API Error: {response.status_code} - {error_detail}")
+        
+        result = response.json()
+        output_text = _extract_output_text(result)
+        status = result.get("status")
+        incomplete_reason = (result.get("incomplete_details") or {}).get("reason")
+        
+        if output_text:
+            return output_text
+        
+        # 出力がトークン上限により途切れた場合は、1度だけ上限を増やして再試行
+        if (
+            attempt == 0
+            and status == "incomplete"
+            and incomplete_reason == "max_output_tokens"
+        ):
+            logger.info(
+                f"Responses API output was truncated (max_output_tokens={current_max_tokens}). Retrying with a higher limit."
+            )
+            current_max_tokens = min(current_max_tokens * 2, 8192)
+            continue
+        
         logger.warning(f"No output_text in response: {result}")
-        output_text = str(result)
+        return str(result)
     
-    return output_text
+    return ""
 
 
 async def _call_chat_completions_api(
