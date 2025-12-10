@@ -65,7 +65,7 @@ async def call_openai_api(
     model: str = None,
     max_tokens: int = 1024,
     temperature: float = 0.7,
-    timeout: int = 120
+    timeout: int = 180
 ) -> str:
     """
     モデルに応じて適切なOpenAI APIを呼び出す
@@ -84,7 +84,10 @@ async def call_openai_api(
     if model is None:
         model = DEFAULT_CHAT_MODEL
     
-    async with httpx.AsyncClient() as client:
+    # タイムアウト設定（接続10秒、読み取り180秒）
+    timeout_config = httpx.Timeout(timeout, connect=10.0)
+    
+    async with httpx.AsyncClient(timeout=timeout_config) as client:
         if is_responses_api_model(model):
             # Responses API を使用
             return await _call_responses_api(
@@ -106,59 +109,73 @@ async def _call_responses_api(
     temperature: float,
     timeout: int
 ) -> str:
-    """Responses API を呼び出す"""
+    """Responses API を呼び出す（リトライ機能付き）"""
+    import asyncio
+    
     input_text = convert_messages_to_input(messages)
     logger.info(f"Calling Responses API with model: {model}")
 
     current_max_tokens = max_tokens
-    # 1回目でトークン上限に達した場合のみ、上限を増やして再試行する
-    for attempt in range(2):
-        request_body = {
-            "model": model,
-            "input": input_text,
-            "max_output_tokens": current_max_tokens,
-        }
-        # codex系モデル以外の場合のみtemperatureを追加
-        if "codex" not in model.lower():
-            request_body["temperature"] = temperature
-        
-        response = await client.post(
-            "https://api.openai.com/v1/responses",
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json"
-            },
-            json=request_body,
-            timeout=timeout
-        )
-        
-        if response.status_code != 200:
-            error_detail = response.text
-            logger.error(f"Responses API Error: {response.status_code} - {error_detail}")
-            raise Exception(f"API Error: {response.status_code} - {error_detail}")
-        
-        result = response.json()
-        output_text = _extract_output_text(result)
-        status = result.get("status")
-        incomplete_reason = (result.get("incomplete_details") or {}).get("reason")
-        
-        if output_text:
-            return output_text
-        
-        # 出力がトークン上限により途切れた場合は、1度だけ上限を増やして再試行
-        if (
-            attempt == 0
-            and status == "incomplete"
-            and incomplete_reason == "max_output_tokens"
-        ):
-            logger.info(
-                f"Responses API output was truncated (max_output_tokens={current_max_tokens}). Retrying with a higher limit."
-            )
-            current_max_tokens = min(current_max_tokens * 2, 8192)
-            continue
-        
-        logger.warning(f"No output_text in response: {result}")
-        return str(result)
+    max_retries = 3
+    
+    for retry in range(max_retries):
+        try:
+            # 1回目でトークン上限に達した場合のみ、上限を増やして再試行する
+            for attempt in range(2):
+                request_body = {
+                    "model": model,
+                    "input": input_text,
+                    "max_output_tokens": current_max_tokens,
+                }
+                # codex系モデル以外の場合のみtemperatureを追加
+                if "codex" not in model.lower():
+                    request_body["temperature"] = temperature
+                
+                response = await client.post(
+                    "https://api.openai.com/v1/responses",
+                    headers={
+                        "Authorization": f"Bearer {api_key}",
+                        "Content-Type": "application/json"
+                    },
+                    json=request_body
+                )
+                
+                if response.status_code != 200:
+                    error_detail = response.text
+                    logger.error(f"Responses API Error: {response.status_code} - {error_detail}")
+                    raise Exception(f"API Error: {response.status_code} - {error_detail}")
+                
+                result = response.json()
+                output_text = _extract_output_text(result)
+                status = result.get("status")
+                incomplete_reason = (result.get("incomplete_details") or {}).get("reason")
+                
+                if output_text:
+                    return output_text
+                
+                # 出力がトークン上限により途切れた場合は、1度だけ上限を増やして再試行
+                if (
+                    attempt == 0
+                    and status == "incomplete"
+                    and incomplete_reason == "max_output_tokens"
+                ):
+                    logger.info(
+                        f"Responses API output was truncated (max_output_tokens={current_max_tokens}). Retrying with a higher limit."
+                    )
+                    current_max_tokens = min(current_max_tokens * 2, 8192)
+                    continue
+                
+                logger.warning(f"No output_text in response: {result}")
+                return str(result)
+            
+            return ""
+            
+        except (httpx.ConnectError, httpx.ReadTimeout, httpx.RemoteProtocolError) as e:
+            logger.warning(f"Responses API connection error (attempt {retry + 1}/{max_retries}): {e}")
+            if retry < max_retries - 1:
+                await asyncio.sleep(2 ** retry)  # 指数バックオフ: 1秒, 2秒, 4秒
+                continue
+            raise Exception(f"API接続エラー（{max_retries}回リトライ後も失敗）: {e}")
     
     return ""
 
