@@ -200,7 +200,7 @@ async def chat(
         db.commit()
     
     # チャットを実行
-    result = await wizard_chat_service.chat(db, session, request.message)
+    result = await wizard_chat_service.chat(db, session, request.message, request.model)
     
     return {
         "response": result["response"],

@@ -331,6 +331,7 @@ class ProjectChatRequest(BaseModel):
     """プロジェクトチャットリクエスト"""
     message: str
     chat_history: Optional[List[dict]] = None
+    model: Optional[str] = None  # AIモデル選択
 
 
 class ProjectChatActionsRequest(BaseModel):
@@ -362,7 +363,8 @@ async def chat_with_project(
         project_id,
         request.message,
         request.chat_history,
-        user_id
+        user_id,
+        request.model  # AIモデル選択
     )
     
     return result
@@ -428,6 +430,7 @@ class WizardChatRequest(BaseModel):
     chat_history: Optional[List[dict]] = None
     video_analysis: Optional[dict] = None
     web_research: Optional[Any] = None  # list または dict を許容
+    model: Optional[str] = None  # AIモデル選択
 
 
 class WebSearchRequest(BaseModel):
@@ -460,7 +463,8 @@ async def wizard_chat(
         request.chat_history,
         request.video_analysis,
         request.web_research,
-        user_id
+        user_id,
+        request.model  # AIモデル選択
     )
     
     return result

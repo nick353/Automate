@@ -28,9 +28,11 @@ import {
   RotateCcw,
   Shield,
   FlaskConical,
-  AlertTriangle
+  AlertTriangle,
+  ChevronDown,
+  Cpu
 } from 'lucide-react'
-import { projectsApi, tasksApi, executionsApi } from '../services/api'
+import { projectsApi, tasksApi, executionsApi, systemApi } from '../services/api'
 import useLanguageStore from '../stores/languageStore'
 import useProjectChatStore from '../stores/projectChatStore'
 import useCredentialStore from '../stores/credentialStore'
@@ -105,6 +107,12 @@ export default function ProjectChatPanel({
   const testMonitorRef = useRef(null) // { executionId, taskName }
   const testMonitorTimerRef = useRef(null)
   
+  // AIモデル選択
+  const [availableModels, setAvailableModels] = useState([])
+  const [selectedModel, setSelectedModel] = useState(null)
+  const [defaultModel, setDefaultModel] = useState('gpt-5.1-codex-max')
+  const [showModelSelector, setShowModelSelector] = useState(false)
+  
   // チャット履歴が変更されたらストアに保存
   useEffect(() => {
     if (chatHistory.length > 0) {
@@ -139,6 +147,32 @@ export default function ProjectChatPanel({
   useEffect(() => {
     fetchStatus()
   }, [fetchStatus])
+  
+  // AIモデルリストを取得
+  useEffect(() => {
+    const fetchModels = async () => {
+      try {
+        const response = await systemApi.getAIModels()
+        setAvailableModels(response.data.models || [])
+        setDefaultModel(response.data.default || 'gpt-5.1-codex-max')
+        setSelectedModel(response.data.default || 'gpt-5.1-codex-max')
+      } catch (error) {
+        console.error('Failed to fetch AI models:', error)
+      }
+    }
+    fetchModels()
+  }, [])
+  
+  // モデルセレクターを閉じる（外側クリック時）
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (showModelSelector && !e.target.closest('[data-model-selector]')) {
+        setShowModelSelector(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showModelSelector])
   
   // 添付ファイルのState
   const [attachedFile, setAttachedFile] = useState(null) // { file: File, type: 'image'|'video'|'file', preview: string }
@@ -324,7 +358,8 @@ export default function ProjectChatPanel({
           userMessage, 
           chatHistory,
           videoAnalysis,
-          webResearchResults
+          webResearchResults,
+          selectedModel
         )
         setChatHistory(response.data.chat_history || [])
         
@@ -345,7 +380,8 @@ export default function ProjectChatPanel({
             `リサーチ結果を確認しました。続けてください。`,
             response.data.chat_history,
             videoAnalysis,
-            searchResponse.data.results
+            searchResponse.data.results,
+            selectedModel
           )
           setChatHistory(followUp.data.chat_history || [])
           await handleSavedCredentials(followUp.data.saved_api_keys)
@@ -360,7 +396,7 @@ export default function ProjectChatPanel({
         await handleSavedCredentials(response.data.saved_api_keys)
       } else {
         // 通常モード（既存タスクがあるプロジェクト）
-        const response = await projectsApi.chat(project.id, userMessage, chatHistory)
+        const response = await projectsApi.chat(project.id, userMessage, chatHistory, selectedModel)
         setChatHistory(response.data.chat_history || [])
         await handleSavedCredentials(response.data.saved_api_keys)
         
@@ -809,6 +845,57 @@ export default function ProjectChatPanel({
           <h3 className="font-semibold text-foreground">{t('taskBoard.aiAssistant')}</h3>
           <p className="text-xs text-muted-foreground truncate">{project.name}</p>
         </div>
+        
+        {/* AIモデル選択 */}
+        <div className="relative" data-model-selector>
+          <button
+            onClick={() => setShowModelSelector(!showModelSelector)}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium bg-gradient-to-r from-purple-100 to-blue-100 dark:from-purple-900/30 dark:to-blue-900/30 text-purple-700 dark:text-purple-300 rounded-lg hover:from-purple-200 hover:to-blue-200 dark:hover:from-purple-900/50 dark:hover:to-blue-900/50 transition-all border border-purple-200/50 dark:border-purple-700/50"
+            title="AIモデルを選択"
+          >
+            <Cpu className="w-3.5 h-3.5" />
+            <span className="max-w-[100px] truncate">{selectedModel?.replace('gpt-', '') || 'モデル'}</span>
+            <ChevronDown className={`w-3 h-3 transition-transform ${showModelSelector ? 'rotate-180' : ''}`} />
+          </button>
+          
+          {showModelSelector && (
+            <div className="absolute right-0 top-full mt-1 w-64 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-xl z-50 overflow-hidden">
+              <div className="p-2 border-b border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50">
+                <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">AIモデルを選択</p>
+              </div>
+              <div className="max-h-64 overflow-y-auto">
+                {availableModels.map((model) => (
+                  <button
+                    key={model.id}
+                    onClick={() => {
+                      setSelectedModel(model.id)
+                      setShowModelSelector(false)
+                    }}
+                    className={`w-full text-left px-3 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors ${
+                      selectedModel === model.id ? 'bg-purple-50 dark:bg-purple-900/20' : ''
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-foreground">{model.name}</span>
+                      {selectedModel === model.id && (
+                        <CheckCircle className="w-4 h-4 text-purple-500" />
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">{model.description}</p>
+                    <span className={`inline-block mt-1 text-[10px] px-1.5 py-0.5 rounded ${
+                      model.api === 'responses' 
+                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' 
+                        : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                    }`}>
+                      {model.api === 'responses' ? 'Responses API' : 'Chat API'}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+        
         <button
           onClick={() => {
             if (confirm('チャット履歴をクリアしますか？')) {

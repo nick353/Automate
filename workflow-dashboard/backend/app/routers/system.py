@@ -2,9 +2,11 @@
 import os
 import platform
 import subprocess
-from typing import Optional
+from typing import Optional, List
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+
+from app.services.openai_client import get_available_models, DEFAULT_CHAT_MODEL
 
 router = APIRouter(prefix="/system", tags=["system"])
 
@@ -179,6 +181,18 @@ def get_permission_instructions():
                 ]
             }
         }
+
+
+# ==================== AIモデル設定 ====================
+
+@router.get("/ai-models")
+def get_ai_models():
+    """利用可能なAIモデルリストを取得"""
+    models = get_available_models()
+    return {
+        "models": models,
+        "default": DEFAULT_CHAT_MODEL
+    }
 
 
 

@@ -5,9 +5,8 @@ from sqlalchemy.orm import Session
 
 from app.models import WizardSession
 from app.services.credential_manager import credential_manager
+from app.services.openai_client import call_openai_api, DEFAULT_CHAT_MODEL, get_available_models
 from app.utils.logger import logger
-
-DEFAULT_CHAT_MODEL = "gpt-4.1"
 
 
 class WizardChatService:
@@ -17,7 +16,8 @@ class WizardChatService:
         self,
         db: Session,
         session: WizardSession,
-        user_message: str
+        user_message: str,
+        model: str = None
     ) -> dict:
         """ユーザーメッセージに応答"""
         try:
@@ -36,9 +36,6 @@ class WizardChatService:
                 raise ValueError("OpenAI APIキーが設定されていません")
             
             api_key = cred["data"].get("api_key")
-            
-            # OpenAI APIを呼び出し
-            import httpx
             
             # 動画分析結果をコンテキストに含める（あれば）
             video_analysis = json.loads(session.video_analysis or "{}")
@@ -123,26 +120,15 @@ class WizardChatService:
             messages = [{"role": "system", "content": system_prompt}]
             messages.extend([{"role": msg["role"], "content": msg["content"]} for msg in chat_history])
             
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    "https://api.openai.com/v1/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {api_key}",
-                        "Content-Type": "application/json"
-                    },
-                    json={
-                        "model": DEFAULT_CHAT_MODEL,
-                        "max_tokens": 1024,
-                        "messages": messages
-                    },
-                    timeout=60
-                )
-                
-                if response.status_code != 200:
-                    raise Exception(f"API Error: {response.status_code} - {response.text}")
-                
-                result = response.json()
-                assistant_message = result["choices"][0]["message"]["content"]
+            # 統一されたOpenAI APIクライアントを使用
+            use_model = model or DEFAULT_CHAT_MODEL
+            assistant_message = await call_openai_api(
+                api_key=api_key,
+                messages=messages,
+                model=use_model,
+                max_tokens=1024,
+                timeout=120
+            )
             
             # アシスタントメッセージを追加
             chat_history.append({
@@ -174,7 +160,8 @@ class WizardChatService:
     async def generate_task(
         self,
         db: Session,
-        session: WizardSession
+        session: WizardSession,
+        model: str = None
     ) -> dict:
         """チャット履歴からタスクを生成"""
         try:
@@ -221,28 +208,15 @@ class WizardChatService:
 }}
 ```"""
             
-            import httpx
-            
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    "https://api.openai.com/v1/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {api_key}",
-                        "Content-Type": "application/json"
-                    },
-                    json={
-                        "model": DEFAULT_CHAT_MODEL,
-                        "max_tokens": 2048,
-                        "messages": [{"role": "user", "content": prompt}]
-                    },
-                    timeout=60
-                )
-                
-                if response.status_code != 200:
-                    raise Exception(f"API Error: {response.status_code}")
-                
-                result = response.json()
-                response_text = result["choices"][0]["message"]["content"]
+            # 統一されたOpenAI APIクライアントを使用
+            use_model = model or DEFAULT_CHAT_MODEL
+            response_text = await call_openai_api(
+                api_key=api_key,
+                messages=[{"role": "user", "content": prompt}],
+                model=use_model,
+                max_tokens=2048,
+                timeout=120
+            )
             
             # JSONを抽出
             json_start = response_text.find("```json")

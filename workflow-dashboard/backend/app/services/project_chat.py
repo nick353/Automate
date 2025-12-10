@@ -12,12 +12,11 @@ from pydantic import BaseModel
 from app.models import Project, Task, TaskTrigger, RoleGroup, Credential
 from app.services.credential_manager import credential_manager
 from app.services.encryption import encryption_service
+from app.services.openai_client import call_openai_api, DEFAULT_CHAT_MODEL, get_available_models
 from app.utils.logger import logger
 
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
-
-DEFAULT_CHAT_MODEL = "gpt-4.1"
 
 # APIキーのパターン定義
 API_KEY_PATTERNS = {
@@ -269,38 +268,26 @@ JSON形式で回答（説明は不要）:
 }}
 ```"""
 
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    "https://api.openai.com/v1/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {api_key}",
-                        "Content-Type": "application/json"
-                    },
-                    json={
-                        "model": DEFAULT_CHAT_MODEL,
-                        "max_tokens": 1000,
-                        "messages": [{"role": "user", "content": review_prompt}]
-                    },
-                    timeout=30
-                )
-                
-                if response.status_code != 200:
-                    return {"reviewed": False, "reason": f"API Error: {response.status_code}"}
-                
-                result = response.json()
-                response_text = result["choices"][0]["message"]["content"]
-                
-                # JSONを抽出
-                json_start = response_text.find("```json")
-                json_end = response_text.find("```", json_start + 7)
-                
-                if json_start != -1 and json_end != -1:
-                    json_str = response_text[json_start + 7:json_end].strip()
-                    review_result = json.loads(json_str)
-                    review_result["reviewed"] = True
-                    return review_result
-                else:
-                    return {"reviewed": False, "reason": "レビュー結果のパースに失敗"}
+            # 統一されたOpenAI APIクライアントを使用
+            response_text = await call_openai_api(
+                api_key=api_key,
+                messages=[{"role": "user", "content": review_prompt}],
+                model=DEFAULT_CHAT_MODEL,
+                max_tokens=1000,
+                timeout=60
+            )
+            
+            # JSONを抽出
+            json_start = response_text.find("```json")
+            json_end = response_text.find("```", json_start + 7)
+            
+            if json_start != -1 and json_end != -1:
+                json_str = response_text[json_start + 7:json_end].strip()
+                review_result = json.loads(json_str)
+                review_result["reviewed"] = True
+                return review_result
+            else:
+                return {"reviewed": False, "reason": "レビュー結果のパースに失敗"}
                     
         except Exception as e:
             logger.warning(f"task_promptレビューエラー: {e}")
@@ -440,7 +427,8 @@ JSON形式で回答（説明は不要）:
         project_id: int,
         user_message: str,
         chat_history: List[Dict] = None,
-        user_id: str = None
+        user_id: str = None,
+        model: str = None
     ) -> dict:
         """プロジェクトのコンテキストを理解したチャット"""
         try:
@@ -616,28 +604,15 @@ task_promptは具体的なステップを含めてください：
             messages = [{"role": "system", "content": system_prompt}]
             messages.extend([{"role": msg["role"], "content": msg["content"]} for msg in chat_history])
             
-            import httpx
-            
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    "https://api.openai.com/v1/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {api_key}",
-                        "Content-Type": "application/json"
-                    },
-                    json={
-                        "model": DEFAULT_CHAT_MODEL,
-                        "max_tokens": 2048,
-                        "messages": messages
-                    },
-                    timeout=90
-                )
-                
-                if response.status_code != 200:
-                    raise Exception(f"API Error: {response.status_code} - {response.text}")
-                
-                result = response.json()
-                assistant_message = result["choices"][0]["message"]["content"]
+            # 統一されたOpenAI APIクライアントを使用
+            use_model = model or DEFAULT_CHAT_MODEL
+            assistant_message = await call_openai_api(
+                api_key=api_key,
+                messages=messages,
+                model=use_model,
+                max_tokens=2048,
+                timeout=120
+            )
             
             # アシスタントメッセージを追加
             chat_history.append({
@@ -886,28 +861,14 @@ task_promptは具体的なステップを含めてください：
 
 日本語で、絵文字を使って親しみやすく説明してください。"""
 
-            import httpx
-            
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    "https://api.openai.com/v1/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {api_key}",
-                        "Content-Type": "application/json"
-                    },
-                    json={
-                        "model": DEFAULT_CHAT_MODEL,
-                        "max_tokens": 1500,
-                        "messages": [{"role": "user", "content": prompt}]
-                    },
-                    timeout=60
-                )
-                
-                if response.status_code != 200:
-                    raise Exception(f"API Error: {response.status_code}")
-                
-                result = response.json()
-                explanation = result["choices"][0]["message"]["content"]
+            # 統一されたOpenAI APIクライアントを使用
+            explanation = await call_openai_api(
+                api_key=api_key,
+                messages=[{"role": "user", "content": prompt}],
+                model=DEFAULT_CHAT_MODEL,
+                max_tokens=1500,
+                timeout=90
+            )
             
             return {
                 "explanation": explanation,
@@ -966,39 +927,31 @@ task_promptは具体的なステップを含めてください：
             
             api_key = cred["data"].get("api_key")
             
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    "https://api.openai.com/v1/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {api_key}",
-                        "Content-Type": "application/json"
-                    },
-                    json={
-                        "model": DEFAULT_CHAT_MODEL,
-                        "max_tokens": 1500,
-                        "messages": [
-                            {
-                                "role": "system",
-                                "content": "あなたはWebリサーチアシスタントです。与えられたトピックについて、最新の情報や関連する情報をまとめてください。"
-                            },
-                            {
-                                "role": "user",
-                                "content": f"以下のトピックについて調べてください：{query}\n\n最新のトレンド、関連する情報、役立つリソースをまとめてください。"
-                            }
-                        ]
-                    },
-                    timeout=60
-                )
-                
-                if response.status_code == 200:
-                    result = response.json()
-                    return {
-                        "success": True,
-                        "results": [{"title": "AI分析結果", "content": result["choices"][0]["message"]["content"]}],
-                        "source": "openai"
-                    }
+            # 統一されたOpenAI APIクライアントを使用
+            messages = [
+                {
+                    "role": "system",
+                    "content": "あなたはWebリサーチアシスタントです。与えられたトピックについて、最新の情報や関連する情報をまとめてください。"
+                },
+                {
+                    "role": "user",
+                    "content": f"以下のトピックについて調べてください：{query}\n\n最新のトレンド、関連する情報、役立つリソースをまとめてください。"
+                }
+            ]
             
-            return {"success": False, "error": "検索に失敗しました"}
+            response_text = await call_openai_api(
+                api_key=api_key,
+                messages=messages,
+                model=DEFAULT_CHAT_MODEL,
+                max_tokens=1500,
+                timeout=90
+            )
+            
+            return {
+                "success": True,
+                "results": [{"title": "AI分析結果", "content": response_text}],
+                "source": "openai"
+            }
             
         except Exception as e:
             logger.error(f"Webリサーチエラー: {e}")
@@ -1203,7 +1156,8 @@ JSON形式で回答してください：
         chat_history: List[Dict] = None,
         video_analysis: Dict = None,
         web_research: Any = None,  # list または dict を許容
-        user_id: str = None
+        user_id: str = None,
+        model: str = None
     ) -> dict:
         """空のプロジェクトでワークフローを構築するためのウィザードチャット"""
         try:
@@ -1386,26 +1340,15 @@ task_prompt（AIエージェントへの指示）は以下を含む詳細なも�
             messages = [{"role": "system", "content": system_prompt}]
             messages.extend([{"role": msg["role"], "content": msg["content"]} for msg in chat_history])
             
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    "https://api.openai.com/v1/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {api_key}",
-                        "Content-Type": "application/json"
-                    },
-                    json={
-                        "model": DEFAULT_CHAT_MODEL,
-                        "max_tokens": 2500,
-                        "messages": messages
-                    },
-                    timeout=90
-                )
-                
-                if response.status_code != 200:
-                    raise Exception(f"API Error: {response.status_code}")
-                
-                result = response.json()
-                assistant_message = result["choices"][0]["message"]["content"]
+            # 統一されたOpenAI APIクライアントを使用
+            use_model = model or DEFAULT_CHAT_MODEL
+            assistant_message = await call_openai_api(
+                api_key=api_key,
+                messages=messages,
+                model=use_model,
+                max_tokens=2500,
+                timeout=120
+            )
             
             chat_history.append({"role": "assistant", "content": assistant_message})
             
@@ -1462,7 +1405,8 @@ task_prompt（AIエージェントへの指示）は以下を含む詳細なも�
         task_id: int,
         user_message: str,
         chat_history: List[Dict] = None,
-        user_id: str = None
+        user_id: str = None,
+        model: str = None
     ) -> dict:
         """個別タスクのロジックを理解したチャット"""
         try:
@@ -1604,26 +1548,15 @@ task_prompt（AIエージェントへの指示）は以下を含む詳細なも�
             messages = [{"role": "system", "content": system_prompt}]
             messages.extend([{"role": msg["role"], "content": msg["content"]} for msg in chat_history])
             
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    "https://api.openai.com/v1/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {api_key}",
-                        "Content-Type": "application/json"
-                    },
-                    json={
-                        "model": DEFAULT_CHAT_MODEL,
-                        "max_tokens": 2048,
-                        "messages": messages
-                    },
-                    timeout=90
-                )
-                
-                if response.status_code != 200:
-                    raise Exception(f"API Error: {response.status_code}")
-                
-                result = response.json()
-                assistant_message = result["choices"][0]["message"]["content"]
+            # 統一されたOpenAI APIクライアントを使用
+            use_model = model or DEFAULT_CHAT_MODEL
+            assistant_message = await call_openai_api(
+                api_key=api_key,
+                messages=messages,
+                model=use_model,
+                max_tokens=2048,
+                timeout=120
+            )
             
             chat_history.append({"role": "assistant", "content": assistant_message})
             

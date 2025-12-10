@@ -81,17 +81,18 @@ export const projectsApi = {
   getRoleGroups: (projectId) => api.get(`/projects/${projectId}/role-groups`),
   updateRoleGroup: (groupId, data) => api.put(`/projects/role-groups/${groupId}`, data),
   deleteRoleGroup: (groupId) => api.delete(`/projects/role-groups/${groupId}`),
-  // プロジェクトチャット
-  chat: (projectId, message, chatHistory) => api.post(`/projects/${projectId}/chat`, { message, chat_history: chatHistory }),
+  // プロジェクトチャット（model選択対応）
+  chat: (projectId, message, chatHistory, model = null) => api.post(`/projects/${projectId}/chat`, { message, chat_history: chatHistory, model }),
   executeActions: (projectId, actions) => api.post(`/projects/${projectId}/chat/execute-actions`, { actions }),
   getWorkflowExplanation: (projectId) => api.get(`/projects/${projectId}/workflow-explanation`),
-  // ウィザードチャット（空プロジェクト用）
-  wizardChat: (projectId, message, chatHistory, videoAnalysis, webResearch) => 
+  // ウィザードチャット（空プロジェクト用、model選択対応）
+  wizardChat: (projectId, message, chatHistory, videoAnalysis, webResearch, model = null) => 
     api.post(`/projects/${projectId}/wizard-chat`, { 
       message, 
       chat_history: chatHistory,
       video_analysis: videoAnalysis,
-      web_research: webResearch
+      web_research: webResearch,
+      model
     }),
   // Webリサーチ
   webSearch: (projectId, query, numResults = 5) => 
@@ -195,6 +196,13 @@ export const statsApi = {
   get: () => api.get('/stats')
 }
 
+// System API
+export const systemApi = {
+  getInfo: () => api.get('/system/info'),
+  getPermissions: () => api.get('/system/permissions'),
+  getAIModels: () => api.get('/system/ai-models')
+}
+
 // Wizard API
 export const wizardApi = {
   // チャット専用セッションを開始
@@ -221,9 +229,9 @@ export const wizardApi = {
   getSession: (sessionId) => 
     api.get(`/wizard/sessions/${sessionId}`),
   
-  // AIとチャット
-  chat: (sessionId, message) => 
-    api.post(`/wizard/sessions/${sessionId}/chat`, { message }),
+  // AIとチャット（model選択対応）
+  chat: (sessionId, message, model = null) => 
+    api.post(`/wizard/sessions/${sessionId}/chat`, { message, model }),
   
   // タスクを生成
   generateTask: (sessionId) => 

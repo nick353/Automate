@@ -343,6 +343,7 @@ class ChatMessage(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str
+    model: Optional[str] = None  # AIモデル選択
 
 
 class ChatResponse(BaseModel):
