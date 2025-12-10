@@ -758,5 +758,7 @@ async def validate_and_create_task(
             "schedule": task.schedule,
             "execution_location": task.execution_location
         },
+        # 直近のテスト実行ID（auto_run_test=true のとき）
+        "execution_id": validation_results.get("test_execution", {}).get("execution_id"),
         "validation": validation_results
     }
