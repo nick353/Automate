@@ -79,10 +79,11 @@ const useTaskStore = create((set, get) => ({
         tasks: state.tasks.filter(t => t.id !== id),
         isLoading: false
       }))
-      return true
+      return { success: true }
     } catch (error) {
-      set({ error: error.message, isLoading: false })
-      return false
+      const message = error.response?.data?.detail || error.message || '削除に失敗しました'
+      set({ error: message, isLoading: false })
+      return { success: false, error: message }
     }
   },
   

@@ -256,9 +256,15 @@ export default function TaskBoard() {
                     <hr className="my-1 border-zinc-200 dark:border-zinc-700" />
                     <button
                       onClick={async () => {
-                        if (confirm(t('tasks.confirmDelete').replace('{name}', task.name))) {
-                          await deleteTask(task.id)
-                          fetchBoardData()
+                        if (!confirm(t('tasks.confirmDelete').replace('{name}', task.name))) {
+                          setShowMenu(false)
+                          return
+                        }
+                        const result = await deleteTask(task.id)
+                        if (result?.success) {
+                          await fetchBoardData()
+                        } else {
+                          alert(result?.error || t('common.error'))
                         }
                         setShowMenu(false)
                       }}
