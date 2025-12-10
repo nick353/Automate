@@ -169,12 +169,14 @@ class LiveViewAgent:
                 agent = Agent(
                     task=task_prompt,
                     llm=llm,
-                    browser_profile=browser_profile
+                    browser_profile=browser_profile,
+                    headless=True  # サーバー環境では必ずヘッドレスで起動（Xサーバー不要）
                 )
             else:
                 agent = Agent(
                     task=task_prompt,
-                    llm=llm
+                    llm=llm,
+                    headless=True  # BrowserProfileがなくてもヘッドレスを強制
                 )
             
             # ステップ追跡用の変数
