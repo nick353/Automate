@@ -732,6 +732,13 @@ async def run_api_only_task(task: Task, execution: Execution, db: Session, mark_
         # processed_ids でフィルタ
         new_files = [f for f in new_files if f["id"] not in processed_ids]
 
+        agent2_task_id = os.getenv("AGENT2_TASK_ID")
+        if agent2_task_id:
+            try:
+                agent2_task_id = int(agent2_task_id)
+            except Exception:
+                agent2_task_id = None
+
         if new_files:
             await live_view_manager.send_log(
                 execution.id,
@@ -754,6 +761,37 @@ async def run_api_only_task(task: Task, execution: Execution, db: Session, mark_
                 ]
             }
             execution.result = json.dumps(result_msg, ensure_ascii=False)
+
+            # Agent2が指定されていれば起動（簡易トリガー）
+            if agent2_task_id and agent2_task_id != task.id:
+                try:
+                    # 新しいExecutionを作成し、バックグラウンドで起動
+                    from app.models import Execution as ExecModel
+                    agent2_exec = ExecModel(
+                        task_id=agent2_task_id,
+                        status="pending",
+                        triggered_by="api_trigger",
+                        started_at=datetime.utcnow()
+                    )
+                    db.add(agent2_exec)
+                    db.commit()
+                    db.refresh(agent2_exec)
+
+                    await live_view_manager.send_log(
+                        execution.id,
+                        "INFO",
+                        f"Agent2を起動しました (task_id={agent2_task_id}, execution_id={agent2_exec.id})"
+                    )
+
+                    # 非同期でAgent2を実行
+                    from app.services.agent import run_task_with_live_view
+                    asyncio.create_task(run_task_with_live_view(agent2_task_id, agent2_exec.id))
+                except Exception as e:
+                    await live_view_manager.send_log(
+                        execution.id,
+                        "ERROR",
+                        f"Agent2起動に失敗: {e}"
+                    )
         else:
             await live_view_manager.send_log(
                 execution.id,
