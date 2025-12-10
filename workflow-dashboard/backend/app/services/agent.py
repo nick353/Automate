@@ -481,6 +481,16 @@ class LiveViewAgent:
             }
         except Exception as e:
             logger.error(f"エージェント実行エラー: {e}")
+            # 代表的なエラーに対するヒントを付与
+            error_hint = None
+            msg = str(e)
+            if "Missing X server" in msg or "DISPLAY" in msg or "headless" in msg:
+                error_hint = "サーバーでブラウザを起動できません。ヘッドレス起動が必要です（headless=Trueを指定済みか確認）。"
+            if "BrowserType.launch" in msg or "Target page" in msg:
+                error_hint = (error_hint or "") + " Playwrightの依存パッケージ不足や権限不足の可能性があります。"
+            if "Browser' object has no attribute 'contexts'" in msg:
+                error_hint = "Browser Use/Playwrightのバージョン不整合の可能性があります。`pip install -U browser-use playwright` を試してください。"
+
             await live_view_manager.send_log(
                 self.execution.id,
                 "ERROR",
@@ -489,11 +499,11 @@ class LiveViewAgent:
             await live_view_manager.send_execution_complete(
                 self.execution.id,
                 status="failed",
-                error=str(e)
+                error=str(e) + (f"\nヒント: {error_hint}" if error_hint else "")
             )
             return {
                 "success": False,
-                "error": str(e),
+                "error": str(e) + (f"\nヒント: {error_hint}" if error_hint else ""),
                 "total_steps": self.step_count
             }
         finally:
