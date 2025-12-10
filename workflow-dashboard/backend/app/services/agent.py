@@ -698,7 +698,18 @@ async def run_task_with_live_view(task_id: int, execution_id: int):
             execution.result = result.get("result")
         else:
             execution.status = "failed"
-            execution.error_message = result.get("error")
+            error_msg = result.get("error")
+            # よくあるエラーに対する簡易サジェスト（例: Browser Use 未インストール/古い）
+            suggestion = None
+            if error_msg:
+                if "Browser Use" in error_msg or "browser_use" in error_msg:
+                    suggestion = "Browser Useが古い/未インストールの可能性があります。サーバーで `pip install -U browser-use` を実行してください。"
+                if "BrowserProfile" in error_msg:
+                    suggestion = "BrowserProfileが見つかりません。browser-useを最新に更新するか、互換モードで起動してください。"
+            if suggestion:
+                execution.error_message = f"{error_msg}\n\n提案: {suggestion}"
+            else:
+                execution.error_message = error_msg
         
         execution.completed_at = datetime.now()
         db.commit()
@@ -708,8 +719,15 @@ async def run_task_with_live_view(task_id: int, execution_id: int):
     except Exception as e:
         logger.error(f"タスク実行エラー: {e}")
         if execution:
+            # よくあるエラーに対する簡易サジェスト
+            suggestion = None
+            msg = str(e)
+            if "Browser Use" in msg or "browser_use" in msg:
+                suggestion = "Browser Useが古い/未インストールの可能性があります。サーバーで `pip install -U browser-use` を実行してください。"
+            if "BrowserProfile" in msg:
+                suggestion = "BrowserProfileが見つかりません。browser-useを最新に更新するか、互換モードで起動してください。"
             execution.status = "failed"
-            execution.error_message = str(e)
+            execution.error_message = f"{msg}\n\n提案: {suggestion}" if suggestion else msg
             execution.completed_at = datetime.now()
             db.commit()
     finally:

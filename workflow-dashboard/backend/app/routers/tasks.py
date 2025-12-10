@@ -197,7 +197,8 @@ async def run_task(
     
     return {
         "message": "タスクを開始しました",
-        "status": str(execution.id)
+        "execution_id": execution.id,
+        "status": "pending"
     }
 
 
