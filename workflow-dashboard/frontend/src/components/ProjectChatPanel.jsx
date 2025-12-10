@@ -1812,7 +1812,7 @@ export default function ProjectChatPanel({
                 </div>
                 {errorAnalysis.analysis.user_info_needed.map((info, idx) => (
                   <div key={idx} className="mb-3 last:mb-0">
-                    <div className="font-medium text-foreground mb-1. {info.name}</div>
+                    <div className="font-medium text-foreground mb-1">{info.name}</div>
                     <div className="text-sm text-muted-foreground mt-1">{info.description}</div>
                     <div className="text-xs text-muted-foreground mt-2 p-2 bg-white dark:bg-zinc-800 rounded border border-zinc-200 dark:border-zinc-700">
                       <div className="font-semibold mb-1">設定方法:</div>
