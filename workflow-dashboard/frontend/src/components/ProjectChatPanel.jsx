@@ -255,16 +255,42 @@ export default function ProjectChatPanel({
           return
         }
         const logsRes = await executionsApi.getLogs(executionId)
-        const logs = logsRes.data || []
-        const tail = logs
-          .slice(-5)
+        const logs = logsRes.data?.logs || logsRes.data || []
+        // ログを整形（詳細ログ形式に対応）
+        const formattedLogs = logs.map((l) => {
+          if (typeof l === 'string') {
+            return { level: 'INFO', message: l, source: 'file' }
+          }
+          return {
+            level: l.level || l.lvl || 'INFO',
+            message: l.message || l.text || l || '',
+            source: l.source || 'unknown',
+            step_number: l.step_number,
+            action_type: l.action_type,
+            status: l.status
+          }
+        })
+        
+        // エラーログを優先的に取得
+        const errorLogs = formattedLogs.filter(l => 
+          (l.level && l.level.toUpperCase() === 'ERROR') || 
+          (l.message && (l.message.toLowerCase().includes('error') || l.message.toLowerCase().includes('失敗') || l.message.toLowerCase().includes('failed')))
+        )
+        const recentLogs = formattedLogs.slice(-30) // 最新30行
+        
+        const tail = [...errorLogs, ...recentLogs]
+          .slice(0, 30) // 最大30行
           .map((l) => {
-            const msg = l.message || l.text || ''
-            const lvl = l.level ? `[${l.level}] ` : ''
-            return `• ${lvl}${msg}`
+            const msg = l.message || ''
+            const lvl = l.level ? `[${l.level}]` : ''
+            const src = l.source && l.source !== 'unknown' ? `[${l.source}]` : ''
+            const step = l.step_number ? `Step${l.step_number}` : ''
+            const parts = [src, step, lvl, msg].filter(Boolean)
+            return `• ${parts.join(' ')}`
           })
           .filter(Boolean)
           .join('\n')
+        
         const error = execRes.data?.error_message
         let msg = `${label} (ID: ${executionId}) が ${status || '完了'} で終了しました。`
         if (tail) msg += `\n\nログ抜粋:\n${tail}`
@@ -281,7 +307,17 @@ export default function ProjectChatPanel({
             
             // 自動的にエラー分析を実行
             try {
-              const logsList = logs.map(l => l.message || l.text || JSON.stringify(l)).filter(Boolean)
+              // より詳細なログ情報を取得
+              const logsList = formattedLogs.map(l => {
+                const parts = []
+                if (l.source && l.source !== 'unknown') parts.push(`[${l.source}]`)
+                if (l.step_number) parts.push(`[Step${l.step_number}]`)
+                if (l.action_type) parts.push(`[${l.action_type}]`)
+                if (l.level) parts.push(`[${l.level}]`)
+                parts.push(l.message || '')
+                return parts.join(' ')
+              }).filter(Boolean)
+              
               const analysisRes = await projectsApi.analyzeError(
                 project.id,
                 retryId,
@@ -332,16 +368,44 @@ export default function ProjectChatPanel({
       } catch (err) {
         const errorMsg = err.message || '不明なエラー'
         const statusCode = err.response?.status
+        const errorData = err.response?.data
         
         // HTTPエラー（422など）の場合もエラー分析を実行
         if (statusCode && statusCode >= 400 && taskIdForRetry) {
           try {
+            // エラーレスポンスから詳細情報を取得
+            const errorDetails = []
+            if (errorData) {
+              if (typeof errorData === 'string') {
+                errorDetails.push(errorData)
+              } else if (errorData.detail) {
+                errorDetails.push(errorData.detail)
+              } else if (errorData.message) {
+                errorDetails.push(errorData.message)
+              } else {
+                errorDetails.push(JSON.stringify(errorData))
+              }
+            }
+            
+            // 可能であれば実行ログも取得を試みる
+            let additionalLogs = []
+            try {
+              const logsRes = await executionsApi.getLogs(executionId)
+              const logs = logsRes.data?.logs || logsRes.data || []
+              additionalLogs = logs.map(l => {
+                if (typeof l === 'string') return l
+                return l.message || l.text || JSON.stringify(l)
+              }).filter(Boolean)
+            } catch (logErr) {
+              // ログ取得に失敗しても続行
+            }
+            
             const analysisRes = await projectsApi.analyzeError(
               project.id,
               taskIdForRetry,
               executionId,
-              `HTTP ${statusCode}: ${errorMsg}`,
-              []
+              `HTTP ${statusCode}: ${errorMsg}\n${errorDetails.join('\n')}`,
+              additionalLogs
             )
             
             if (analysisRes.data?.success && analysisRes.data?.analysis) {
@@ -1739,6 +1803,26 @@ export default function ProjectChatPanel({
               </div>
             </div>
             
+            {/* ユーザーに必要な情報 */}
+            {errorAnalysis.analysis.user_info_needed && errorAnalysis.analysis.user_info_needed.length > 0 && (
+              <div className="p-3 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20">
+                <div className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
+                  <Info className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                  必要な設定・情報
+                </div>
+                {errorAnalysis.analysis.user_info_needed.map((info, idx) => (
+                  <div key={idx} className="mb-3 last:mb-0">
+                    <div className="font-medium text-foreground mb-1. {info.name}</div>
+                    <div className="text-sm text-muted-foreground mt-1">{info.description}</div>
+                    <div className="text-xs text-muted-foreground mt-2 p-2 bg-white dark:bg-zinc-800 rounded border border-zinc-200 dark:border-zinc-700">
+                      <div className="font-semibold mb-1">設定方法:</div>
+                      <div className="whitespace-pre-wrap">{info.how_to_set}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            
             {errorAnalysis.analysis.suggestions && errorAnalysis.analysis.suggestions.length > 0 && (
               <div>
                 <div className="text-sm font-semibold text-foreground mb-2">改善案</div>
@@ -1749,7 +1833,7 @@ export default function ProjectChatPanel({
                       key={idx}
                       className={`mb-3 p-3 rounded-lg border ${
                         isRecommended
-                          ? 'border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20'
+                          ? 'border-emerald-300 dark:border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20'
                           : 'border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800'
                       }`}
                     >
@@ -1773,6 +1857,23 @@ export default function ProjectChatPanel({
                       <div className="text-sm text-muted-foreground whitespace-pre-wrap mb-2">
                         {suggestion.description}
                       </div>
+                      
+                      {/* 環境設定が必要な場合 */}
+                      {suggestion.environment_setup && (
+                        <div className="mb-3 p-2 rounded border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800">
+                          <div className="text-xs font-semibold text-foreground mb-1">必要な環境設定:</div>
+                          {suggestion.environment_setup.variables && suggestion.environment_setup.variables.length > 0 && (
+                            <div className="text-xs text-muted-foreground">
+                              {suggestion.environment_setup.variables.map((v, vIdx) => (
+                                <div key={vIdx} className="mb-1">
+                                  • {v.name} = {v.value} ({v.description})
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      
                       {errorAnalysis.analysis.auto_fixable && isRecommended && (
                         <button
                           onClick={async () => {

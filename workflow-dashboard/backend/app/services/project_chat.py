@@ -927,7 +927,12 @@ task_promptは具体的なステップを含めてください：
             # ログを整形
             logs_text = "\n".join(logs[:20]) if logs else "ログが取得できませんでした"
             
-            prompt = f"""以下のタスク実行でエラーが発生しました。エラー内容を分析し、具体的な改善案を提案してください。
+            # 環境情報を取得
+            import os
+            deployment_env = os.getenv('ZEABUR_ENVIRONMENT_NAME', '')
+            is_zeabur = bool(deployment_env) or 'zeabur' in str(os.getenv('HOME', '')).lower()
+            
+            prompt = f"""以下のタスク実行でエラーが発生しました。エラー内容とログを詳細に分析し、具体的な改善案を提案してください。
 
 【タスク情報】
 名前: {task.name}
@@ -935,42 +940,70 @@ task_promptは具体的なステップを含めてください：
 実行場所: {task.execution_location}
 スケジュール: {task.schedule or '手動実行'}
 
+【実行環境】
+{'Zeaburなどのクラウド環境で実行されています' if is_zeabur else 'ローカル環境で実行されています'}
+
 【エラーメッセージ】
 {error_message}
 
-【実行ログ（最新20行）】
+【実行ログ（詳細）】
 {logs_text}
 
 【現在のタスクプロンプト】
 {task.task_prompt[:1000]}
+
+【重要な分析ポイント】
+1. ログからエラーの根本原因を特定してください（例：BrowserProfileが見つからない、認証情報不足、APIエンドポイント誤り、環境変数未設定など）
+2. Zeaburなどのクラウド環境で実行されている場合、環境変数や設定ファイルの不足も考慮してください
+3. Browser Useを使用している場合、BrowserProfileの設定が必要な場合があります
+4. エラーメッセージやログのパターンから、よくある問題を特定してください
+5. ログに「BrowserProfile が見つかりません」や「Agent.run() got an unexpected」などのエラーが含まれている場合、BrowserProfileの設定方法を具体的に説明してください
+6. HTTP 422エラーの場合、リクエストのバリデーションエラーの可能性があります。ログから詳細を確認してください
 
 【分析と改善案の出力形式】
 以下のJSON形式で回答してください：
 
 ```json
 {{
-    "error_analysis": "エラーの原因を簡潔に説明（100文字程度）",
-    "root_cause": "根本原因（認証情報不足、APIエンドポイント誤り、セレクタ変更など）",
+    "error_analysis": "エラーの原因を簡潔に説明（200文字程度）",
+    "root_cause": "根本原因（BrowserProfile未設定、認証情報不足、環境変数未設定、APIエンドポイント誤り、セレクタ変更など）",
+    "user_info_needed": [
+        {{
+            "type": "environment_variable" | "credential" | "configuration" | "file" | "other",
+            "name": "必要な設定名（例: BROWSER_PROFILE_PATH）",
+            "description": "この設定が必要な理由と取得方法",
+            "how_to_set": "設定方法の詳細説明（Zeaburの場合の設定方法も含む）"
+        }}
+    ],
     "suggestions": [
         {{
             "priority": "high" | "medium" | "low",
             "title": "改善案のタイトル",
             "description": "具体的な改善内容の説明",
-            "improved_task_prompt": "改善後のtask_prompt（全体を書き直す）",
+            "improved_task_prompt": "改善後のtask_prompt（全体を書き直す、または変更部分のみ）",
             "additional_changes": {{
                 "execution_location": "server" | "local" | null,
                 "schedule": "cron形式" | null,
                 "description": "説明文の変更" | null
+            }},
+            "environment_setup": {{
+                "variables": [
+                    {{"name": "変数名", "value": "値", "description": "説明"}}
+                ],
+                "files": [
+                    {{"path": "ファイルパス", "content": "ファイル内容", "description": "説明"}}
+                ]
             }}
         }}
     ],
     "auto_fixable": true | false,
-    "recommended_action": "最も推奨する改善案のインデックス（0から始まる）"
+    "recommended_action": 0
 }}
 ```
 
 改善案は優先度順に並べてください。最も効果的な改善案を recommended_action に指定してください。
-auto_fixable が true の場合、ユーザーが承認すれば自動的に修正を適用できます。"""
+auto_fixable が true の場合、ユーザーが承認すれば自動的に修正を適用できます。
+user_info_needed には、ユーザーが設定する必要がある環境変数や認証情報の情報を含めてください。"""
 
             use_model = model or DEFAULT_CHAT_MODEL
             response_text = await call_openai_api(

@@ -44,20 +44,70 @@ def get_execution(execution_id: int, db: Session = Depends(get_db)):
 
 @router.get("/{execution_id}/logs")
 def get_execution_logs(execution_id: int, db: Session = Depends(get_db)):
-    """実行ログを取得"""
+    """実行ログを取得（詳細版：execution_stepsとライブビューログも含む）"""
     execution = db.query(Execution).filter(Execution.id == execution_id).first()
     if not execution:
         raise HTTPException(status_code=404, detail="実行履歴が見つかりません")
     
-    if not execution.log_file:
-        return {"logs": []}
+    logs = []
     
-    log_path = Path(execution.log_file)
-    if not log_path.exists():
-        return {"logs": []}
+    # 1. ファイルログを取得
+    if execution.log_file:
+        log_path = Path(execution.log_file)
+        if log_path.exists():
+            try:
+                with open(log_path, "r", encoding="utf-8") as f:
+                    file_logs = f.readlines()
+                    logs.extend([{"source": "file", "level": "INFO", "message": line.strip()} for line in file_logs if line.strip()])
+            except Exception as e:
+                logs.append({"source": "file", "level": "ERROR", "message": f"ログファイル読み込みエラー: {e}"})
     
-    with open(log_path, "r", encoding="utf-8") as f:
-        logs = f.readlines()
+    # 2. execution_stepsのエラーメッセージを取得
+    steps = db.query(ExecutionStep).filter(ExecutionStep.execution_id == execution_id).order_by(ExecutionStep.step_number).all()
+    for step in steps:
+        if step.error_message:
+            logs.append({
+                "source": "step",
+                "level": "ERROR",
+                "message": f"Step {step.step_number} ({step.action_type}): {step.error_message}",
+                "step_number": step.step_number,
+                "action_type": step.action_type,
+                "status": step.status
+            })
+        if step.description:
+            logs.append({
+                "source": "step",
+                "level": "INFO",
+                "message": f"Step {step.step_number} ({step.action_type}): {step.description}",
+                "step_number": step.step_number,
+                "action_type": step.action_type,
+                "status": step.status
+            })
+    
+    # 3. ライブビューのログキャッシュを取得
+    try:
+        from app.services.live_view_manager import live_view_manager
+        cached_logs = live_view_manager.get_cached_logs(execution_id)
+        for cached_log in cached_logs:
+            logs.append({
+                "source": "live_view",
+                "level": cached_log.get("level", "INFO"),
+                "message": cached_log.get("message", ""),
+                "timestamp": cached_log.get("timestamp")
+            })
+    except Exception:
+        pass
+    
+    # 4. エラーメッセージも追加
+    if execution.error_message:
+        logs.append({
+            "source": "execution",
+            "level": "ERROR",
+            "message": f"実行エラー: {execution.error_message}"
+        })
+    
+    # タイムスタンプ順にソート（可能な場合）
+    logs.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
     
     return {"logs": logs}
 
