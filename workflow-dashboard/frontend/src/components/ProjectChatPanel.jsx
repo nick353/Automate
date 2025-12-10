@@ -237,7 +237,7 @@ export default function ProjectChatPanel({
   }
 
   // 実行IDを監視してログをチャットに表示
-  const monitorExecution = (executionId, label = 'タスク実行') => {
+  const monitorExecution = (executionId, label = 'タスク実行', taskIdForRetry = null) => {
     if (!executionId) return
     setExecutionWatchers((prev) => ({ ...prev, [executionId]: { status: 'pending', label } }))
     setChatHistory((prev) => [
@@ -268,14 +268,19 @@ export default function ProjectChatPanel({
         let msg = `${label} (ID: ${executionId}) が ${status || '完了'} で終了しました。`
         if (tail) msg += `\n\nログ抜粋:\n${tail}`
         if (error) msg += `\n\nエラー: ${error}`
+        if (status === 'failed') {
+          msg += `\n\n改善案を提案しましょうか？「再実行」か「提案して」と入力してください。`
+        } else {
+          msg += `\n\n次のステップがあれば教えてください。`
+        }
         setChatHistory((prev) => [...prev, { role: 'assistant', content: msg }])
 
         // 失敗時は再実行ボタンを出せるように保持
         if (status === 'failed') {
-          // 直近で作成されたタスクを候補にする
           const lastTask = createdTasks[createdTasks.length - 1]
-          if (lastTask?.id) {
-            setRetryTaskId(lastTask.id)
+          const retryId = taskIdForRetry || lastTask?.id
+          if (retryId) {
+            setRetryTaskId(retryId)
             setRetrySuggestion(error || null)
           }
         }
@@ -1302,11 +1307,21 @@ export default function ProjectChatPanel({
   // タスクを実行
   const handleRunTask = async (taskId) => {
     try {
-      await tasksApi.run(taskId)
+      const res = await tasksApi.run(taskId)
+      const execId = res.data?.execution_id || res.data?.status
+
+      // チャットに開始メッセージ
       setChatHistory(prev => [...prev, {
         role: 'assistant',
-        content: `タスクの実行を開始しました。履歴画面で進捗を確認できます。`
+        content: execId
+          ? `タスクの実行を開始しました（実行ID: ${execId}）。このチャット内でも進捗をモニタリングします。`
+          : `タスクの実行を開始しました。履歴画面で進捗を確認できます。`
       }])
+
+      // 実行IDがあればポーリングして結果を通知
+      if (execId) {
+        monitorExecution(execId, '手動実行', taskId)
+      }
     } catch (error) {
       setChatHistory(prev => [...prev, {
         role: 'assistant',
