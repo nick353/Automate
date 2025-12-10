@@ -451,16 +451,27 @@ export default function ProjectChatPanel({
         } else if (response.data.actions?.actions) {
           // JSONアクションがある場合は自動実行
           const actions = response.data.actions.actions
-          // チャット履歴からJSONブロックを除去して表示
+          // チャット履歴からJSONを除去して表示
           const cleanedHistory = (response.data.chat_history || []).map(msg => {
-            if (msg.role === 'assistant' && msg.content.includes('```json')) {
-              const jsonStart = msg.content.indexOf('```json')
-              const jsonEnd = msg.content.indexOf('```', jsonStart + 7)
-              if (jsonStart !== -1 && jsonEnd !== -1) {
-                const beforeJson = msg.content.slice(0, jsonStart).trim()
-                const afterJson = msg.content.slice(jsonEnd + 3).trim()
-                return { ...msg, content: beforeJson + (afterJson ? '\n\n' + afterJson : '') }
+            if (msg.role === 'assistant') {
+              let content = msg.content
+              // ```json ブロックを除去
+              if (content.includes('```json')) {
+                const jsonStart = content.indexOf('```json')
+                const jsonEnd = content.indexOf('```', jsonStart + 7)
+                if (jsonStart !== -1 && jsonEnd !== -1) {
+                  const beforeJson = content.slice(0, jsonStart).trim()
+                  const afterJson = content.slice(jsonEnd + 3).trim()
+                  content = beforeJson + (afterJson ? '\n\n' + afterJson : '')
+                }
               }
+              // { で始まるJSONオブジェクトを除去
+              const jsonMatch = content.match(/\{\s*"actions"\s*:/s)
+              if (jsonMatch) {
+                const jsonStartIdx = content.indexOf(jsonMatch[0])
+                content = content.slice(0, jsonStartIdx).trim()
+              }
+              return { ...msg, content: content || 'タスクを作成します...' }
             }
             return msg
           })
@@ -479,16 +490,27 @@ export default function ProjectChatPanel({
         if (response.data.actions?.actions) {
           // JSONアクションがある場合は自動実行
           const actions = response.data.actions.actions
-          // チャット履歴からJSONブロックを除去して表示
+          // チャット履歴からJSONを除去して表示
           const cleanedHistory = (response.data.chat_history || []).map(msg => {
-            if (msg.role === 'assistant' && msg.content.includes('```json')) {
-              const jsonStart = msg.content.indexOf('```json')
-              const jsonEnd = msg.content.indexOf('```', jsonStart + 7)
-              if (jsonStart !== -1 && jsonEnd !== -1) {
-                const beforeJson = msg.content.slice(0, jsonStart).trim()
-                const afterJson = msg.content.slice(jsonEnd + 3).trim()
-                return { ...msg, content: beforeJson + (afterJson ? '\n\n' + afterJson : '') }
+            if (msg.role === 'assistant') {
+              let content = msg.content
+              // ```json ブロックを除去
+              if (content.includes('```json')) {
+                const jsonStart = content.indexOf('```json')
+                const jsonEnd = content.indexOf('```', jsonStart + 7)
+                if (jsonStart !== -1 && jsonEnd !== -1) {
+                  const beforeJson = content.slice(0, jsonStart).trim()
+                  const afterJson = content.slice(jsonEnd + 3).trim()
+                  content = beforeJson + (afterJson ? '\n\n' + afterJson : '')
+                }
               }
+              // { で始まるJSONオブジェクトを除去
+              const jsonMatch = content.match(/\{\s*"actions"\s*:/s)
+              if (jsonMatch) {
+                const jsonStartIdx = content.indexOf(jsonMatch[0])
+                content = content.slice(0, jsonStartIdx).trim()
+              }
+              return { ...msg, content: content || 'タスクを作成します...' }
             }
             return msg
           })
