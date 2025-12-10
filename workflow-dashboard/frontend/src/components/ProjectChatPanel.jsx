@@ -112,7 +112,6 @@ export default function ProjectChatPanel({
   const [showTestOption, setShowTestOption] = useState(false) // テスト実行オプション表示
   const testMonitorRef = useRef(null) // { executionId, taskName }
   const testMonitorTimerRef = useRef(null)
-  const executionPollerRef = useRef({})
   const { dequeueExecution } = useTaskStore()
   
   // AIモデル選択
