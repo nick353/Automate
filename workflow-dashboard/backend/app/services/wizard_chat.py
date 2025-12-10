@@ -189,11 +189,23 @@ class WizardChatService:
                 except:
                     pass
             
+            # フロントエンドは actions.actions を期待するためラップして返す
+            wrapped_actions = None
+            if actions:
+                if isinstance(actions, dict) and "actions" in actions:
+                    wrapped_actions = {
+                        "actions": actions.get("actions"),
+                        "creating_info": actions.get("creating_info"),
+                    }
+                else:
+                    # actions配列のみだった場合に対応
+                    wrapped_actions = {"actions": actions}
+            
             return {
                 "response": assistant_message,
                 "is_ready_to_create": is_ready,
                 "chat_history": chat_history,
-                "actions": actions
+                "actions": wrapped_actions
             }
             
         except Exception as e:
