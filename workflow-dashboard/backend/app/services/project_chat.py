@@ -900,6 +900,126 @@ task_promptは具体的なステップを含めてください：
                 "created_tasks": created_tasks
             }
     
+    async def analyze_execution_error(
+        self,
+        db: Session,
+        project_id: int,
+        task_id: int,
+        execution_id: int,
+        error_message: str,
+        logs: List[str] = None,
+        model: str = None
+    ) -> dict:
+        """実行エラーを分析して改善案を提案"""
+        try:
+            # タスク情報を取得
+            task = db.query(Task).filter(Task.id == task_id, Task.project_id == project_id).first()
+            if not task:
+                raise ValueError("タスクが見つかりません")
+            
+            # OpenAI APIキーを取得
+            cred = credential_manager.get_default(db, "api_key", "openai")
+            if not cred:
+                raise ValueError("OpenAI APIキーが設定されていません")
+            
+            api_key = cred["data"].get("api_key")
+            
+            # ログを整形
+            logs_text = "\n".join(logs[:20]) if logs else "ログが取得できませんでした"
+            
+            prompt = f"""以下のタスク実行でエラーが発生しました。エラー内容を分析し、具体的な改善案を提案してください。
+
+【タスク情報】
+名前: {task.name}
+説明: {task.description or 'なし'}
+実行場所: {task.execution_location}
+スケジュール: {task.schedule or '手動実行'}
+
+【エラーメッセージ】
+{error_message}
+
+【実行ログ（最新20行）】
+{logs_text}
+
+【現在のタスクプロンプト】
+{task.task_prompt[:1000]}
+
+【分析と改善案の出力形式】
+以下のJSON形式で回答してください：
+
+```json
+{{
+    "error_analysis": "エラーの原因を簡潔に説明（100文字程度）",
+    "root_cause": "根本原因（認証情報不足、APIエンドポイント誤り、セレクタ変更など）",
+    "suggestions": [
+        {{
+            "priority": "high" | "medium" | "low",
+            "title": "改善案のタイトル",
+            "description": "具体的な改善内容の説明",
+            "improved_task_prompt": "改善後のtask_prompt（全体を書き直す）",
+            "additional_changes": {{
+                "execution_location": "server" | "local" | null,
+                "schedule": "cron形式" | null,
+                "description": "説明文の変更" | null
+            }}
+        }}
+    ],
+    "auto_fixable": true | false,
+    "recommended_action": "最も推奨する改善案のインデックス（0から始まる）"
+}}
+```
+
+改善案は優先度順に並べてください。最も効果的な改善案を recommended_action に指定してください。
+auto_fixable が true の場合、ユーザーが承認すれば自動的に修正を適用できます。"""
+
+            use_model = model or DEFAULT_CHAT_MODEL
+            response_text = await call_openai_api(
+                api_key=api_key,
+                messages=[{"role": "user", "content": prompt}],
+                model=use_model,
+                max_tokens=2048,
+                timeout=120
+            )
+            
+            # JSONを抽出
+            import json
+            import re
+            
+            json_match = re.search(r'```json\s*([\s\S]*?)```', response_text)
+            if json_match:
+                analysis = json.loads(json_match.group(1))
+            else:
+                # JSONブロックがない場合、メッセージ全体をパース
+                try:
+                    analysis = json.loads(response_text)
+                except:
+                    # JSON解析に失敗した場合、デフォルトの改善案を返す
+                    analysis = {
+                        "error_analysis": "エラーの詳細な分析ができませんでした",
+                        "root_cause": "不明",
+                        "suggestions": [{
+                            "priority": "medium",
+                            "title": "タスクプロンプトの見直し",
+                            "description": "エラーメッセージを参考に、タスクプロンプトを修正してください",
+                            "improved_task_prompt": task.task_prompt,
+                            "additional_changes": {}
+                        }],
+                        "auto_fixable": False,
+                        "recommended_action": 0
+                    }
+            
+            return {
+                "success": True,
+                "analysis": analysis
+            }
+            
+        except Exception as e:
+            logger.error(f"エラー分析エラー: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+    
     async def get_workflow_explanation(
         self,
         db: Session,

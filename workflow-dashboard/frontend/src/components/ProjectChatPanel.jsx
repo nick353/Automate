@@ -105,6 +105,7 @@ export default function ProjectChatPanel({
   const [createdTasks, setCreatedTasks] = useState(getCreatedTasks(project.id)) // 作成されたタスクのリスト
   const [retryTaskId, setRetryTaskId] = useState(null)
   const [retrySuggestion, setRetrySuggestion] = useState(null)
+  const [errorAnalysis, setErrorAnalysis] = useState(null) // { analysis, taskId, executionId }
   const executionPollerRef = useRef({})
   
   // 検証状態の管理
@@ -268,26 +269,105 @@ export default function ProjectChatPanel({
         let msg = `${label} (ID: ${executionId}) が ${status || '完了'} で終了しました。`
         if (tail) msg += `\n\nログ抜粋:\n${tail}`
         if (error) msg += `\n\nエラー: ${error}`
+        
         if (status === 'failed') {
-          msg += `\n\n改善案を提案しましょうか？「再実行」か「提案して」と入力してください。`
-        } else {
-          msg += `\n\n次のステップがあれば教えてください。`
-        }
-        setChatHistory((prev) => [...prev, { role: 'assistant', content: msg }])
-
-        // 失敗時は再実行ボタンを出せるように保持
-        if (status === 'failed') {
+          // エラー発生時は自動的に改善案を取得
           const lastTask = createdTasks[createdTasks.length - 1]
           const retryId = taskIdForRetry || lastTask?.id
+          
           if (retryId) {
             setRetryTaskId(retryId)
             setRetrySuggestion(error || null)
+            
+            // 自動的にエラー分析を実行
+            try {
+              const logsList = logs.map(l => l.message || l.text || JSON.stringify(l)).filter(Boolean)
+              const analysisRes = await projectsApi.analyzeError(
+                project.id,
+                retryId,
+                executionId,
+                error || 'エラーが発生しました',
+                logsList
+              )
+              
+              if (analysisRes.data?.success && analysisRes.data?.analysis) {
+                const analysis = analysisRes.data.analysis
+                setErrorAnalysis({
+                  analysis,
+                  taskId: retryId,
+                  executionId
+                })
+                
+                // 改善案をチャットに表示
+                let suggestionMsg = `\n\n🔍 エラーを分析しました\n\n`
+                suggestionMsg += `【原因】\n${analysis.error_analysis || analysis.root_cause || '不明'}\n\n`
+                
+                if (analysis.suggestions && analysis.suggestions.length > 0) {
+                  const recommended = analysis.suggestions[analysis.recommended_action || 0]
+                  suggestionMsg += `【推奨改善案】\n${recommended.title}\n${recommended.description}\n\n`
+                  
+                  if (analysis.auto_fixable) {
+                    suggestionMsg += `この改善案を承認すると、自動的に修正を適用して再実行します。`
+                  } else {
+                    suggestionMsg += `改善案の詳細を確認して、手動で修正してください。`
+                  }
+                }
+                
+                msg += suggestionMsg
+              } else {
+                msg += `\n\n改善案を提案しましょうか？「再実行」か「提案して」と入力してください。`
+              }
+            } catch (analysisError) {
+              console.error('エラー分析に失敗:', analysisError)
+              msg += `\n\n改善案を提案しましょうか？「再実行」か「提案して」と入力してください。`
+            }
+          } else {
+            msg += `\n\n改善案を提案しましょうか？「再実行」か「提案して」と入力してください。`
+          }
+        } else {
+          msg += `\n\n次のステップがあれば教えてください。`
+        }
+        
+        setChatHistory((prev) => [...prev, { role: 'assistant', content: msg }])
+      } catch (err) {
+        const errorMsg = err.message || '不明なエラー'
+        const statusCode = err.response?.status
+        
+        // HTTPエラー（422など）の場合もエラー分析を実行
+        if (statusCode && statusCode >= 400 && taskIdForRetry) {
+          try {
+            const analysisRes = await projectsApi.analyzeError(
+              project.id,
+              taskIdForRetry,
+              executionId,
+              `HTTP ${statusCode}: ${errorMsg}`,
+              []
+            )
+            
+            if (analysisRes.data?.success && analysisRes.data?.analysis) {
+              const analysis = analysisRes.data.analysis
+              setErrorAnalysis({
+                analysis,
+                taskId: taskIdForRetry,
+                executionId
+              })
+              
+              setChatHistory((prev) => [
+                ...prev,
+                { role: 'assistant', content: `${label} (ID: ${executionId}) のログ取得に失敗しました: ${errorMsg}\n\n🔍 エラーを分析しました。改善案を表示しています。` }
+              ])
+              
+              setRetryTaskId(taskIdForRetry)
+              return
+            }
+          } catch (analysisError) {
+            console.error('エラー分析に失敗:', analysisError)
           }
         }
-      } catch (err) {
+        
         setChatHistory((prev) => [
           ...prev,
-          { role: 'assistant', content: `${label} (ID: ${executionId}) のログ取得に失敗しました: ${err.message}` }
+          { role: 'assistant', content: `${label} (ID: ${executionId}) のログ取得に失敗しました: ${errorMsg}` }
         ])
       } finally {
         setExecutionWatchers((prev) => {
@@ -1643,8 +1723,135 @@ export default function ProjectChatPanel({
         />
       </div>
 
-      {/* 再実行カード（失敗時） */}
-      {retryTaskId && (
+      {/* エラー分析と改善案カード */}
+      {errorAnalysis && errorAnalysis.analysis && (
+        <div className="mx-4 mb-3 p-4 rounded-xl border-2 border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/20">
+          <div className="flex items-center gap-2 mb-3">
+            <AlertCircle className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+            <div className="font-bold text-lg text-foreground">エラー分析結果</div>
+          </div>
+          
+          <div className="mb-4 space-y-3">
+            <div>
+              <div className="text-sm font-semibold text-foreground mb-1">原因</div>
+              <div className="text-sm text-muted-foreground whitespace-pre-wrap">
+                {errorAnalysis.analysis.error_analysis || errorAnalysis.analysis.root_cause || '不明'}
+              </div>
+            </div>
+            
+            {errorAnalysis.analysis.suggestions && errorAnalysis.analysis.suggestions.length > 0 && (
+              <div>
+                <div className="text-sm font-semibold text-foreground mb-2">改善案</div>
+                {errorAnalysis.analysis.suggestions.map((suggestion, idx) => {
+                  const isRecommended = idx === (errorAnalysis.analysis.recommended_action || 0)
+                  return (
+                    <div
+                      key={idx}
+                      className={`mb-3 p-3 rounded-lg border ${
+                        isRecommended
+                          ? 'border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20'
+                          : 'border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded ${
+                          suggestion.priority === 'high'
+                            ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                            : suggestion.priority === 'medium'
+                            ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                            : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                        }`}>
+                          {suggestion.priority === 'high' ? '高' : suggestion.priority === 'medium' ? '中' : '低'}
+                        </span>
+                        {isRecommended && (
+                          <span className="text-xs font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                            推奨
+                          </span>
+                        )}
+                        <span className="font-semibold text-foreground">{suggestion.title}</span>
+                      </div>
+                      <div className="text-sm text-muted-foreground whitespace-pre-wrap mb-2">
+                        {suggestion.description}
+                      </div>
+                      {errorAnalysis.analysis.auto_fixable && isRecommended && (
+                        <button
+                          onClick={async () => {
+                            setIsChatLoading(true)
+                            try {
+                              // タスクを更新
+                              const updateData = {
+                                task_prompt: suggestion.improved_task_prompt
+                              }
+                              if (suggestion.additional_changes) {
+                                Object.assign(updateData, suggestion.additional_changes)
+                              }
+                              
+                              await tasksApi.update(errorAnalysis.taskId, updateData)
+                              
+                              setChatHistory(prev => [...prev, {
+                                role: 'assistant',
+                                content: `✅ 改善案を適用しました。タスクを更新して再実行します...`
+                              }])
+                              
+                              // 再実行
+                              const res = await tasksApi.run(errorAnalysis.taskId)
+                              const execId = res.data?.execution_id || res.data?.status
+                              
+                              if (execId) {
+                                monitorExecution(execId, '改善案適用後の再実行', errorAnalysis.taskId)
+                              }
+                              
+                              // エラー分析をクリア
+                              setErrorAnalysis(null)
+                              setRetryTaskId(null)
+                              setRetrySuggestion(null)
+                            } catch (err) {
+                              setChatHistory(prev => [...prev, {
+                                role: 'assistant',
+                                content: `改善案の適用に失敗しました: ${err.message}`
+                              }])
+                            } finally {
+                              setIsChatLoading(false)
+                            }
+                          }}
+                          className="w-full px-4 py-2 rounded-lg bg-emerald-500 text-white font-medium hover:bg-emerald-600 disabled:opacity-50 transition-all"
+                          disabled={isChatLoading}
+                        >
+                          ✓ この改善案を承認して自動修正・再実行
+                        </button>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+          
+          <div className="flex gap-2 flex-wrap pt-2 border-t border-blue-200 dark:border-blue-800">
+            <button
+              onClick={() => handleRetryTask(errorAnalysis.taskId, false)}
+              className="px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              disabled={isChatLoading}
+            >
+              この設定で再実行
+            </button>
+            <button
+              onClick={() => {
+                setErrorAnalysis(null)
+                setRetryTaskId(null)
+                setRetrySuggestion(null)
+              }}
+              className="px-4 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              disabled={isChatLoading}
+            >
+              閉じる
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 再実行カード（失敗時、エラー分析がない場合） */}
+      {retryTaskId && !errorAnalysis && (
         <div className="mx-4 mb-3 p-3 rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-900/20">
           <div className="font-semibold text-foreground mb-2">実行が失敗しました。再実行しますか？</div>
           {retrySuggestion && (

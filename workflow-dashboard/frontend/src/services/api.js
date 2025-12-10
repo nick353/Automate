@@ -133,6 +133,14 @@ export const projectsApi = {
       task_data: taskData,
       skip_review: skipReview,
       auto_run_test: autoRunTest
+    }),
+  // エラー分析と改善案生成
+  analyzeError: (projectId, taskId, executionId, errorMessage, logs = []) =>
+    api.post(`/projects/${projectId}/analyze-error`, {
+      task_id: taskId,
+      execution_id: executionId,
+      error_message: errorMessage,
+      logs
     })
 }
 

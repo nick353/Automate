@@ -762,3 +762,39 @@ async def validate_and_create_task(
         "execution_id": validation_results.get("test_execution", {}).get("execution_id"),
         "validation": validation_results
     }
+
+
+class AnalyzeErrorRequest(BaseModel):
+    """エラー分析リクエスト"""
+    task_id: int
+    execution_id: int
+    error_message: str
+    logs: List[str] = []
+
+
+@router.post("/{project_id}/analyze-error")
+async def analyze_execution_error(
+    project_id: int,
+    request: AnalyzeErrorRequest,
+    db: Session = Depends(get_db),
+    current_user: Optional[UserInfo] = Depends(get_current_user)
+):
+    """実行エラーを分析して改善案を提案"""
+    user_id = get_user_filter(current_user)
+    project_query = db.query(Project).filter(Project.id == project_id)
+    if user_id:
+        project_query = project_query.filter(Project.user_id == user_id)
+    
+    project = project_query.first()
+    if not project:
+        raise HTTPException(status_code=404, detail="プロジェクトが見つかりません")
+    
+    result = await project_chat_service.analyze_execution_error(
+        db,
+        project_id,
+        request.task_id,
+        request.execution_id,
+        request.error_message,
+        request.logs
+    )
+    return result
