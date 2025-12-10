@@ -413,6 +413,7 @@ export default function ProjectChatPanel({
         const errorMsg = err.message || '不明なエラー'
         const statusCode = err.response?.status
         const errorData = err.response?.data
+        const reason = statusCode ? `HTTP ${statusCode}: ${errorMsg}` : errorMsg
         
         // HTTPエラー（422など）の場合もエラー分析を実行
         if (statusCode && statusCode >= 400 && taskIdForRetry) {
@@ -478,7 +479,7 @@ export default function ProjectChatPanel({
           ...prev,
           { role: 'assistant', content: `${label} (ID: ${executionId}) のログ取得に失敗しました: ${errorMsg}` }
         ])
-        updatePendingNotice('ログ取得に失敗しました', errorMsg)
+        updatePendingNotice('ログ取得に失敗しました', `${reason}\n管理画面の手動実行IDで詳細ログを確認してください。`)
       } finally {
         clearPendingNotice()
         setExecutionWatchers((prev) => {
@@ -1695,7 +1696,9 @@ export default function ProjectChatPanel({
         <div className="mx-4 mt-3 mb-0 p-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 flex items-start gap-3">
           <Loader2 className="w-4 h-4 mt-0.5 text-blue-600 dark:text-blue-300 animate-spin" />
           <div className="flex-1 min-w-0">
-            <div className="text-sm font-semibold text-foreground">{pendingNotice.message || '処理中です'}</div>
+            <div className="text-sm font-semibold text-foreground">
+              {pendingNotice.message || '処理中です'}
+            </div>
             {pendingNotice.subMessage && (
               <div className="text-xs text-muted-foreground whitespace-pre-wrap mt-1">
                 {pendingNotice.subMessage}
