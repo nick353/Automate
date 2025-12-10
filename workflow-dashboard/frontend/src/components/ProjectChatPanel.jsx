@@ -858,7 +858,7 @@ export default function ProjectChatPanel({
           </button>
           
           {showModelSelector && (
-            <div className="absolute right-0 top-full mt-1 w-80 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-xl z-50 overflow-hidden ring-1 ring-black/5">
+            <div className="absolute right-0 top-full mt-1 w-80 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-xl z-[100] overflow-hidden ring-1 ring-black/5">
               <div className="px-3 py-2 border-b border-zinc-200 dark:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-800/50 backdrop-blur-sm">
                 <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">AIモデルを選択</p>
               </div>
@@ -1320,7 +1320,7 @@ export default function ProjectChatPanel({
             </button>
           </div>
         )}
-        <div className="flex gap-2 items-end">
+        <div className="flex gap-2 items-center">
           {/* 画像添付ボタン */}
           <button
             onClick={() => document.getElementById('image-upload-chat')?.click()}
@@ -1351,7 +1351,7 @@ export default function ProjectChatPanel({
           
           <div className="flex-1 relative min-w-0">
             <textarea
-              rows={2}
+              rows={1}
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
               onKeyDown={(e) => {
@@ -1362,7 +1362,7 @@ export default function ProjectChatPanel({
               }}
               placeholder={isListening ? t('wizard.voiceListening') : (attachedFile ? 'メッセージを入力...' : t('taskBoard.chatPlaceholder'))}
               disabled={isChatLoading}
-              className={`w-full min-h-[44px] max-h-40 pr-10 pl-4 py-2 rounded-2xl bg-zinc-100 dark:bg-zinc-800 border-transparent focus:bg-white dark:focus:bg-zinc-900 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 outline-none transition-all disabled:opacity-50 resize-none ${
+              className={`w-full h-10 min-h-[40px] max-h-40 pr-10 pl-4 py-2.5 rounded-full bg-zinc-100 dark:bg-zinc-800 border-transparent focus:bg-white dark:focus:bg-zinc-900 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 outline-none transition-all disabled:opacity-50 resize-none leading-tight ${
                 isListening ? 'border-red-500/50 bg-red-500/5' : ''
               }`}
             />
