@@ -89,9 +89,16 @@ class LiveViewAgent:
             # Browser Useをインポート（遅延インポート）
             try:
                 from browser_use import Agent, BrowserProfile
-            except ImportError as e:
-                logger.error(f"Browser Use のインポートに失敗: {e}")
-                raise ValueError("Browser Use がインストールされていません。pip install browser-use を実行してください。")
+                browser_profile_cls = BrowserProfile
+            except ImportError:
+                # BrowserProfileがないバージョンへの後方互換
+                try:
+                    from browser_use import Agent  # type: ignore
+                    browser_profile_cls = None
+                    logger.warning("BrowserProfile が見つかりません。デフォルト設定で起動します。")
+                except ImportError as e:
+                    logger.error(f"Browser Use のインポートに失敗: {e}")
+                    raise ValueError("Browser Use がインストールされていません。pip install browser-use を実行してください。")
             
             # 環境変数にAPIキーを設定
             if use_openai:
@@ -115,17 +122,19 @@ class LiveViewAgent:
                 "ブラウザを起動中..."
             )
             
-            # ブラウザプロファイルを作成
-            browser_profile = BrowserProfile(
-                headless=True,
-                disable_security=True,
-                extra_chromium_args=[
-                    "--no-sandbox",
-                    "--disable-setuid-sandbox",
-                    "--disable-dev-shm-usage",
-                    "--disable-gpu"
-                ]
-            )
+            # ブラウザプロファイルを作成（利用可能な場合のみ）
+            browser_profile = None
+            if browser_profile_cls:
+                browser_profile = browser_profile_cls(
+                    headless=True,
+                    disable_security=True,
+                    extra_chromium_args=[
+                        "--no-sandbox",
+                        "--disable-setuid-sandbox",
+                        "--disable-dev-shm-usage",
+                        "--disable-gpu"
+                    ]
+                )
             
             # サイト認証情報があれば追加のコンテキストを設定
             task_prompt = self.task.task_prompt
@@ -156,11 +165,17 @@ class LiveViewAgent:
                 )
             
             # エージェントを作成
-            agent = Agent(
-                task=task_prompt,
-                llm=llm,
-                browser_profile=browser_profile
-            )
+            if browser_profile:
+                agent = Agent(
+                    task=task_prompt,
+                    llm=llm,
+                    browser_profile=browser_profile
+                )
+            else:
+                agent = Agent(
+                    task=task_prompt,
+                    llm=llm
+                )
             
             # ステップ追跡用の変数
             screencast_registered_ref = {"value": False}
