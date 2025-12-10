@@ -297,8 +297,18 @@ export default function ProjectChatPanel({
           executionPollerRef.current[executionId] = setTimeout(poll, 2000)
           return
         }
-        const logsRes = await executionsApi.getLogs(executionId)
-        const logs = logsRes.data?.logs || logsRes.data || []
+        // ログ取得（空ならリトライしてできるだけ埋める）
+        let logsRes = await executionsApi.getLogs(executionId)
+        let logs = logsRes.data?.logs || logsRes.data || []
+        if ((!logs || logs.length === 0) && (status === 'completed' || status === 'failed')) {
+          try {
+            await new Promise((r) => setTimeout(r, 800))
+            logsRes = await executionsApi.getLogs(executionId)
+            logs = logsRes.data?.logs || logsRes.data || []
+          } catch (_) {
+            // リトライ失敗は無視
+          }
+        }
         // ログを整形（詳細ログ形式に対応）
         const formattedLogs = logs.map((l) => {
           if (typeof l === 'string') {

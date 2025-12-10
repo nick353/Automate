@@ -220,12 +220,16 @@ class LiveViewAgent:
                 
                 # ページ情報
                 title, url = await _get_page_context()
-                step_desc = (title or url) or "ブラウザ操作開始"
+                # より具体的なステップ内容を記録（タイトル/URL/ステップ番号）
+                if title or url:
+                    step_desc = f"Step {self.step_count} 開始: {title} {url}".strip()
+                else:
+                    step_desc = f"Step {self.step_count} 開始: ブラウザ操作開始"
 
                 # ステップ開始を記録
                 step = await self._create_step(
                     step_number=self.step_count,
-                    action_type="action",
+                    action_type="browser_action",
                     description=step_desc,
                     status="running"
                 )
