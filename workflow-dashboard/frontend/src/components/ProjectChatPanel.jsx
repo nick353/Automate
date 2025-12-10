@@ -771,7 +771,7 @@ export default function ProjectChatPanel({
           project.id,
           taskData,
           true, // skipReview（既に検証済み）
-          autoRunTest
+          true  // autoRunTest: 作成と同時にテスト実行
         )
         
         // 即座にタスクボードを更新
