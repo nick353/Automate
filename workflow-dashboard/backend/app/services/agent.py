@@ -945,19 +945,41 @@ async def run_task_with_live_view(task_id: int, execution_id: int):
         execution.started_at = datetime.now()
         db.commit()
         
+        # タイムアウト設定を取得
+        from app.config import settings
+        timeout_seconds = settings.execution_timeout_seconds
+        
         # サーバー実行は常にBrowser Use（Web自動化）を使用
         agent = LiveViewAgent(
             task=task,
             execution=execution,
             db=db
         )
-        logger.info(f"Webエージェント（Browser Use）を使用（サーバー実行）: task_id={task_id}")
+        logger.info(f"Webエージェント（Browser Use）を使用（サーバー実行）: task_id={task_id}, timeout={timeout_seconds}s")
         
-        result = await agent.run()
+        # タイムアウト付きで実行
+        try:
+            result = await asyncio.wait_for(agent.run(), timeout=timeout_seconds)
+        except asyncio.TimeoutError:
+            logger.error(f"タスク実行がタイムアウトしました: task_id={task_id}, timeout={timeout_seconds}s")
+            # タイムアウト時の通知
+            await live_view_manager.send_log(
+                execution.id,
+                "ERROR",
+                f"タスクが{timeout_seconds}秒でタイムアウトしました。タスクを分割するか、タイムアウト設定を調整してください。"
+            )
+            result = {
+                "success": False,
+                "error": f"タスクが{timeout_seconds}秒でタイムアウトしました。\n\n対処法:\n- タスクを複数の小さなタスクに分割\n- より具体的な指示に変更\n- サーバーのタイムアウト設定を調整（現在: {timeout_seconds}秒）",
+                "timeout": True
+            }
         
         # 結果を保存
         if result.get("stopped"):
             execution.status = "stopped"
+        elif result.get("timeout"):
+            execution.status = "failed"
+            execution.error_message = result.get("error")
         elif result.get("success"):
             execution.status = "completed"
             execution.result = result.get("result")

@@ -1,0 +1,118 @@
+name: Browser Automation Task
+
+on:
+  repository_dispatch:
+    types: [run-browser-task]
+
+# 同時実行を制限（同じタスクが複数走らないように）
+concurrency:
+  group: browser-task-${{ github.event.client_payload.task_id }}
+  cancel-in-progress: false
+
+env:
+  PYTHONUNBUFFERED: "1"
+
+jobs:
+  execute-browser-task:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30  # 最大30分（必要に応じて調整）
+    
+    steps:
+      # 1. リポジトリをチェックアウト
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      # 2. Python環境をセットアップ
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      # 3. 依存パッケージをインストール
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install browser-use langchain-anthropic playwright httpx
+      
+      # 4. Playwrightブラウザをインストール（重要！）
+      - name: Install Playwright browsers
+        run: |
+          playwright install chromium
+          playwright install-deps chromium
+      
+      # 5. 自動化スクリプトを実行
+      - name: Execute automation task
+        id: execute
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          TASK_ID: ${{ github.event.client_payload.task_id }}
+          EXECUTION_ID: ${{ github.event.client_payload.execution_id }}
+          TASK_PROMPT: ${{ github.event.client_payload.task_prompt }}
+          TARGET_URL: ${{ github.event.client_payload.target_url }}
+          MAX_STEPS: ${{ github.event.client_payload.max_steps }}
+          CALLBACK_URL: ${{ github.event.client_payload.callback_url }}
+          # 追加の認証情報（必要に応じてSecretsから取得）
+          SITE_USERNAME: ${{ secrets.SITE_USERNAME }}
+          SITE_PASSWORD: ${{ secrets.SITE_PASSWORD }}
+        run: |
+          python automation_script.py
+        continue-on-error: true
+      
+      # 6. 結果をアーティファクトとして保存
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: automation-results-${{ github.event.client_payload.execution_id }}
+          path: |
+            results/
+            screenshots/
+          retention-days: 7
+      
+      # 7. 結果をWebhookで通知（Zeaburに送信）
+      - name: Send result to callback
+        if: always()
+        env:
+          CALLBACK_URL: ${{ github.event.client_payload.callback_url }}
+          EXECUTION_ID: ${{ github.event.client_payload.execution_id }}
+          TASK_ID: ${{ github.event.client_payload.task_id }}
+        run: |
+          if [ -n "$CALLBACK_URL" ]; then
+            # 結果ファイルが存在するか確認
+            if [ -f "results/result.json" ]; then
+              RESULT=$(cat results/result.json)
+            else
+              RESULT='{"success": false, "error": "Result file not found"}'
+            fi
+            
+            # Webhookに送信
+            curl -X POST "$CALLBACK_URL" \
+              -H "Content-Type: application/json" \
+              -H "X-GitHub-Execution-ID: $EXECUTION_ID" \
+              -d "{
+                \"execution_id\": $EXECUTION_ID,
+                \"task_id\": $TASK_ID,
+                \"status\": \"${{ steps.execute.outcome }}\",
+                \"result\": $RESULT,
+                \"run_id\": ${{ github.run_id }},
+                \"run_url\": \"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"
+              }" || echo "Callback failed (non-critical)"
+          fi
+      
+      # 8. 実行結果のサマリーを出力
+      - name: Job Summary
+        if: always()
+        run: |
+          echo "## 🤖 Browser Automation Result" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Task ID**: ${{ github.event.client_payload.task_id }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Execution ID**: ${{ github.event.client_payload.execution_id }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ${{ steps.execute.outcome }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f "results/result.json" ]; then
+            echo "### Result" >> $GITHUB_STEP_SUMMARY
+            echo '```json' >> $GITHUB_STEP_SUMMARY
+            cat results/result.json >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi

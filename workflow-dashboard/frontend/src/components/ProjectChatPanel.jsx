@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   Plus,
   Sparkles,
@@ -28,13 +28,19 @@ import {
   FlaskConical,
   AlertTriangle,
   ChevronDown,
-  Cpu
+  Cpu,
+  MessageSquare,
+  ChevronRight,
+  Eye,
+  RefreshCw,
+  ArrowRight
 } from 'lucide-react'
 import { projectsApi, tasksApi, executionsApi, systemApi } from '../services/api'
 import useLanguageStore from '../stores/languageStore'
 import useProjectChatStore from '../stores/projectChatStore'
 import useTaskStore from '../stores/taskStore'
 import useCredentialStore from '../stores/credentialStore'
+import useNotificationStore from '../stores/notificationStore'
 
 export default function ProjectChatPanel({
   project,
@@ -44,6 +50,7 @@ export default function ProjectChatPanel({
 }) {
   const { t } = useLanguageStore()
   const { fetchCredentials, fetchStatus, status } = useCredentialStore()
+  const { success: notifySuccess, error: notifyError, info: notifyInfo } = useNotificationStore()
   const chatEndRef = useRef(null)
   
   // ストアからチャット履歴を取得
@@ -62,28 +69,33 @@ export default function ProjectChatPanel({
   // 初期メッセージを生成
   const getInitialMessage = () => ({
     role: 'assistant',
-    content: `こんにちは！プロジェクト「${project.name}」の自動化フロー作成をお手伝いします。
+    content: `こんにちは！プロジェクト「${project.name}」の自動化をお手伝いします 🤖
 
-まず、自動化を実行するためにAPIキーが必要です。
-以下のAPIキーをお持ちでしたら、このチャットに貼り付けてください。自動的に登録されます：
+━━━━━━━━━━━━━━━━━━━━
+📋 できること
+━━━━━━━━━━━━━━━━━━━━
 
-- OpenAI APIキー（sk-で始まる文字列）
-- Anthropic APIキー（sk-ant-で始まる文字列）
-- Google APIキー（AIzaで始まる文字列）
+✅ タスクの作成
+  チャットで「〇〇を自動化したい」と伝えるだけ
 
-※APIキーは暗号化して安全に保存されます。
-※すでに登録済みの場合はスキップしてください。
+✅ テスト実行
+  作成したタスクをすぐに動作確認
 
-その後、以下を教えてください：
+✅ 編集・調整
+  チャットで「スケジュールを変更」「指示を改善」など
 
-1. どんな作業を自動化したいですか？
-   （例：毎日のデータ収集、SNS投稿、メール処理など）
+━━━━━━━━━━━━━━━━━━━━
+🚀 始め方
+━━━━━━━━━━━━━━━━━━━━
 
-2. どのサービスやサイトを使いますか？
-   （例：Twitter、Googleスプレッドシート、特定のWebサイトなど）
+自動化したい作業を教えてください！
 
-3. どのくらいの頻度で実行しますか？
-   （例：毎日9時、週1回、手動で実行など）`
+例：
+• 「毎朝9時にニュースサイトから最新記事を取得したい」
+• 「Amazonの商品価格を定期的にチェックしたい」
+• 「Googleスプレッドシートにデータを転記したい」
+
+※APIキー（sk-...）をお持ちの場合は、このチャットに貼り付けると自動登録されます`
   })
   
   // ストアから履歴を取得、なければ初期メッセージを使用
@@ -116,6 +128,15 @@ export default function ProjectChatPanel({
   const testMonitorRef = useRef(null) // { executionId, taskName }
   const testMonitorTimerRef = useRef(null)
   const { dequeueExecution } = useTaskStore()
+  
+  // タスク編集モードの管理
+  const [editingTask, setEditingTask] = useState(null) // 編集中のタスク
+  const [taskEditChatHistory, setTaskEditChatHistory] = useState([]) // タスク編集用チャット履歴
+  const [taskEditPendingActions, setTaskEditPendingActions] = useState(null) // タスク編集用アクション
+  
+  // ワークフローステップガイド
+  const [workflowStep, setWorkflowStep] = useState(null) // 'creating' | 'testing' | 'editing' | 'completed'
+  const [expandedTaskId, setExpandedTaskId] = useState(null) // 展開されたタスクカードのID
   
   // 長時間処理中のUI制御
   const startPendingNotice = (message, subMessage = '処理中です。少々お待ちください…') => {
@@ -413,8 +434,12 @@ export default function ProjectChatPanel({
           } else {
             msg += `\n\n改善案を提案しましょうか？「再実行」か「提案して」と入力してください。`
           }
+          // 失敗通知
+          notifyError('実行失敗', `${label}でエラーが発生しました`)
         } else {
           msg += `\n\n次のステップがあれば教えてください。`
+          // 成功通知
+          notifySuccess('実行完了', `${label}が正常に完了しました`)
         }
         
         setChatHistory((prev) => [...prev, { role: 'assistant', content: msg }])
@@ -574,6 +599,140 @@ export default function ProjectChatPanel({
       setIsChatLoading(false)
       setRetryTaskId(null)
       setRetrySuggestion(null)
+    }
+  }
+
+  // タスク編集モードを開始
+  const startTaskEdit = async (task) => {
+    setEditingTask(task)
+    setWorkflowStep('editing')
+    setTaskEditChatHistory([{
+      role: 'assistant',
+      content: `タスク「${task.name}」の編集モードです。
+
+📝 現在の設定:
+• 名前: ${task.name}
+• 説明: ${task.description || 'なし'}
+• 実行場所: ${task.execution_location === 'server' ? 'サーバー' : 'ローカル'}
+• スケジュール: ${task.schedule || '手動実行'}
+
+何を変更しますか？
+例: 「指示内容を改善して」「スケジュールを毎日9時に変更」「より詳細な手順を追加」`
+    }])
+    setTaskEditPendingActions(null)
+  }
+
+  // タスク編集チャットを送信
+  const handleTaskEditChat = async (message) => {
+    if (!message.trim() || !editingTask || isChatLoading) return
+    
+    setIsChatLoading(true)
+    setTaskEditPendingActions(null)
+    
+    // ユーザーメッセージを追加
+    const newHistory = [...taskEditChatHistory, { role: 'user', content: message }]
+    setTaskEditChatHistory(newHistory)
+    
+    try {
+      const response = await tasksApi.taskChat(editingTask.id, message, taskEditChatHistory)
+      setTaskEditChatHistory(response.data.chat_history || newHistory)
+      
+      if (response.data.actions?.actions) {
+        setTaskEditPendingActions(response.data.actions.actions)
+      }
+    } catch (error) {
+      console.error('Task edit chat error:', error)
+      setTaskEditChatHistory(prev => [...prev, {
+        role: 'assistant',
+        content: `エラーが発生しました: ${error.message}`
+      }])
+    }
+    
+    setIsChatLoading(false)
+  }
+
+  // タスク編集アクションを実行
+  const handleTaskEditExecuteActions = async () => {
+    if (!taskEditPendingActions || !editingTask) return
+    
+    setIsChatLoading(true)
+    try {
+      const response = await tasksApi.executeTaskActions(editingTask.id, taskEditPendingActions)
+      
+      setTaskEditChatHistory(prev => [...prev, {
+        role: 'assistant',
+        content: `✅ 変更を適用しました！
+
+${response.data.message}
+
+テスト実行して動作を確認しますか？`
+      }])
+      
+      setTaskEditPendingActions(null)
+      
+      // タスク情報を更新
+      try {
+        const updatedTaskRes = await tasksApi.get(editingTask.id)
+        setEditingTask(updatedTaskRes.data)
+        
+        // createdTasksも更新
+        setCreatedTasks(prev => prev.map(t => 
+          t.id === editingTask.id ? updatedTaskRes.data : t
+        ))
+      } catch (e) {
+        // 更新に失敗しても続行
+      }
+      
+      onRefresh()
+    } catch (error) {
+      setTaskEditChatHistory(prev => [...prev, {
+        role: 'assistant',
+        content: `❌ 変更の適用に失敗しました: ${error.message}`
+      }])
+    }
+    setIsChatLoading(false)
+  }
+
+  // タスク編集モードを終了
+  const closeTaskEdit = () => {
+    setEditingTask(null)
+    setTaskEditChatHistory([])
+    setTaskEditPendingActions(null)
+    setWorkflowStep(createdTasks.length > 0 ? 'completed' : null)
+  }
+
+  // クイックテスト実行（編集モードから）
+  const handleQuickTestRun = async () => {
+    if (!editingTask) return
+    
+    setTaskEditChatHistory(prev => [...prev, {
+      role: 'assistant',
+      content: `🚀 テスト実行を開始しています...`
+    }])
+    
+    try {
+      const res = await tasksApi.run(editingTask.id)
+      const execId = res.data?.execution_id || res.data?.executionId || res.data?.execution?.id
+      
+      if (execId) {
+        setTaskEditChatHistory(prev => [...prev, {
+          role: 'assistant',
+          content: `テスト実行を開始しました（実行ID: ${execId}）
+
+メインチャットでログを監視しています。結果が出たらお知らせします。`
+        }])
+        monitorExecution(execId, `テスト実行: ${editingTask.name}`, editingTask.id)
+      } else {
+        setTaskEditChatHistory(prev => [...prev, {
+          role: 'assistant',
+          content: `実行を開始しました。履歴画面で確認できます。`
+        }])
+      }
+    } catch (error) {
+      setTaskEditChatHistory(prev => [...prev, {
+        role: 'assistant',
+        content: `❌ テスト実行に失敗しました: ${error.message}`
+      }])
     }
   }
 
@@ -1072,6 +1231,7 @@ export default function ProjectChatPanel({
     
     setIsChatLoading(true)
     setShowTestOption(false)
+    setWorkflowStep('creating')
     
     // 作成情報があれば設定
     if (pendingActions.creating_info) {
@@ -1089,7 +1249,7 @@ export default function ProjectChatPanel({
           project.id,
           taskData,
           true, // skipReview（既に検証済み）
-          true  // autoRunTest: 作成と同時にテスト実行
+          autoRunTest  // autoRunTest: 作成と同時にテスト実行
         )
         
         // 即座にタスクボードを更新
@@ -1103,6 +1263,7 @@ export default function ProjectChatPanel({
           setPendingActions(null)
           setCreatingInfo(null)
           setValidationResult(null)
+          setWorkflowStep(null)
           setIsChatLoading(false)
           return
         }
@@ -1111,20 +1272,23 @@ export default function ProjectChatPanel({
         const createdTaskInfo = [task]
         setCreatedTasks(prev => [...prev, ...createdTaskInfo])
         addCreatedTasks(project.id, createdTaskInfo)
+        setExpandedTaskId(task.id) // 新しく作成されたタスクを展開
         
-        let successMessage = `タスクを作成しました！\n\n`
-        successMessage += `【作成されたタスク】\n`
-        successMessage += `名前: ${task.name}\n`
-        successMessage += `説明: ${task.description || 'なし'}\n`
-        successMessage += `実行場所: ${task.execution_location === 'server' ? 'サーバー' : 'ローカル'}\n`
-        successMessage += `スケジュール: ${task.schedule || '手動実行'}\n\n`
+        // 通知を表示
+        notifySuccess('タスク作成完了', `「${task.name}」を作成しました`)
+        
+        let successMessage = `✅ タスクを作成しました！\n\n`
         
         if (autoRunTest && response.data.validation?.test_execution) {
-          successMessage += `テスト実行を開始しました（実行ID: ${response.data.validation.test_execution.execution_id}）\n`
-          successMessage += `履歴画面で進捗を確認できます。`
+          successMessage += `🚀 テスト実行を開始しました（実行ID: ${response.data.validation.test_execution.execution_id}）\n\n`
           const execId = response.data.validation.test_execution.execution_id
           testMonitorRef.current = { executionId: execId, taskName: task.name }
           pollTestExecution(execId, task.name)
+          setWorkflowStep('testing')
+          notifyInfo('テスト実行開始', '結果をお待ちください...')
+        } else {
+          successMessage += `下のタスクカードから「テスト実行」や「編集」ができます。\n\n`
+          setWorkflowStep('completed')
         }
         
         setChatHistory(prev => [...prev, {
@@ -1824,6 +1988,177 @@ export default function ProjectChatPanel({
       </div>
       
       
+      {/* タスク編集モードのオーバーレイ */}
+      <AnimatePresence>
+        {editingTask && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className="absolute inset-0 bg-white/98 dark:bg-zinc-900/98 backdrop-blur-sm z-10 flex flex-col"
+          >
+            {/* タスク編集ヘッダー */}
+            <div className="flex items-center gap-3 p-4 border-b border-cyan-200 dark:border-cyan-800 bg-gradient-to-r from-cyan-500/10 to-blue-500/10">
+              <div className="w-10 h-10 rounded-lg bg-cyan-100 dark:bg-cyan-500/20 flex items-center justify-center">
+                <MessageSquare className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-foreground">タスク編集チャット</h3>
+                <p className="text-xs text-muted-foreground truncate">{editingTask.name}</p>
+              </div>
+              <button
+                onClick={closeTaskEdit}
+                className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* クイックアクション */}
+            <div className="flex items-center gap-2 p-3 border-b border-zinc-200 dark:border-zinc-800 overflow-x-auto">
+              <button
+                onClick={() => handleTaskEditChat('このタスクの指示を改善してください')}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded-full whitespace-nowrap hover:bg-amber-200 dark:hover:bg-amber-500/30 transition-colors"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                改善
+              </button>
+              <button
+                onClick={() => handleTaskEditChat('スケジュールを変更したい')}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 rounded-full whitespace-nowrap hover:bg-purple-200 dark:hover:bg-purple-500/30 transition-colors"
+              >
+                <Clock className="w-3.5 h-3.5" />
+                スケジュール
+              </button>
+              <button
+                onClick={handleQuickTestRun}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-full whitespace-nowrap hover:bg-emerald-200 dark:hover:bg-emerald-500/30 transition-colors"
+              >
+                <Play className="w-3.5 h-3.5" />
+                テスト実行
+              </button>
+              <button
+                onClick={() => handleTaskEditChat('実行場所をサーバーに変更して')}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 rounded-full whitespace-nowrap hover:bg-blue-200 dark:hover:bg-blue-500/30 transition-colors"
+              >
+                <Settings className="w-3.5 h-3.5" />
+                実行場所
+              </button>
+            </div>
+
+            {/* タスク編集チャット履歴 */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {taskEditChatHistory.map((msg, idx) => (
+                <div key={idx} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+                    msg.role === 'user' 
+                      ? 'bg-primary/10 text-primary' 
+                      : 'bg-gradient-to-br from-cyan-500/20 to-blue-500/20 text-cyan-500'
+                  }`}>
+                    {msg.role === 'user' ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
+                  </div>
+                  <div className={`flex-1 max-w-[85%] ${msg.role === 'user' ? 'text-right' : ''}`}>
+                    <div className={`inline-block p-3 rounded-2xl text-sm whitespace-pre-wrap ${
+                      msg.role === 'user'
+                        ? 'bg-primary text-primary-foreground rounded-br-md'
+                        : 'bg-zinc-100 dark:bg-zinc-800 text-foreground rounded-bl-md'
+                    }`}>
+                      {msg.content}
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {/* ローディング */}
+              {isChatLoading && (
+                <div className="flex gap-3">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500/20 to-blue-500/20 flex items-center justify-center">
+                    <Loader2 className="w-4 h-4 text-cyan-500 animate-spin" />
+                  </div>
+                  <div className="bg-zinc-100 dark:bg-zinc-800 p-3 rounded-2xl rounded-bl-md">
+                    <div className="flex gap-1">
+                      <span className="w-2 h-2 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <span className="w-2 h-2 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <span className="w-2 h-2 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* タスク編集アクション実行ボタン */}
+              {taskEditPendingActions && taskEditPendingActions.length > 0 && (
+                <div className="bg-gradient-to-r from-cyan-500/10 to-blue-500/10 border-2 border-cyan-500/50 rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <AlertCircle className="w-5 h-5 text-cyan-500" />
+                    <span className="font-semibold text-foreground">変更の確認</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    {taskEditPendingActions.length}件の変更を適用します
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleTaskEditExecuteActions}
+                      disabled={isChatLoading}
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-cyan-500 text-white font-medium rounded-lg hover:bg-cyan-600 disabled:opacity-50 transition-colors"
+                    >
+                      <CheckCircle className="w-4 h-4" />
+                      適用する
+                    </button>
+                    <button
+                      onClick={() => setTaskEditPendingActions(null)}
+                      className="px-4 py-2.5 border border-zinc-300 dark:border-zinc-700 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                    >
+                      キャンセル
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* タスク編集入力フィールド */}
+            <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="タスクの編集内容を入力..."
+                  disabled={isChatLoading}
+                  className="flex-1 px-4 py-3 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 outline-none transition-all disabled:opacity-50"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault()
+                      handleTaskEditChat(e.target.value)
+                      e.target.value = ''
+                    }
+                  }}
+                />
+                <button
+                  onClick={(e) => {
+                    const input = e.target.closest('.flex').querySelector('input')
+                    if (input.value.trim()) {
+                      handleTaskEditChat(input.value)
+                      input.value = ''
+                    }
+                  }}
+                  disabled={isChatLoading}
+                  className="px-4 py-3 bg-cyan-500 text-white rounded-xl hover:bg-cyan-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <Send className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="mt-2 text-xs text-muted-foreground flex items-center justify-between">
+                <span>💡 「指示を改善して」「スケジュールを変更」などと入力</span>
+                <button
+                  onClick={closeTaskEdit}
+                  className="text-cyan-500 hover:text-cyan-700 font-medium"
+                >
+                  メインチャットに戻る
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* ファイルアップロード用input（非表示） */}
       <div className="hidden">
         {/* 動画アップロード（添付用） */}
@@ -2170,52 +2505,186 @@ export default function ProjectChatPanel({
                 })}
               </div>
               
-              {/* 作成されたタスクのアクションボタン */}
+              {/* 作成されたタスクのアクションボタン（改善版） */}
               {msg.createdTasks && msg.createdTasks.length > 0 && (
-                <div className="mt-2 space-y-2">
-                  {msg.createdTasks.map((task, taskIdx) => (
-                    <div key={taskIdx} className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg p-3">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-medium text-sm text-emerald-700 dark:text-emerald-300">{task.name}</span>
-                        <div className="flex gap-1">
-                          <button
-                            onClick={() => handleRunTask(task.id)}
-                            className="p-1.5 rounded hover:bg-emerald-200 dark:hover:bg-emerald-800 text-emerald-600 dark:text-emerald-400"
-                            title="実行"
-                          >
-                            <Play className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => {
-                              setChatInput(`タスク「${task.name}」を編集したい`)
-                            }}
-                            className="p-1.5 rounded hover:bg-emerald-200 dark:hover:bg-emerald-800 text-emerald-600 dark:text-emerald-400"
-                            title="編集"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                      <div className="text-xs text-emerald-600 dark:text-emerald-400 space-y-1">
-                        <div className="flex items-center gap-2">
-                          <Settings className="w-3 h-3" />
-                          <span>{task.execution_location === 'server' ? 'サーバー実行' : 'ローカル実行'}</span>
-                        </div>
-                        {task.schedule && (
-                          <div className="flex items-center gap-2">
-                            <Clock className="w-3 h-3" />
-                            <span>{task.schedule}</span>
+                <div className="mt-3 space-y-3">
+                  {msg.createdTasks.map((task, taskIdx) => {
+                    const isExpanded = expandedTaskId === task.id
+                    return (
+                      <div key={taskIdx} className="bg-gradient-to-r from-emerald-50 to-cyan-50 dark:from-emerald-900/20 dark:to-cyan-900/20 border-2 border-emerald-300 dark:border-emerald-700 rounded-xl overflow-hidden shadow-sm">
+                        {/* タスクヘッダー */}
+                        <div 
+                          className="flex items-center justify-between p-3 cursor-pointer hover:bg-emerald-100/50 dark:hover:bg-emerald-800/30 transition-colors"
+                          onClick={() => setExpandedTaskId(isExpanded ? null : task.id)}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+                              <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                            </div>
+                            <div>
+                              <span className="font-semibold text-sm text-emerald-800 dark:text-emerald-200">{task.name}</span>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                                  task.execution_location === 'server' 
+                                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' 
+                                    : 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300'
+                                }`}>
+                                  {task.execution_location === 'server' ? '🖥️ サーバー' : '💻 ローカル'}
+                                </span>
+                                {task.schedule && (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300 font-medium">
+                                    ⏰ {task.schedule}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
                           </div>
-                        )}
+                          <ChevronRight className={`w-5 h-5 text-emerald-500 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                        </div>
+                        
+                        {/* 展開時のアクションパネル */}
+                        <AnimatePresence>
+                          {isExpanded && (
+                            <motion.div
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: 'auto', opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              transition={{ duration: 0.2 }}
+                              className="border-t border-emerald-200 dark:border-emerald-700"
+                            >
+                              <div className="p-3 space-y-3">
+                                {/* 詳細情報 */}
+                                {task.description && (
+                                  <div className="text-xs text-zinc-600 dark:text-zinc-400 bg-white/50 dark:bg-zinc-800/50 rounded-lg p-2">
+                                    📝 {task.description}
+                                  </div>
+                                )}
+                                
+                                {/* アクションボタン */}
+                                <div className="grid grid-cols-3 gap-2">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleRunTask(task.id)
+                                    }}
+                                    className="flex flex-col items-center gap-1.5 p-3 rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 transition-colors shadow-sm"
+                                  >
+                                    <Play className="w-5 h-5" />
+                                    <span className="text-xs font-medium">テスト実行</span>
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      startTaskEdit(task)
+                                    }}
+                                    className="flex flex-col items-center gap-1.5 p-3 rounded-lg bg-cyan-500 text-white hover:bg-cyan-600 transition-colors shadow-sm"
+                                  >
+                                    <MessageSquare className="w-5 h-5" />
+                                    <span className="text-xs font-medium">編集チャット</span>
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      // 詳細表示（task_promptを表示）
+                                      setChatHistory(prev => [...prev, {
+                                        role: 'assistant',
+                                        content: `📋 タスク「${task.name}」の詳細\n\n【指示内容】\n${task.task_prompt || 'なし'}\n\n【設定】\n• 実行場所: ${task.execution_location === 'server' ? 'サーバー' : 'ローカル'}\n• スケジュール: ${task.schedule || '手動実行'}\n• 役割グループ: ${task.role_group || '未分類'}`
+                                      }])
+                                    }}
+                                    className="flex flex-col items-center gap-1.5 p-3 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+                                  >
+                                    <Eye className="w-5 h-5" />
+                                    <span className="text-xs font-medium">詳細表示</span>
+                                  </button>
+                                </div>
+                                
+                                {/* ヒント */}
+                                <div className="text-[10px] text-zinc-500 dark:text-zinc-400 text-center">
+                                  💡 「テスト実行」で動作確認、「編集チャット」で内容を調整できます
+                                </div>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </div>
           </div>
         ))}
         
+        {/* ワークフローステップガイド */}
+        {workflowStep && (
+          <div className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 border border-indigo-200 dark:border-indigo-800 rounded-xl p-4 mb-4">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm font-semibold text-indigo-700 dark:text-indigo-300">📍 ワークフロー進捗</span>
+              <button
+                onClick={() => setWorkflowStep(null)}
+                className="text-xs text-indigo-500 hover:text-indigo-700"
+              >
+                閉じる
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              {/* Step 1: 作成 */}
+              <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                workflowStep === 'creating' 
+                  ? 'bg-amber-500 text-white animate-pulse' 
+                  : ['testing', 'editing', 'completed'].includes(workflowStep)
+                    ? 'bg-emerald-500 text-white'
+                    : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-500'
+              }`}>
+                {['testing', 'editing', 'completed'].includes(workflowStep) ? <CheckCircle className="w-3 h-3" /> : <span>1</span>}
+                作成
+              </div>
+              <ArrowRight className="w-4 h-4 text-zinc-400" />
+              
+              {/* Step 2: テスト */}
+              <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                workflowStep === 'testing' 
+                  ? 'bg-amber-500 text-white animate-pulse' 
+                  : ['editing', 'completed'].includes(workflowStep)
+                    ? 'bg-emerald-500 text-white'
+                    : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-500'
+              }`}>
+                {['editing', 'completed'].includes(workflowStep) ? <CheckCircle className="w-3 h-3" /> : <span>2</span>}
+                テスト
+              </div>
+              <ArrowRight className="w-4 h-4 text-zinc-400" />
+              
+              {/* Step 3: 編集/調整 */}
+              <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                workflowStep === 'editing' 
+                  ? 'bg-cyan-500 text-white' 
+                  : workflowStep === 'completed'
+                    ? 'bg-emerald-500 text-white'
+                    : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-500'
+              }`}>
+                {workflowStep === 'completed' ? <CheckCircle className="w-3 h-3" /> : <span>3</span>}
+                編集
+              </div>
+              <ArrowRight className="w-4 h-4 text-zinc-400" />
+              
+              {/* Step 4: 完了 */}
+              <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                workflowStep === 'completed' 
+                  ? 'bg-emerald-500 text-white' 
+                  : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-500'
+              }`}>
+                ✓ 完了
+              </div>
+            </div>
+            <div className="mt-2 text-xs text-indigo-600 dark:text-indigo-400">
+              {workflowStep === 'creating' && '🔄 タスクを作成しています...'}
+              {workflowStep === 'testing' && '🧪 テスト実行中です。結果をお待ちください...'}
+              {workflowStep === 'editing' && '✏️ タスクを編集中です。変更を保存してください。'}
+              {workflowStep === 'completed' && '🎉 タスクの作成が完了しました！タスクボードで確認できます。'}
+            </div>
+          </div>
+        )}
+
         {/* 作成中の表示 */}
         {creatingInfo && (
           <div className="flex gap-3">
@@ -2249,115 +2718,172 @@ export default function ProjectChatPanel({
           </div>
         )}
         
-        {/* アクション実行ボタン */}
+        {/* 作成されたタスク一覧（サマリー） */}
+        {createdTasks.length > 0 && !pendingActions && !editingTask && (
+          <div className="bg-gradient-to-r from-emerald-50 to-cyan-50 dark:from-emerald-900/10 dark:to-cyan-900/10 border border-emerald-200 dark:border-emerald-800 rounded-xl p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="w-5 h-5 text-emerald-500" />
+                <span className="font-semibold text-sm text-foreground">作成済みタスク ({createdTasks.length}件)</span>
+              </div>
+              <button
+                onClick={() => setCreatedTasks([])}
+                className="text-xs text-muted-foreground hover:text-foreground"
+              >
+                クリア
+              </button>
+            </div>
+            <div className="space-y-2 max-h-48 overflow-y-auto">
+              {createdTasks.map((task, idx) => (
+                <div key={idx} className="flex items-center justify-between p-2 bg-white/70 dark:bg-zinc-800/70 rounded-lg">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-6 h-6 rounded bg-emerald-500/20 flex items-center justify-center text-emerald-600 text-xs font-bold">
+                      {idx + 1}
+                    </div>
+                    <span className="text-sm text-foreground truncate">{task.name}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => handleRunTask(task.id)}
+                      className="p-1 rounded hover:bg-emerald-100 dark:hover:bg-emerald-800 text-emerald-600"
+                      title="テスト実行"
+                    >
+                      <Play className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => startTaskEdit(task)}
+                      className="p-1 rounded hover:bg-cyan-100 dark:hover:bg-cyan-800 text-cyan-600"
+                      title="編集"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-3 text-[10px] text-center text-muted-foreground">
+              タスクをクリックして「テスト実行」や「編集」ができます
+            </div>
+          </div>
+        )}
+
+        {/* アクション実行ボタン（簡素化版） */}
         {pendingActions && (Array.isArray(pendingActions) ? pendingActions.length > 0 : true) && (
           <div className="bg-gradient-to-r from-emerald-500/10 to-blue-500/10 border-2 border-emerald-500/50 rounded-xl p-4 shadow-lg">
             <div className="flex items-center gap-2 mb-3">
               <CheckCircle className="w-6 h-6 text-emerald-500" />
               <span className="font-bold text-lg text-foreground">タスク作成の準備完了</span>
             </div>
-            {creatingInfo && (
-              <div className="mb-3 p-3 bg-white/50 dark:bg-zinc-800/50 rounded-lg">
-                <p className="font-medium text-foreground">📋 {creatingInfo.task_name}</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {creatingInfo.current}/{creatingInfo.total} 件のタスクを作成します
-                </p>
-              </div>
-            )}
-            <p className="text-sm text-muted-foreground mb-3">
-              下のボタンをクリックしてタスクを作成してください
-            </p>
             
-            {/* 検証結果がある場合の表示 */}
-            {validationResult && (
-              <div className="mb-4 p-3 bg-white/50 dark:bg-zinc-800/50 rounded-lg text-sm">
-                <div className="flex items-center gap-2 mb-2">
-                  {validationResult.credentials?.is_ready ? (
-                    <CheckCircle className="w-4 h-4 text-emerald-500" />
-                  ) : (
-                    <AlertTriangle className="w-4 h-4 text-amber-500" />
-                  )}
-                  <span className="font-medium">
-                    認証情報: {validationResult.credentials?.is_ready ? '準備OK' : '不足あり'}
-                  </span>
-                </div>
-                {validationResult.review?.reviewed && (
-                  <div className="flex items-center gap-2">
-                    {validationResult.review.score >= 5 ? (
-                      <CheckCircle className="w-4 h-4 text-emerald-500" />
-                    ) : (
-                      <AlertTriangle className="w-4 h-4 text-amber-500" />
+            {/* タスクプレビュー */}
+            {(() => {
+              const actions = pendingActions.actions || pendingActions
+              const createActions = actions.filter(a => a.type === 'create_task')
+              if (createActions.length > 0) {
+                const taskData = createActions[0].data
+                return (
+                  <div className="mb-4 p-3 bg-white/70 dark:bg-zinc-800/70 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Sparkles className="w-4 h-4 text-emerald-500" />
+                      <span className="font-semibold text-sm text-foreground">{taskData.name || '新規タスク'}</span>
+                    </div>
+                    {taskData.description && (
+                      <p className="text-xs text-muted-foreground mb-2">📝 {taskData.description}</p>
                     )}
-                    <span className="font-medium">
-                      品質スコア: {validationResult.review.score}/10
+                    <div className="flex flex-wrap gap-2 text-[10px]">
+                      <span className={`px-2 py-0.5 rounded-full font-medium ${
+                        taskData.execution_location === 'server' 
+                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' 
+                          : 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300'
+                      }`}>
+                        {taskData.execution_location === 'server' ? '🖥️ サーバー' : '💻 ローカル'}
+                      </span>
+                      {taskData.schedule && (
+                        <span className="px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300 font-medium">
+                          ⏰ {taskData.schedule}
+                        </span>
+                      )}
+                      {taskData.role_group && (
+                        <span className="px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300 font-medium">
+                          📁 {taskData.role_group}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )
+              }
+              return null
+            })()}
+            
+            {/* 検証結果（簡易表示） */}
+            {validationResult && (
+              <div className="mb-4 p-2 bg-white/50 dark:bg-zinc-800/50 rounded-lg">
+                <div className="flex items-center gap-3 text-xs">
+                  <div className="flex items-center gap-1">
+                    {validationResult.credentials?.is_ready ? (
+                      <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
+                    ) : (
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                    )}
+                    <span className={validationResult.credentials?.is_ready ? 'text-emerald-600' : 'text-amber-600'}>
+                      認証: {validationResult.credentials?.is_ready ? 'OK' : '要確認'}
                     </span>
                   </div>
-                )}
+                  {validationResult.review?.reviewed && (
+                    <div className="flex items-center gap-1">
+                      {validationResult.review.score >= 5 ? (
+                        <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
+                      ) : (
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                      )}
+                      <span className={validationResult.review.score >= 5 ? 'text-emerald-600' : 'text-amber-600'}>
+                        品質: {validationResult.review.score}/10
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
             
-            {/* ボタン群 */}
-            {!showTestOption ? (
-              <div className="flex gap-2 flex-wrap">
-                <button
-                  onClick={handlePreValidate}
-                  disabled={isChatLoading}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-amber-500 text-white font-medium rounded-lg hover:bg-amber-600 disabled:opacity-50"
-                >
-                  <Shield className="w-4 h-4" />
-                  検証する
-                </button>
+            {/* シンプルな2ボタン */}
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={() => handleExecuteActions(true, false)}
                   disabled={isChatLoading}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50"
+                  className="flex flex-col items-center gap-1.5 px-4 py-3 bg-primary text-primary-foreground font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
                 >
-                  <CheckCircle className="w-4 h-4" />
-                  作成する
+                  <CheckCircle className="w-5 h-5" />
+                  <span className="text-sm">作成する</span>
+                  <span className="text-[10px] opacity-70">後でテスト実行</span>
                 </button>
                 <button
-                  onClick={() => {
-                    setPendingActions(null)
-                    setValidationResult(null)
-                    setShowTestOption(false)
-                  }}
-                  className="px-4 py-2.5 border border-zinc-300 dark:border-zinc-700 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                  onClick={() => handleExecuteActions(true, true)}
+                  disabled={isChatLoading}
+                  className="flex flex-col items-center gap-1.5 px-4 py-3 bg-emerald-500 text-white font-medium rounded-lg hover:bg-emerald-600 disabled:opacity-50 transition-colors shadow-md shadow-emerald-500/20"
                 >
-                  {t('common.cancel')}
+                  <FlaskConical className="w-5 h-5" />
+                  <span className="text-sm">テスト付き作成</span>
+                  <span className="text-[10px] opacity-70">おすすめ</span>
                 </button>
               </div>
-            ) : (
-              <div className="space-y-2">
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleExecuteActions(true, false)}
-                    disabled={isChatLoading}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50"
-                  >
-                    <CheckCircle className="w-4 h-4" />
-                    作成のみ
-                  </button>
-                  <button
-                    onClick={() => handleExecuteActions(true, true)}
-                    disabled={isChatLoading}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-500 text-white font-medium rounded-lg hover:bg-emerald-600 disabled:opacity-50"
-                  >
-                    <FlaskConical className="w-4 h-4" />
-                    テスト実行付きで作成
-                  </button>
-                </div>
-                <button
-                  onClick={() => {
-                    setPendingActions(null)
-                    setValidationResult(null)
-                    setShowTestOption(false)
-                  }}
-                  className="w-full px-4 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-sm"
-                >
-                  {t('common.cancel')}
-                </button>
-              </div>
-            )}
+              <button
+                onClick={() => {
+                  setPendingActions(null)
+                  setValidationResult(null)
+                  setShowTestOption(false)
+                  setWorkflowStep(null)
+                }}
+                className="w-full px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
+              >
+                キャンセル
+              </button>
+            </div>
+            
+            {/* ヒント */}
+            <div className="mt-3 text-[10px] text-center text-muted-foreground">
+              💡 「テスト付き作成」で作成後すぐに動作確認できます
+            </div>
           </div>
         )}
         

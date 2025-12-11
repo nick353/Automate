@@ -12,15 +12,16 @@ from app.schemas import ExecutionResponse, ExecutionWithTask, ExecutionWithSteps
 router = APIRouter(prefix="/executions", tags=["executions"])
 
 
-@router.get("", response_model=List[ExecutionWithTask])
+@router.get("")
 def get_executions(
     skip: int = 0,
-    limit: int = 100,
+    limit: int = 20,
     task_id: Optional[int] = None,
     status: Optional[str] = None,
+    with_total: bool = False,
     db: Session = Depends(get_db)
 ):
-    """実行履歴一覧を取得"""
+    """実行履歴一覧を取得（ページネーション対応）"""
     query = db.query(Execution)
     
     if task_id:
@@ -29,7 +30,22 @@ def get_executions(
     if status:
         query = query.filter(Execution.status == status)
     
+    # トータルカウント（オプション）
+    total = None
+    if with_total:
+        total = query.count()
+    
     executions = query.order_by(Execution.started_at.desc()).offset(skip).limit(limit).all()
+    
+    if with_total:
+        return {
+            "items": executions,
+            "total": total,
+            "skip": skip,
+            "limit": limit,
+            "has_more": (skip + limit) < total
+        }
+    
     return executions
 
 

@@ -175,11 +175,18 @@ async def run_task(
     task_id: int,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    current_user: Optional[UserInfo] = Depends(get_current_user)
+    current_user: Optional[UserInfo] = Depends(get_current_user),
+    use_github_actions: bool = False  # クエリパラメータ
 ):
-    """タスクを手動実行"""
+    """タスクを手動実行
+    
+    Args:
+        use_github_actions: Trueの場合、GitHub Actionsで実行（デフォルト: False）
+    """
     from app.services.agent import run_task_with_live_view
+    from app.services.github_actions import github_actions_service
     from datetime import datetime
+    import os
     
     query = db.query(Task).filter(Task.id == task_id)
     
@@ -196,21 +203,142 @@ async def run_task(
     execution = Execution(
         task_id=task_id,
         status="pending",
-        triggered_by="manual",
+        triggered_by="manual" if not use_github_actions else "github_actions",
         started_at=datetime.utcnow()
     )
     db.add(execution)
     db.commit()
     db.refresh(execution)
     
-    # バックグラウンドで実行
+    # GitHub Actionsで実行する場合
+    if use_github_actions:
+        if not github_actions_service.is_configured():
+            # 設定されていない場合はエラー
+            execution.status = "failed"
+            execution.error_message = "GitHub Actionsが設定されていません。環境変数GITHUB_PAT, GITHUB_REPO_OWNER, GITHUB_REPO_NAMEを設定してください。"
+            db.commit()
+            raise HTTPException(
+                status_code=400, 
+                detail="GitHub Actionsが設定されていません"
+            )
+        
+        # Webhook URLを構築
+        app_url = os.environ.get("APP_URL", "http://localhost:8000")
+        callback_url = f"{app_url}/api/github-webhook/result"
+        
+        # GitHub Actionsにディスパッチ
+        result = await github_actions_service.dispatch_task(
+            task_id=task_id,
+            execution_id=execution.id,
+            task_prompt=task.task_prompt,
+            target_url=None,  # タスクプロンプト内にURLが含まれる想定
+            max_steps=task.max_steps or 20,
+            callback_url=callback_url
+        )
+        
+        if result.get("success"):
+            execution.status = "running"
+            db.commit()
+            return {
+                "message": "GitHub Actionsでタスクを開始しました。完了までお待ちください。",
+                "execution_id": execution.id,
+                "status": "running",
+                "execution_mode": "github_actions",
+                "estimated_start": "30秒〜1分後"
+            }
+        else:
+            execution.status = "failed"
+            execution.error_message = result.get("error", "GitHub Actions dispatch failed")
+            db.commit()
+            raise HTTPException(status_code=500, detail=result.get("error"))
+    
+    # 従来通りバックグラウンドで実行
     background_tasks.add_task(run_task_with_live_view, task_id, execution.id)
     
     return {
         "message": "タスクを開始しました",
         "execution_id": execution.id,
-        "status": "pending"
+        "status": "pending",
+        "execution_mode": "local"
     }
+
+
+@router.post("/{task_id}/run-remote", response_model=MessageResponse)
+async def run_task_remote(
+    task_id: int,
+    db: Session = Depends(get_db),
+    current_user: Optional[UserInfo] = Depends(get_current_user)
+):
+    """タスクをGitHub Actionsで実行（リモート実行専用エンドポイント）
+    
+    Zeabur上のリソース制約を回避するため、GitHub Actionsで実行します。
+    - タイムアウトなし（最大6時間）
+    - 7GB RAM
+    - 毎回クリーンな環境
+    """
+    from app.services.github_actions import github_actions_service
+    from datetime import datetime
+    import os
+    
+    query = db.query(Task).filter(Task.id == task_id)
+    
+    # ユーザーIDでフィルタリング
+    user_id = get_user_filter(current_user)
+    if user_id:
+        query = query.filter(Task.user_id == user_id)
+    
+    task = query.first()
+    if not task:
+        raise HTTPException(status_code=404, detail="タスクが見つかりません")
+    
+    # GitHub Actions設定確認
+    if not github_actions_service.is_configured():
+        raise HTTPException(
+            status_code=400,
+            detail="GitHub Actionsが設定されていません。環境変数GITHUB_PAT, GITHUB_REPO_OWNER, GITHUB_REPO_NAMEを設定してください。"
+        )
+    
+    # 実行レコードを作成
+    execution = Execution(
+        task_id=task_id,
+        status="pending",
+        triggered_by="github_actions",
+        started_at=datetime.utcnow()
+    )
+    db.add(execution)
+    db.commit()
+    db.refresh(execution)
+    
+    # Webhook URLを構築
+    app_url = os.environ.get("APP_URL", "http://localhost:8000")
+    callback_url = f"{app_url}/api/github-webhook/result"
+    
+    # GitHub Actionsにディスパッチ
+    result = await github_actions_service.dispatch_task(
+        task_id=task_id,
+        execution_id=execution.id,
+        task_prompt=task.task_prompt,
+        target_url=None,
+        max_steps=task.max_steps or 20,
+        callback_url=callback_url
+    )
+    
+    if result.get("success"):
+        execution.status = "running"
+        db.commit()
+        return {
+            "message": "GitHub Actionsでタスクを開始しました",
+            "execution_id": execution.id,
+            "status": "running",
+            "execution_mode": "github_actions",
+            "estimated_start": "30秒〜1分後",
+            "note": "完了時に自動で通知されます"
+        }
+    else:
+        execution.status = "failed"
+        execution.error_message = result.get("error", "GitHub Actions dispatch failed")
+        db.commit()
+        raise HTTPException(status_code=500, detail=result.get("error"))
 
 
 # ==================== バッチ更新API ====================

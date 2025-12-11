@@ -50,6 +50,16 @@ class Settings(BaseSettings):
     supabase_url: str = "https://vyvarctfzslbthdbsmvd.supabase.co"
     supabase_anon_key: str = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ5dmFyY3RmenNsYnRoZGJzbXZkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NDU1NjcsImV4cCI6MjA4MDQyMTU2N30.FZDTrLLeFrou-ZYSOhegGkHIe0mqDYS_ne9pginpYE8"
     
+    # GitHub Actions Settings（リモート実行用）
+    github_pat: str = ""  # Personal Access Token
+    github_repo_owner: str = ""  # リポジトリオーナー
+    github_repo_name: str = ""  # リポジトリ名
+    app_url: str = "http://localhost:8000"  # Webhook用のアプリURL
+    
+    # 実行タイムアウト設定
+    execution_timeout_seconds: int = 600  # デフォルト10分
+    execution_step_timeout_seconds: int = 120  # 各ステップのタイムアウト（2分）
+    
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

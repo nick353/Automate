@@ -182,6 +182,10 @@ export const credentialsApi = {
 // Executions API
 export const executionsApi = {
   getAll: (params) => api.get('/executions', { params }),
+  // ページネーション対応版
+  getPaginated: (params) => api.get('/executions', { 
+    params: { ...params, with_total: true } 
+  }),
   get: (id) => api.get(`/executions/${id}`),
   getLogs: (id) => api.get(`/executions/${id}/logs`),
   delete: (id) => api.delete(`/executions/${id}`),

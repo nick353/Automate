@@ -11,9 +11,12 @@ import Execution from './pages/Execution'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
 import ImmersiveDemo from './pages/ImmersiveDemo'
+import ToastNotifications from './components/ToastNotifications'
 
 export default function App() {
   return (
+    <>
+    <ToastNotifications />
     <Routes>
       {/* Immersive Demo Route (Public) */}
       <Route path="/immersive" element={<ImmersiveDemo />} />
@@ -40,5 +43,6 @@ export default function App() {
         <Route path="execution/:executionId" element={<Execution />} />
       </Route>
     </Routes>
+    </>
   )
 }

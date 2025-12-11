@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { 
   History as HistoryIcon, 
@@ -8,32 +8,83 @@ import {
   CheckCircle2,
   XCircle,
   AlertCircle,
-  Sparkles
+  Sparkles,
+  ChevronLeft,
+  ChevronRight,
+  Loader2
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { executionsApi } from '../services/api'
 import { BentoGrid, BentoItem } from '../components/Bento/BentoGrid'
 import useLanguageStore from '../stores/languageStore'
+import useNotificationStore from '../stores/notificationStore'
+import { SkeletonHistoryCard, SkeletonGrid } from '../components/Skeleton'
+
+const PAGE_SIZE = 20
 
 export default function History() {
   const [executions, setExecutions] = useState([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [filter, setFilter] = useState('all')
+  const [page, setPage] = useState(0)
+  const [total, setTotal] = useState(0)
+  const [hasMore, setHasMore] = useState(false)
   const { t } = useLanguageStore()
+  const { success: notifySuccess, error: notifyError } = useNotificationStore()
   
-  useEffect(() => {
-    fetchExecutions()
-  }, [filter])
-  
-  const fetchExecutions = async () => {
+  const fetchExecutions = useCallback(async (pageNum = 0, append = false) => {
+    if (append) {
+      setIsLoadingMore(true)
+    } else {
+      setIsLoading(true)
+    }
+    
     try {
-      const params = filter !== 'all' ? { status: filter } : {}
-      const response = await executionsApi.getAll(params)
-      setExecutions(response.data)
+      const params = {
+        skip: pageNum * PAGE_SIZE,
+        limit: PAGE_SIZE,
+        ...(filter !== 'all' ? { status: filter } : {})
+      }
+      const response = await executionsApi.getPaginated(params)
+      const data = response.data
+      
+      if (data.items) {
+        // ページネーション対応レスポンス
+        if (append) {
+          setExecutions(prev => [...prev, ...data.items])
+        } else {
+          setExecutions(data.items)
+        }
+        setTotal(data.total)
+        setHasMore(data.has_more)
+      } else {
+        // 従来のレスポンス（配列直接）
+        if (append) {
+          setExecutions(prev => [...prev, ...data])
+        } else {
+          setExecutions(data)
+        }
+        setHasMore(data.length === PAGE_SIZE)
+      }
+      setPage(pageNum)
     } catch (error) {
       console.error('Failed to fetch executions:', error)
+      notifyError('エラー', '履歴の取得に失敗しました')
     } finally {
       setIsLoading(false)
+      setIsLoadingMore(false)
+    }
+  }, [filter, notifyError])
+  
+  useEffect(() => {
+    setPage(0)
+    fetchExecutions(0)
+  }, [filter])
+  
+  const loadMore = () => {
+    if (!isLoadingMore && hasMore) {
+      fetchExecutions(page + 1, true)
     }
   }
   
@@ -42,8 +93,10 @@ export default function History() {
       try {
         await executionsApi.delete(execution.id)
         setExecutions(executions.filter(e => e.id !== execution.id))
+        setTotal(prev => prev - 1)
+        notifySuccess('削除完了', '履歴を削除しました')
       } catch (error) {
-        alert('Failed to delete')
+        notifyError('削除失敗', error.message)
       }
     }
   }
@@ -89,9 +142,8 @@ export default function History() {
     return `${minutes}m ${seconds % 60}s`
   }
   
-  const filteredExecutions = filter === 'all' 
-    ? executions 
-    : executions.filter(e => e.status === filter)
+  // フィルタは既にバックエンドで適用済み
+  const filteredExecutions = executions
 
   const filterOptions = [
     { value: 'all', label: t('history.all') },
@@ -129,10 +181,9 @@ export default function History() {
       
       {/* List */}
       {isLoading ? (
-        <div className="flex items-center justify-center h-64">
-          <div className="relative">
-            <div className="w-12 h-12 border-4 border-zinc-200 border-t-primary rounded-full animate-spin" />
-          </div>
+        <div className="space-y-4">
+          {/* スケルトンUI */}
+          <SkeletonGrid columns={1} rows={5} itemComponent={SkeletonHistoryCard} />
         </div>
       ) : filteredExecutions.length === 0 ? (
         <BentoGrid>
@@ -264,6 +315,48 @@ export default function History() {
              ))}
           </div>
         </BentoGrid>
+      )}
+      
+      {/* ページネーション */}
+      {!isLoading && filteredExecutions.length > 0 && (
+        <div className="flex flex-col items-center gap-4 mt-8">
+          {/* 件数表示 */}
+          <div className="text-sm text-muted-foreground">
+            {total > 0 ? (
+              <span>{filteredExecutions.length} / {total} 件を表示中</span>
+            ) : (
+              <span>{filteredExecutions.length} 件を表示中</span>
+            )}
+          </div>
+          
+          {/* もっと読み込むボタン */}
+          {hasMore && (
+            <button
+              onClick={loadMore}
+              disabled={isLoadingMore}
+              className="flex items-center gap-2 px-6 py-3 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-lg font-medium transition-colors disabled:opacity-50"
+            >
+              {isLoadingMore ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  読み込み中...
+                </>
+              ) : (
+                <>
+                  <ChevronRight className="w-4 h-4" />
+                  もっと読み込む
+                </>
+              )}
+            </button>
+          )}
+          
+          {/* 全件読み込み完了 */}
+          {!hasMore && filteredExecutions.length > PAGE_SIZE && (
+            <div className="text-sm text-muted-foreground">
+              すべての履歴を表示しています
+            </div>
+          )}
+        </div>
       )}
     </div>
   )
