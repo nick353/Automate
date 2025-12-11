@@ -282,6 +282,14 @@ export default function Tasks() {
   const TaskCard = ({ task }) => {
     const config = EXECUTION_LOCATION_CONFIG[task.execution_location] || EXECUTION_LOCATION_CONFIG.server
     const LocationIcon = config.icon
+    const executionTypeLabel = (() => {
+      switch (task.execution_type) {
+        case 'api': return 'API専用'
+        case 'hybrid': return 'ハイブリッド'
+        case 'desktop': return 'デスクトップ'
+        default: return 'Web'
+      }
+    })()
     
     return (
       <motion.div
@@ -307,6 +315,10 @@ export default function Tasks() {
               <div className={`flex items-center gap-1 px-2 py-0.5 rounded-sm text-xs ${config.bg} ${config.color}`}>
                 <LocationIcon className="w-3 h-3" />
                 {config.label}
+              </div>
+              <div className="flex items-center gap-1 px-2 py-0.5 rounded-sm text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">
+                <Layers className="w-3 h-3" />
+                {executionTypeLabel}
               </div>
               {task.schedule && (
                 <div className="flex items-center gap-1 px-2 py-0.5 rounded-sm text-xs bg-zinc-100 dark:bg-zinc-800 text-muted-foreground">

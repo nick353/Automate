@@ -226,6 +226,27 @@ export default function TaskForm({ task, onClose }) {
                 </div>
               </div>
             )}
+
+          {/* Execution Type Selection */}
+          <div className="grid gap-2">
+            <label className="block text-sm font-medium text-foreground">
+              実行タイプ（ブラウザ不要なら「api」を選択）
+            </label>
+            <select
+              name="execution_type"
+              value={formData.execution_type}
+              onChange={handleChange}
+              className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+            >
+              <option value="api">api（ブラウザ不要のAPI専用）</option>
+              <option value="web">web（Browser Useでブラウザ操作）</option>
+              <option value="hybrid">hybrid（API前処理後にブラウザ）</option>
+              <option value="desktop">desktop（ローカルAgentでデスクトップ操作）</option>
+            </select>
+            <p className="text-xs text-muted-foreground">
+              Drive監視などブラウザ不要タスクは api を選択してください。ブラウザを使うタスクのみ web/hybrid を選択します。
+            </p>
+          </div>
             
             {/* サーバー実行の説明 */}
             {formData.execution_location === 'server' && (
