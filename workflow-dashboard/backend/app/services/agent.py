@@ -160,7 +160,7 @@ class LiveViewAgent:
             else:
                 from langchain_anthropic import ChatAnthropic
                 llm = ChatAnthropic(
-                    model="claude-sonnet-4-20250514",
+                    model="claude-sonnet-4-5-20250929",
                     api_key=api_key
                 )
             

@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.models import WizardSession
 from app.services.credential_manager import credential_manager
-from app.services.openai_client import call_openai_api, DEFAULT_CHAT_MODEL, get_available_models
+from app.services.anthropic_client import call_anthropic_api, DEFAULT_MODEL as DEFAULT_CHAT_MODEL, get_available_models
 from app.utils.logger import logger
 
 
@@ -30,10 +30,12 @@ class WizardChatService:
                 "content": user_message
             })
             
-            # OpenAI APIキーを取得
-            cred = credential_manager.get_default(db, "api_key", "openai")
+            # Anthropic APIキーを優先、なければOpenAI
+            cred = credential_manager.get_default(db, "api_key", "anthropic")
             if not cred:
-                raise ValueError("OpenAI APIキーが設定されていません")
+                cred = credential_manager.get_default(db, "api_key", "openai")
+            if not cred:
+                raise ValueError("Anthropic または OpenAI APIキーが設定されていません")
             
             api_key = cred["data"].get("api_key")
             
@@ -166,7 +168,7 @@ JSONを出力する際は、以下の形式でメッセージを構成してく�
             
             # 統一されたOpenAI APIクライアントを使用
             use_model = model or DEFAULT_CHAT_MODEL
-            assistant_message = await call_openai_api(
+            assistant_message = await call_anthropic_api(
                 api_key=api_key,
                 messages=messages,
                 model=use_model,
@@ -263,10 +265,12 @@ JSONを出力する際は、以下の形式でメッセージを構成してく�
     ) -> dict:
         """チャット履歴からタスクを生成"""
         try:
-            # OpenAI APIキーを取得
-            cred = credential_manager.get_default(db, "api_key", "openai")
+            # Anthropic APIキーを優先、なければOpenAI
+            cred = credential_manager.get_default(db, "api_key", "anthropic")
             if not cred:
-                raise ValueError("OpenAI APIキーが設定されていません")
+                cred = credential_manager.get_default(db, "api_key", "openai")
+            if not cred:
+                raise ValueError("Anthropic または OpenAI APIキーが設定されていません")
             
             api_key = cred["data"].get("api_key")
             
@@ -308,7 +312,7 @@ JSONを出力する際は、以下の形式でメッセージを構成してく�
             
             # 統一されたOpenAI APIクライアントを使用
             use_model = model or DEFAULT_CHAT_MODEL
-            response_text = await call_openai_api(
+            response_text = await call_anthropic_api(
                 api_key=api_key,
                 messages=[{"role": "user", "content": prompt}],
                 model=use_model,

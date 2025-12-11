@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from app.models import Project, Task, TaskTrigger, RoleGroup, Credential
 from app.services.credential_manager import credential_manager
 from app.services.encryption import encryption_service
-from app.services.openai_client import call_openai_api, DEFAULT_CHAT_MODEL, get_available_models
+from app.services.anthropic_client import call_anthropic_api, DEFAULT_MODEL as DEFAULT_CHAT_MODEL, get_available_models
 from app.utils.logger import logger
 
 UPLOAD_DIR = Path("uploads")
@@ -269,7 +269,7 @@ JSON形式で回答（説明は不要）:
 ```"""
 
             # 統一されたOpenAI APIクライアントを使用
-            response_text = await call_openai_api(
+            response_text = await call_anthropic_api(
                 api_key=api_key,
                 messages=[{"role": "user", "content": review_prompt}],
                 model=DEFAULT_CHAT_MODEL,
@@ -474,10 +474,12 @@ JSON形式で回答（説明は不要）:
                 "content": user_message
             })
             
-            # OpenAI APIキーを取得
-            cred = credential_manager.get_default(db, "api_key", "openai")
+            # Anthropic APIキーを優先、なければOpenAI
+            cred = credential_manager.get_default(db, "api_key", "anthropic")
             if not cred:
-                raise ValueError("OpenAI APIキーが設定されていません")
+                cred = credential_manager.get_default(db, "api_key", "openai")
+            if not cred:
+                raise ValueError("Anthropic または OpenAI APIキーが設定されていません。設定画面からAPIキーを追加してください。")
             
             api_key = cred["data"].get("api_key")
             
@@ -650,7 +652,7 @@ task_promptは具体的なステップを含めてください：
             
             # 統一されたOpenAI APIクライアントを使用
             use_model = model or DEFAULT_CHAT_MODEL
-            assistant_message = await call_openai_api(
+            assistant_message = await call_anthropic_api(
                 api_key=api_key,
                 messages=messages,
                 model=use_model,
@@ -917,10 +919,12 @@ task_promptは具体的なステップを含めてください：
             if not task:
                 raise ValueError("タスクが見つかりません")
             
-            # OpenAI APIキーを取得
-            cred = credential_manager.get_default(db, "api_key", "openai")
+            # Anthropic APIキーを優先、なければOpenAI
+            cred = credential_manager.get_default(db, "api_key", "anthropic")
             if not cred:
-                raise ValueError("OpenAI APIキーが設定されていません")
+                cred = credential_manager.get_default(db, "api_key", "openai")
+            if not cred:
+                raise ValueError("Anthropic または OpenAI APIキーが設定されていません。設定画面からAPIキーを追加してください。")
             
             api_key = cred["data"].get("api_key")
             
@@ -1006,7 +1010,7 @@ auto_fixable が true の場合、ユーザーが承認すれば自動的に修�
 user_info_needed には、ユーザーが設定する必要がある環境変数や認証情報の情報を含めてください。"""
 
             use_model = model or DEFAULT_CHAT_MODEL
-            response_text = await call_openai_api(
+            response_text = await call_anthropic_api(
                 api_key=api_key,
                 messages=[{"role": "user", "content": prompt}],
                 model=use_model,
@@ -1100,7 +1104,7 @@ user_info_needed には、ユーザーが設定する必要がある環境変数
 日本語で、絵文字を使って親しみやすく説明してください。"""
 
             # 統一されたOpenAI APIクライアントを使用
-            explanation = await call_openai_api(
+            explanation = await call_anthropic_api(
                 api_key=api_key,
                 messages=[{"role": "user", "content": prompt}],
                 model=DEFAULT_CHAT_MODEL,
@@ -1177,7 +1181,7 @@ user_info_needed には、ユーザーが設定する必要がある環境変数
                 }
             ]
             
-            response_text = await call_openai_api(
+            response_text = await call_anthropic_api(
                 api_key=api_key,
                 messages=messages,
                 model=DEFAULT_CHAT_MODEL,
@@ -1419,10 +1423,12 @@ JSON形式で回答してください：
             
             chat_history.append({"role": "user", "content": user_message})
             
-            # OpenAI APIキーを取得
-            cred = credential_manager.get_default(db, "api_key", "openai")
+            # Anthropic APIキーを優先、なければOpenAI
+            cred = credential_manager.get_default(db, "api_key", "anthropic")
             if not cred:
-                raise ValueError("OpenAI APIキーが設定されていません")
+                cred = credential_manager.get_default(db, "api_key", "openai")
+            if not cred:
+                raise ValueError("Anthropic または OpenAI APIキーが設定されていません。設定画面からAPIキーを追加してください。")
             
             api_key = cred["data"].get("api_key")
             
@@ -1590,7 +1596,7 @@ task_prompt（AIエージェントへの指示）は以下を含む詳細なも�
             
             # 統一されたOpenAI APIクライアントを使用
             use_model = model or DEFAULT_CHAT_MODEL
-            assistant_message = await call_openai_api(
+            assistant_message = await call_anthropic_api(
                 api_key=api_key,
                 messages=messages,
                 model=use_model,
@@ -1687,10 +1693,12 @@ task_prompt（AIエージェントへの指示）は以下を含む詳細なも�
             
             chat_history.append({"role": "user", "content": user_message})
             
-            # OpenAI APIキーを取得
-            cred = credential_manager.get_default(db, "api_key", "openai")
+            # Anthropic APIキーを優先、なければOpenAI
+            cred = credential_manager.get_default(db, "api_key", "anthropic")
             if not cred:
-                raise ValueError("OpenAI APIキーが設定されていません")
+                cred = credential_manager.get_default(db, "api_key", "openai")
+            if not cred:
+                raise ValueError("Anthropic または OpenAI APIキーが設定されていません。設定画面からAPIキーを追加してください。")
             
             api_key = cred["data"].get("api_key")
             
@@ -1798,7 +1806,7 @@ task_prompt（AIエージェントへの指示）は以下を含む詳細なも�
             
             # 統一されたOpenAI APIクライアントを使用
             use_model = model or DEFAULT_CHAT_MODEL
-            assistant_message = await call_openai_api(
+            assistant_message = await call_anthropic_api(
                 api_key=api_key,
                 messages=messages,
                 model=use_model,
