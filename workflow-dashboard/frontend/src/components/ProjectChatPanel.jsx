@@ -225,10 +225,21 @@ export default function ProjectChatPanel({
       try {
         const response = await systemApi.getAIModels()
         setAvailableModels(response.data.models || [])
-        setDefaultModel(response.data.default || 'gpt-5.1-codex-max')
-        setSelectedModel(response.data.default || 'gpt-5.1-codex-max')
+        setDefaultModel(response.data.default || 'claude-sonnet-4-5-20250929')
+        setSelectedModel(response.data.default || 'claude-sonnet-4-5-20250929')
       } catch (error) {
         console.error('Failed to fetch AI models:', error)
+        // エラー時はデフォルト値を設定
+        setDefaultModel('claude-sonnet-4-5-20250929')
+        setSelectedModel('claude-sonnet-4-5-20250929')
+        setAvailableModels([
+          {
+            id: 'claude-sonnet-4-5-20250929',
+            name: 'Claude Sonnet 4.5',
+            description: 'Anthropic最新モデル（推奨）',
+            api: 'chat'
+          }
+        ])
       }
     }
     fetchModels()
@@ -913,16 +924,17 @@ ${response.data.message}
       
       if (isWizardMode) {
         // ウィザードモード（空プロジェクト用）
-        const response = await projectsApi.wizardChat(
-          project.id, 
-          userMessage, 
-          chatHistory,
-          videoAnalysis,
-          webResearchResults,
-          selectedModel
-        )
+        try {
+          const response = await projectsApi.wizardChat(
+            project.id, 
+            userMessage, 
+            chatHistory,
+            videoAnalysis,
+            webResearchResults,
+            selectedModel
+          )
         
-        // Webリサーチリクエストがあれば実行
+          // Webリサーチリクエストがあれば実行
         if (response.data.web_search_request) {
           setChatHistory(response.data.chat_history || [])
           const { query, reason } = response.data.web_search_request
@@ -1028,9 +1040,19 @@ ${response.data.message}
         }
         
         await handleSavedCredentials(response.data.saved_api_keys)
+        } catch (wizardError) {
+          console.error('Wizard chat error:', wizardError)
+          setChatHistory(prev => [...prev, {
+            role: 'assistant',
+            content: `❌ ウィザードチャットでエラーが発生しました。\n\n${wizardError?.response?.data?.error || wizardError?.message || '不明なエラー'}\n\nAPIキーの設定を確認してください。`
+          }])
+          setIsChatLoading(false)
+          return
+        }
       } else {
         // 通常モード（既存タスクがあるプロジェクト）
-        const response = await projectsApi.chat(project.id, userMessage, chatHistory, selectedModel)
+        try {
+          const response = await projectsApi.chat(project.id, userMessage, chatHistory, selectedModel)
         
         if (response.data.actions?.actions) {
           // JSONアクションがある場合は確認ボタンを表示
@@ -1095,6 +1117,15 @@ ${response.data.message}
               }
             }
           }
+        }
+        } catch (chatError) {
+          console.error('Chat error:', chatError)
+          setChatHistory(prev => [...prev, {
+            role: 'assistant',
+            content: `❌ チャットでエラーが発生しました。\n\n${chatError?.response?.data?.error || chatError?.message || '不明なエラー'}\n\nAPIキーの設定を確認してください。`
+          }])
+          setIsChatLoading(false)
+          return
         }
       }
     } catch (error) {
