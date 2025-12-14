@@ -160,6 +160,9 @@ export const tasksApi = {
   createTrigger: (taskId, data) => api.post(`/tasks/${taskId}/triggers`, data),
   updateTrigger: (triggerId, data) => api.put(`/tasks/triggers/${triggerId}`, data),
   deleteTrigger: (triggerId) => api.delete(`/tasks/triggers/${triggerId}`),
+  // Webhook URL取得
+  getWebhookUrl: (taskId, triggerType = 'generic') => api.get(`/webhook/tasks/${taskId}/webhook-url`, { params: { trigger_type: triggerType } }),
+  testWebhookTrigger: (taskId, triggerId) => api.post(`/webhook/test/${taskId}/${triggerId}`),
   // タスク個別チャット
   taskChat: (taskId, message, chatHistory) => api.post(`/tasks/${taskId}/chat`, { message, chat_history: chatHistory }),
   executeTaskActions: (taskId, actions) => api.post(`/tasks/${taskId}/chat/execute-actions`, { actions })

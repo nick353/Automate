@@ -116,3 +116,4 @@ jobs:
             cat results/result.json >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
           fi
+

@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
-import { X, Eye, EyeOff, Shield, Lock, Monitor, Globe, Layers, Settings, Play } from 'lucide-react'
+import { X, Eye, EyeOff, Shield, Lock, Monitor, Globe, Layers, Settings, Play, Calendar } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import useCredentialStore from '../stores/credentialStore'
 import useTaskStore from '../stores/taskStore'
 import PermissionChecker from './PermissionChecker'
 import TrialRunPreview from './TrialRunPreview'
+import ScheduleHelper from './ScheduleHelper'
 import useLanguageStore from '../stores/languageStore'
 
 export default function TaskForm({ task, onClose }) {
@@ -13,6 +14,7 @@ export default function TaskForm({ task, onClose }) {
   const [isLoading, setIsLoading] = useState(false)
   const [showPermissionChecker, setShowPermissionChecker] = useState(false)
   const [showTrialRun, setShowTrialRun] = useState(false)
+  const [showScheduleHelper, setShowScheduleHelper] = useState(false)
   const { t } = useLanguageStore()
   
   // 実行場所の定義（実行タイプと紐づけ）
@@ -352,14 +354,24 @@ export default function TaskForm({ task, onClose }) {
             <div className="space-y-6">
                <div>
                 <label className="block text-sm font-medium text-foreground mb-2">{t('tasks.schedule')}</label>
-                <input
-                  type="text"
-                  name="schedule"
-                  value={formData.schedule}
-                  onChange={handleChange}
-                  placeholder={t('tasks.schedulePlaceholder')}
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all font-mono"
-                />
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    name="schedule"
+                    value={formData.schedule}
+                    onChange={handleChange}
+                    placeholder={t('tasks.schedulePlaceholder')}
+                    className="flex-1 px-4 py-2.5 bg-background border border-border rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all font-mono"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowScheduleHelper(true)}
+                    className="px-4 py-2.5 bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/30 rounded-xl hover:bg-blue-500/20 transition-colors flex items-center gap-2 font-medium"
+                  >
+                    <Calendar className="w-4 h-4" />
+                    ヘルパー
+                  </button>
+                </div>
               </div>
               
               <div>
@@ -458,6 +470,19 @@ export default function TaskForm({ task, onClose }) {
               // 試運転成功後、そのまま登録することも可能
             }}
             onClose={() => setShowTrialRun(false)}
+          />
+        )}
+      </AnimatePresence>
+      
+      {/* Schedule Helper Modal */}
+      <AnimatePresence>
+        {showScheduleHelper && (
+          <ScheduleHelper
+            value={formData.schedule}
+            onChange={(value) => {
+              setFormData(prev => ({ ...prev, schedule: value }))
+            }}
+            onClose={() => setShowScheduleHelper(false)}
           />
         )}
       </AnimatePresence>

@@ -10,7 +10,7 @@ import os
 
 from app.config import settings
 from app.database import init_db
-from app.routers import tasks, credentials, executions, live_view, websocket, scheduler, wizard, auth, system, trial_run, projects, github_webhook
+from app.routers import tasks, credentials, executions, live_view, websocket, scheduler, wizard, auth, system, trial_run, projects, github_webhook, webhook_triggers
 from app.routers import settings as settings_router
 from app.utils.logger import logger
 
@@ -131,6 +131,7 @@ app.include_router(system.router, prefix=settings.api_prefix)
 app.include_router(projects.router, prefix=settings.api_prefix)
 app.include_router(trial_run.router, prefix=settings.api_prefix)
 app.include_router(github_webhook.router, prefix=settings.api_prefix)
+app.include_router(webhook_triggers.router, prefix=settings.api_prefix)
 app.include_router(websocket.router)  # WebSocketはプレフィックスなし
 app.include_router(websocket.router, prefix=settings.api_prefix, tags=["screencast"])  # API用
 

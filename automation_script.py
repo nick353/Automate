@@ -1,238 +1,186 @@
-#!/usr/bin/env python3
 """
-Browser Automation Script for GitHub Actions
+GitHub Actions用の自動化実行スクリプト
 
-このスクリプトはGitHub Actions上で実行され、
-browser-use + Claude Sonnet 4 を使ってWebブラウザを自動操作します。
-
-環境変数:
-    ANTHROPIC_API_KEY: Anthropic APIキー
-    TASK_PROMPT: 実行するタスクの指示
-    TARGET_URL: 対象URL（オプション）
-    MAX_STEPS: 最大ステップ数（デフォルト: 20）
-    EXECUTION_ID: 実行ID
-    TASK_ID: タスクID
-    SITE_USERNAME: サイトログイン用ユーザー名（オプション）
-    SITE_PASSWORD: サイトログイン用パスワード（オプション）
-
-出力:
-    results/result.json: 実行結果
-    screenshots/: スクリーンショット
+このスクリプトはGitHub Actions内で実行され、Browser Useを使ってタスクを実行します。
+実行結果はZeaburのバックエンドにWebhookで送信されます。
 """
-
-import asyncio
-import json
 import os
 import sys
-import traceback
+import json
+import asyncio
+import httpx
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+
+# 結果ディレクトリを作成
+RESULTS_DIR = Path("results")
+RESULTS_DIR.mkdir(exist_ok=True)
+
+SCREENSHOTS_DIR = Path("screenshots")
+SCREENSHOTS_DIR.mkdir(exist_ok=True)
 
 
-def setup_directories():
-    """結果保存用ディレクトリを作成"""
-    Path("results").mkdir(exist_ok=True)
-    Path("screenshots").mkdir(exist_ok=True)
-
-
-def save_result(success: bool, result: Optional[str] = None, error: Optional[str] = None, 
-                steps_completed: int = 0, screenshots: list = None):
-    """実行結果をJSONファイルに保存"""
-    data = {
-        "success": success,
-        "result": result,
-        "error": error,
-        "steps_completed": steps_completed,
-        "screenshots": screenshots or [],
-        "completed_at": datetime.utcnow().isoformat(),
-        "execution_id": os.environ.get("EXECUTION_ID"),
-        "task_id": os.environ.get("TASK_ID")
-    }
-    
-    with open("results/result.json", "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-    
-    print(f"\n{'='*50}")
-    print("📊 Execution Result:")
-    print(json.dumps(data, ensure_ascii=False, indent=2))
-    print(f"{'='*50}\n")
-
-
-async def run_browser_automation():
-    """メイン自動化処理"""
-    
-    # 環境変数から設定を取得
-    task_prompt = os.environ.get("TASK_PROMPT", "")
-    target_url = os.environ.get("TARGET_URL", "")
+async def run_browser_task():
+    """Browser Useタスクを実行"""
+    # 環境変数から取得
+    task_id = os.environ.get("TASK_ID")
+    execution_id = os.environ.get("EXECUTION_ID")
+    task_prompt = os.environ.get("TASK_PROMPT")
+    target_url = os.environ.get("TARGET_URL")
     max_steps = int(os.environ.get("MAX_STEPS", "20"))
-    execution_id = os.environ.get("EXECUTION_ID", "unknown")
-    task_id = os.environ.get("TASK_ID", "unknown")
+    callback_url = os.environ.get("CALLBACK_URL")
+    anthropic_api_key = os.environ.get("ANTHROPIC_API_KEY")
     
-    # 認証情報（オプション）
-    site_username = os.environ.get("SITE_USERNAME", "")
-    site_password = os.environ.get("SITE_PASSWORD", "")
-    
-    print(f"""
-╔═══════════════════════════════════════════════════════════════╗
-║       Browser Automation - GitHub Actions Worker              ║
-╚═══════════════════════════════════════════════════════════════╝
-
-📋 Task ID: {task_id}
-🔢 Execution ID: {execution_id}
-🌐 Target URL: {target_url or '(none)'}
-📝 Max Steps: {max_steps}
-🔐 Credentials: {'Yes' if site_username else 'No'}
-
-📄 Task Prompt:
-{task_prompt[:500]}{'...' if len(task_prompt) > 500 else ''}
-
-{'='*60}
-""")
+    print("=" * 60)
+    print("GitHub Actions - Browser Automation Task")
+    print("=" * 60)
+    print(f"Task ID: {task_id}")
+    print(f"Execution ID: {execution_id}")
+    print(f"Task Prompt: {task_prompt[:100]}...")
+    print(f"Max Steps: {max_steps}")
+    print("=" * 60)
     
     if not task_prompt:
-        save_result(False, error="タスクプロンプトが指定されていません")
-        return
+        return {
+            "success": False,
+            "error": "TASK_PROMPT environment variable is not set"
+        }
     
-    # Anthropic APIキーの確認
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
-    if not api_key:
-        save_result(False, error="ANTHROPIC_API_KEY が設定されていません")
-        return
+    if not anthropic_api_key:
+        return {
+            "success": False,
+            "error": "ANTHROPIC_API_KEY environment variable is not set"
+        }
     
     try:
-        # browser-use と langchain-anthropic をインポート
-        from browser_use import Agent, BrowserConfig
+        # Browser Useをインポート
+        from browser_use import Agent, BrowserProfile
         from langchain_anthropic import ChatAnthropic
+        from playwright.async_api import async_playwright
         
-        print("✅ browser-use ライブラリをインポートしました")
+        print("\n✅ Browser Use and dependencies imported successfully")
         
+        # LLMを初期化
+        llm = ChatAnthropic(
+            model="claude-sonnet-4-5-20250929",
+            api_key=anthropic_api_key,
+            timeout=60
+        )
+        print("✅ LLM initialized (Claude Sonnet 4.5)")
+        
+        # Browser Profileを作成（ヘッドレス）
+        browser_profile = BrowserProfile(
+            headless=True,
+            disable_security=False
+        )
+        print("✅ Browser profile created (headless mode)")
+        
+        # Agentを作成
+        agent = Agent(
+            task=task_prompt,
+            llm=llm,
+            browser_profile=browser_profile
+        )
+        print("✅ Agent created")
+        
+        print(f"\n🚀 Starting task execution (max {max_steps} steps)...")
+        print("-" * 60)
+        
+        # タスクを実行
+        result = await agent.run()
+        
+        print("-" * 60)
+        print("✅ Task completed successfully!")
+        print(f"Result: {result}")
+        
+        return {
+            "success": True,
+            "result": str(result),
+            "steps_executed": "N/A",  # Browser Useは内部でステップを管理
+            "completed_at": datetime.now().isoformat()
+        }
+    
     except ImportError as e:
-        save_result(False, error=f"必要なライブラリがインストールされていません: {e}")
+        error_msg = f"Failed to import required modules: {str(e)}"
+        print(f"❌ {error_msg}")
+        return {
+            "success": False,
+            "error": error_msg
+        }
+    
+    except Exception as e:
+        error_msg = f"Task execution failed: {str(e)}"
+        print(f"❌ {error_msg}")
+        import traceback
+        traceback.print_exc()
+        return {
+            "success": False,
+            "error": error_msg,
+            "traceback": traceback.format_exc()
+        }
+
+
+async def send_callback(callback_url, result):
+    """結果をZeaburのバックエンドに送信"""
+    if not callback_url:
+        print("⚠️  Callback URL not set, skipping notification")
         return
     
-    # タスクプロンプトを構築
-    full_prompt = task_prompt
-    
-    # URLが指定されている場合は追加
-    if target_url:
-        full_prompt = f"対象URL: {target_url}\n\n{full_prompt}"
-    
-    # 認証情報が指定されている場合は追加
-    if site_username and site_password:
-        full_prompt += f"\n\nログイン情報:\nユーザー名: {site_username}\nパスワード: {site_password}"
-    
-    step_count = 0
-    screenshots = []
-    
     try:
-        # LLMを設定（Claude Sonnet 4）
-        llm = ChatAnthropic(
-            model="claude-sonnet-4-20250514",
-            api_key=api_key,
-            timeout=120,
-            max_retries=2
-        )
+        print(f"\n📤 Sending result to callback URL: {callback_url}")
         
-        print("✅ Claude Sonnet 4 を初期化しました")
-        
-        # ブラウザ設定（ヘッドレスモード必須）
-        browser_config = BrowserConfig(
-            headless=True,  # GitHub Actionsでは必須
-            disable_security=True,  # セキュリティポップアップ回避
-            extra_chromium_args=[
-                "--no-sandbox",
-                "--disable-setuid-sandbox",
-                "--disable-dev-shm-usage",
-                "--disable-gpu",
-                "--disable-software-rasterizer",
-                "--disable-extensions",
-                "--disable-background-networking",
-                "--disable-background-timer-throttling",
-                "--disable-backgrounding-occluded-windows",
-                "--disable-breakpad",
-                "--disable-component-update",
-                "--disable-domain-reliability",
-                "--disable-features=AudioServiceOutOfProcess",
-                "--disable-hang-monitor",
-                "--disable-ipc-flooding-protection",
-                "--disable-popup-blocking",
-                "--disable-prompt-on-repost",
-                "--disable-renderer-backgrounding",
-                "--disable-sync",
-                "--force-color-profile=srgb",
-                "--metrics-recording-only",
-                "--no-first-run",
-                "--enable-features=NetworkService,NetworkServiceInProcess",
-                "--password-store=basic",
-                "--use-mock-keychain",
-            ]
-        )
-        
-        print("✅ ブラウザ設定を構成しました（ヘッドレスモード）")
-        
-        # エージェントを作成
-        agent = Agent(
-            task=full_prompt,
-            llm=llm,
-            browser_config=browser_config,
-            max_actions_per_step=5
-        )
-        
-        print("✅ Agentを作成しました")
-        print(f"🚀 タスク実行開始...\n")
-        
-        # 実行
-        result = await agent.run(max_steps=max_steps)
-        
-        print(f"\n✅ タスク実行完了")
-        
-        # 結果を保存
-        save_result(
-            success=True,
-            result=str(result) if result else "タスクが完了しました",
-            steps_completed=step_count,
-            screenshots=screenshots
-        )
-        
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                callback_url,
+                json=result,
+                headers={
+                    "Content-Type": "application/json",
+                    "X-GitHub-Actions": "true"
+                }
+            )
+            
+            if response.status_code in [200, 201]:
+                print("✅ Callback sent successfully")
+            else:
+                print(f"⚠️  Callback failed: {response.status_code} {response.text}")
+    
     except Exception as e:
-        error_message = str(e)
-        traceback_str = traceback.format_exc()
-        
-        print(f"\n❌ エラー発生: {error_message}")
-        print(f"Traceback:\n{traceback_str}")
-        
-        # エラー詳細を保存
-        save_result(
-            success=False,
-            error=error_message,
-            steps_completed=step_count,
-            screenshots=screenshots
-        )
+        print(f"❌ Failed to send callback: {e}")
 
 
-def main():
-    """エントリーポイント"""
-    print(f"🕐 開始時刻: {datetime.utcnow().isoformat()}")
+async def main():
+    """メインエントリーポイント"""
+    start_time = datetime.now()
     
-    # ディレクトリ作成
-    setup_directories()
+    # タスクを実行
+    result = await run_browser_task()
     
-    # Python バージョン確認
-    print(f"🐍 Python: {sys.version}")
+    # 結果をファイルに保存
+    result_file = RESULTS_DIR / "result.json"
+    with open(result_file, "w") as f:
+        json.dump(result, f, indent=2)
+    print(f"\n💾 Result saved to {result_file}")
     
-    # 非同期処理を実行
-    try:
-        asyncio.run(run_browser_automation())
-    except KeyboardInterrupt:
-        print("\n⚠️ 実行が中断されました")
-        save_result(False, error="実行が中断されました")
-    except Exception as e:
-        print(f"\n❌ 予期しないエラー: {e}")
-        save_result(False, error=str(e))
+    # コールバックを送信
+    callback_url = os.environ.get("CALLBACK_URL")
+    if callback_url:
+        # 実行IDとタスクIDを追加
+        result["execution_id"] = int(os.environ.get("EXECUTION_ID", "0"))
+        result["task_id"] = int(os.environ.get("TASK_ID", "0"))
+        await send_callback(callback_url, result)
     
-    print(f"🕐 終了時刻: {datetime.utcnow().isoformat()}")
+    # 実行時間を表示
+    duration = datetime.now() - start_time
+    print(f"\n⏱️  Total execution time: {duration}")
+    
+    # 成功/失敗で終了コードを設定
+    if result.get("success"):
+        print("\n✅ Automation task completed successfully!")
+        sys.exit(0)
+    else:
+        print("\n❌ Automation task failed!")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

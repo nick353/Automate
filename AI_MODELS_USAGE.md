@@ -91,3 +91,4 @@ from app.services.openai_client import call_openai_api
 
 Browser Useは画面を「見て」操作するため、ビジョンモデル（GPT-4o等）が必須です。
 Claude 3.5 Sonnetもビジョン対応していますが、GPT-4oが推奨されています。
+

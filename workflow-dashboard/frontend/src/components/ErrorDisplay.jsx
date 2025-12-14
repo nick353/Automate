@@ -209,3 +209,4 @@ function getIconForCode(code) {
   }
   return iconMapping[code] || 'alert-triangle'
 }
+

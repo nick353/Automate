@@ -20,7 +20,8 @@ import {
   MessageSquare,
   Clock,
   GitBranch,
-  GripVertical
+  GripVertical,
+  Webhook
 } from 'lucide-react'
 
 import { motion, AnimatePresence } from 'framer-motion'
@@ -30,6 +31,7 @@ import StatusBadge from '../components/StatusBadge'
 import { BentoGrid, BentoItem } from '../components/Bento/BentoGrid'
 import useLanguageStore from '../stores/languageStore'
 import ProjectChatPanel from '../components/ProjectChatPanel'
+import WebhookTriggerManager from '../components/WebhookTriggerManager'
 import { projectsApi, tasksApi } from '../services/api'
 
 export default function Tasks() {
@@ -49,6 +51,7 @@ export default function Tasks() {
   
   // チャット関連のState
   const [showChat, setShowChat] = useState(null) // project_id
+  const [showWebhookManager, setShowWebhookManager] = useState(null) // { taskId, taskName }
   
   // 実行場所のアイコンと色
   const EXECUTION_LOCATION_CONFIG = {
@@ -330,6 +333,13 @@ export default function Tasks() {
           </div>
           <div className="flex items-center gap-1">
             <button
+              onClick={(e) => { e.stopPropagation(); setShowWebhookManager({ taskId: task.id, taskName: task.name }) }}
+              className="p-2 rounded-sm bg-purple-500/10 text-purple-600 hover:bg-purple-500/20 transition-colors"
+              title="Webhookトリガー"
+            >
+              <Webhook className="w-4 h-4" />
+            </button>
+            <button
               onClick={(e) => handleRun(e, task)}
               disabled={runningTaskId === task.id}
               className="p-2 rounded-sm bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 transition-colors"
@@ -601,6 +611,13 @@ export default function Tasks() {
             />
           )
         })()}
+        {showWebhookManager && (
+          <WebhookTriggerManager
+            taskId={showWebhookManager.taskId}
+            taskName={showWebhookManager.taskName}
+            onClose={() => setShowWebhookManager(null)}
+          />
+        )}
       </AnimatePresence>
     </div>
   )

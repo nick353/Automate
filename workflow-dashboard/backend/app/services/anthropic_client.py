@@ -158,3 +158,4 @@ def get_default_model() -> str:
 def get_model_display_name() -> str:
     """モデル表示名を返す"""
     return MODEL_DISPLAY_NAME
+

@@ -215,3 +215,4 @@ def parse_error_message(error: Exception) -> Dict[str, Any]:
         "code": "UNKNOWN_ERROR",
         "suggestion": "エラーの詳細をログで確認するか、サポートにお問い合わせください。"
     }
+

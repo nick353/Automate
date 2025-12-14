@@ -178,3 +178,4 @@ async def get_recent_runs(limit: int = 10):
     
     result = await github_actions_service.list_recent_runs(limit=limit)
     return result
+
