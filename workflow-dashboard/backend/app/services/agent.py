@@ -75,3 +75,43 @@ class LiveViewAgent:
             ),
             "disabled_server_execution": True
         }
+
+
+# --- スケジューラー用: 最低限のスタブを提供 ---
+async def run_task_with_live_view(task_id: int, execution_id: int):
+    """
+    サーバー側実行を無効化したため、GitHub Actions経由で実行するように促すスタブ。
+    スケジューラーからのImportErrorを防ぎ、実行を失敗ステータスで完了させる。
+    """
+    db = SessionLocal()
+    try:
+        task = db.query(Task).filter(Task.id == task_id).first()
+        execution = db.query(Execution).filter(Execution.id == execution_id).first()
+
+        if not task or not execution:
+            logger.warning(f"タスクまたは実行が見つかりません: task_id={task_id}, execution_id={execution_id}")
+            return
+
+        msg = (
+            "サーバー側のブラウザ実行は無効化されています。\\n"
+            "GitHub Actionsで実行してください。\\n"
+            "手順: GITHUB_ACTIONS_SETUP.md を参照。"
+        )
+
+        execution.status = "failed"
+        execution.error_message = msg
+        execution.completed_at = datetime.utcnow()
+        db.commit()
+
+        await live_view_manager.send_log(execution.id, "WARNING", msg)
+        await live_view_manager.send_execution_complete(
+            execution.id,
+            status="failed",
+            error=msg
+        )
+        logger.warning(f"サーバー実行は無効化されています: task_id={task_id}, execution_id={execution_id}")
+
+    except Exception as e:
+        logger.error(f"run_task_with_live_view スタブでエラー: {e}")
+    finally:
+        db.close()
