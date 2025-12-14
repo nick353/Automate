@@ -1138,17 +1138,6 @@ ${response.data.message}
         content: errorLines.filter(Boolean).join('\n')
       }])
     } finally {
-        status ? `ステータス: ${status}` : null,
-        detail ? `詳細: ${detail}` : null,
-        serializedData ? `レスポンス: ${serializedData}` : null,
-        `メッセージ: ${error.message}`
-      ].filter(Boolean)
-      
-      setChatHistory(prev => [...prev, {
-        role: 'assistant',
-        content: errorLines.join('\n')
-      }])
-    }
     
     setIsChatLoading(false)
   }
