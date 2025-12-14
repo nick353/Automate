@@ -40,73 +40,44 @@ class LiveViewAgent:
         self.state: Optional[ExecutionState] = None
     
     async def run(self) -> dict:
-        """タスクを実行"""
-        try:
-            # 実行状態を登録
-            self.state = browser_controller.register_execution(self.execution.id)
-            
-            # 制御状態の変更時にWebSocket配信
-            browser_controller.add_callback(
-                self.execution.id,
-                lambda event: asyncio.create_task(
-                    live_view_manager.send_control_update(self.execution.id, event)
-                )
-            )
-            
-            # LLM APIキーを取得（OpenAI優先、なければAnthropic）
-            llm_credential = credential_manager.get_default(self.db, "api_key", "openai")
-            use_openai = True
-            if not llm_credential:
-                llm_credential = credential_manager.get_default(self.db, "api_key", "anthropic")
-                use_openai = False
-            if not llm_credential:
-                raise ValueError(
-                    "AIエージェントを実行するにはAPIキーが必要です。\n\n"
-                    "以下のいずれかを「認証情報」画面から登録してください：\n"
-                    "- OpenAI APIキー（推奨: GPT-4o使用）\n"
-                    "- Anthropic APIキー（Claude使用）\n\n"
-                    "APIキーの取得方法：\n"
-                    "OpenAI: https://platform.openai.com/api-keys\n"
-                    "Anthropic: https://console.anthropic.com/settings/keys"
-                )
-            
-            # task_promptの確認
-            if not self.task.task_prompt or len(self.task.task_prompt.strip()) < 10:
-                raise ValueError(
-                    "タスクの指示内容（task_prompt）が設定されていません。\n"
-                    "AIアシスタントでタスクを編集し、具体的な手順を記載してください。"
-                )
-            
-            api_key = llm_credential["data"]["api_key"]
-            
-            # 実行開始を通知
-            await live_view_manager.send_log(
-                self.execution.id,
-                "INFO",
-                f"タスク開始: {self.task.name}"
-            )
-            
-            # Browser Useをインポート（遅延インポート）
-            try:
-                from browser_use import Agent, BrowserConfig
-                browser_config_cls = BrowserConfig
-            except ImportError:
-                # BrowserConfigがないバージョンへの後方互換
-                try:
-                    from browser_use import Agent, BrowserProfile  # type: ignore
-                    browser_config_cls = BrowserProfile
-                    logger.warning("BrowserProfile を使用します（旧バージョン）。")
-                except ImportError as e:
-                    logger.error(f"Browser Use のインポートに失敗: {e}")
-                    raise ValueError("Browser Use がインストールされていません。pip install browser-use を実行してください。")
-            
-            # 環境変数にAPIキーを設定
-            if use_openai:
-                os.environ["OPENAI_API_KEY"] = api_key
-            else:
-                os.environ["ANTHROPIC_API_KEY"] = api_key
-            
-            # Browser Use APIキー（環境変数から取得、なければ認証情報から）
+        """タスクを実行（サーバー実行は無効化）"""
+        # サーバー側のブラウザ実行を無効化
+        logger.warning(f"サーバー側のブラウザ実行は無効化されています: task_id={self.task.id}")
+        
+        await live_view_manager.send_log(
+            self.execution.id,
+            "WARNING",
+            "⚠️ サーバー側のブラウザ実行は無効化されています"
+        )
+        
+        await live_view_manager.send_log(
+            self.execution.id,
+            "INFO",
+            "GitHub Actionsで実行してください（GITHUB_ACTIONS_SETUP.md参照）"
+        )
+        
+        await live_view_manager.send_execution_complete(
+            self.execution.id,
+            status="failed",
+            error="サーバー実行は無効化されています。GitHub Actionsを使用してください。"
+        )
+        
+        return {
+            "success": False,
+            "error": (
+                "🚫 サーバー側のブラウザ実行は無効化されています\n\n"
+                "🚀 **GitHub Actionsで実行してください**\n\n"
+                "理由：\n"
+                "- GitHub Actionsの方が安定して動作します\n"
+                "- リソース制限がありません\n"
+                "- クリーンな環境で毎回実行されます\n\n"
+                "設定方法は GITHUB_ACTIONS_SETUP.md を参照してください。"
+            ),
+            "disabled_server_execution": True
+        }
+    
+    async def _create_step(
+        self,
             browser_use_key = os.environ.get("BROWSER_USE_API_KEY")
             if not browser_use_key:
                 browser_use_cred = credential_manager.get_default(self.db, "api_key", "browser_use")
