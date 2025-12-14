@@ -88,14 +88,14 @@ class LiveViewAgent:
             
             # Browser Useをインポート（遅延インポート）
             try:
-                from browser_use import Agent, BrowserProfile
-                browser_profile_cls = BrowserProfile
+                from browser_use import Agent, BrowserConfig
+                browser_config_cls = BrowserConfig
             except ImportError:
-                # BrowserProfileがないバージョンへの後方互換
+                # BrowserConfigがないバージョンへの後方互換
                 try:
-                    from browser_use import Agent  # type: ignore
-                    browser_profile_cls = None
-                    logger.warning("BrowserProfile が見つかりません。デフォルト設定で起動します。")
+                    from browser_use import Agent, BrowserProfile  # type: ignore
+                    browser_config_cls = BrowserProfile
+                    logger.warning("BrowserProfile を使用します（旧バージョン）。")
                 except ImportError as e:
                     logger.error(f"Browser Use のインポートに失敗: {e}")
                     raise ValueError("Browser Use がインストールされていません。pip install browser-use を実行してください。")
@@ -122,17 +122,18 @@ class LiveViewAgent:
                 "ブラウザを起動中..."
             )
             
-            # ブラウザプロファイルを作成（利用可能な場合のみ）
-            browser_profile = None
-            if browser_profile_cls:
-                browser_profile = browser_profile_cls(
+            # ブラウザ設定を作成（利用可能な場合のみ）
+            browser_config = None
+            if browser_config_cls:
+                browser_config = browser_config_cls(
                     headless=True,
                     disable_security=True,
                     extra_chromium_args=[
                         "--no-sandbox",
                         "--disable-setuid-sandbox",
                         "--disable-dev-shm-usage",
-                        "--disable-gpu"
+                        "--disable-gpu",
+                        "--disable-software-rasterizer"
                     ]
                 )
             
@@ -165,11 +166,11 @@ class LiveViewAgent:
                 )
             
             # エージェントを作成
-            if browser_profile:
+            if browser_config:
                 agent = Agent(
                     task=task_prompt,
                     llm=llm,
-                    browser_profile=browser_profile
+                    browser=browser_config
                 )
             else:
                 agent = Agent(

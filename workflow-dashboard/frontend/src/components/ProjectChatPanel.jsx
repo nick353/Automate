@@ -886,14 +886,25 @@ ${response.data.message}
       
       if (isWizardMode) {
         // ウィザードモード（空プロジェクト用）
-        const response = await projectsApi.wizardChat(
-          project.id, 
-          userMessage, 
-          chatHistory,
-          videoAnalysis,
-          webResearchResults,
-          selectedModel
-        )
+        let response
+        try {
+          response = await projectsApi.wizardChat(
+            project.id, 
+            userMessage, 
+            chatHistory,
+            videoAnalysis,
+            webResearchResults,
+            selectedModel
+          )
+        } catch (error) {
+          const apiMsg = error?.response?.data?.error?.message || error?.message || '不明なエラー'
+          setChatHistory(prev => [...prev, {
+            role: 'assistant',
+            content: `❌ ウィザードチャットに失敗しました。\n${apiMsg}\n\nAnthropic残高不足やAPIキー設定を確認してください。OpenAIキーを設定すると自動でそちらに切り替えます。`
+          }])
+          setIsChatLoading(false)
+          return
+        }
         
         // Webリサーチリクエストがあれば実行
         if (response.data.web_search_request) {
@@ -908,14 +919,25 @@ ${response.data.message}
           setWebResearchResults(searchResponse.data.results)
           
           // リサーチ結果を含めて再度チャット
-          const followUp = await projectsApi.wizardChat(
-            project.id,
-            `リサーチ結果を確認しました。続けてください。`,
-            response.data.chat_history,
-            videoAnalysis,
-            searchResponse.data.results,
-            selectedModel
-          )
+          let followUp
+          try {
+            followUp = await projectsApi.wizardChat(
+              project.id,
+              `リサーチ結果を確認しました。続けてください。`,
+              response.data.chat_history,
+              videoAnalysis,
+              searchResponse.data.results,
+              selectedModel
+            )
+          } catch (error) {
+            const apiMsg = error?.response?.data?.error?.message || error?.message || '不明なエラー'
+            setChatHistory(prev => [...prev, {
+              role: 'assistant',
+              content: `❌ ウィザードチャット（リサーチ後）に失敗しました。\n${apiMsg}\n\nAnthropic残高不足やAPIキー設定を確認してください。OpenAIキーを設定すると自動でそちらに切り替えます。`
+            }])
+            setIsChatLoading(false)
+            return
+          }
           if (followUp.data.actions?.actions) {
             // JSONアクションがある場合は確認ボタンを表示
             const actions = followUp.data.actions.actions
@@ -1003,7 +1025,18 @@ ${response.data.message}
         await handleSavedCredentials(response.data.saved_api_keys)
       } else {
         // 通常モード（既存タスクがあるプロジェクト）
-        const response = await projectsApi.chat(project.id, userMessage, chatHistory, selectedModel)
+        let response
+        try {
+          response = await projectsApi.chat(project.id, userMessage, chatHistory, selectedModel)
+        } catch (error) {
+          const apiMsg = error?.response?.data?.error || error?.response?.data?.detail || error?.message || '不明なエラー'
+          setChatHistory(prev => [...prev, {
+            role: 'assistant',
+            content: `❌ チャットAPIエラーが発生しました。\n\n${apiMsg}\n\n考えられる原因:\n- Anthropic APIキーの残高不足\n- APIキーが無効\n- ネットワークエラー\n\n設定画面でAPIキーを確認してください。`
+          }])
+          setIsChatLoading(false)
+          return
+        }
         
         if (response.data.actions?.actions) {
           // JSONアクションがある場合は確認ボタンを表示
@@ -1083,7 +1116,28 @@ ${response.data.message}
         !detail && data && typeof data === 'object' ? JSON.stringify(data, null, 2) : null
       
       const errorLines = [
-        'エラーが発生しました',
+        '❌ エラーが発生しました',
+        '',
+        detail ? `詳細: ${detail}` : '',
+        serializedData ? `レスポンス:\n\`\`\`json\n${serializedData}\n\`\`\`` : '',
+        status ? `HTTPステータス: ${status}` : '',
+        '',
+        '考えられる原因:',
+        '- Anthropic APIキーの残高不足または無効なキー',
+        '- ネットワークエラー',
+        '- サーバーの一時的な問題',
+        '',
+        '対処法:',
+        '1. 設定画面でAPIキーを確認',
+        '2. Anthropicのダッシュボードで残高を確認',
+        '3. ページをリロードして再試行'
+      ]
+      
+      setChatHistory(prev => [...prev, {
+        role: 'assistant',
+        content: errorLines.filter(Boolean).join('\n')
+      }])
+    } finally {
         status ? `ステータス: ${status}` : null,
         detail ? `詳細: ${detail}` : null,
         serializedData ? `レスポンス: ${serializedData}` : null,
